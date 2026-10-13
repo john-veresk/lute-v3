@@ -15,6 +15,9 @@ docker-compose.yml
 # user data
 data/
 
+# Generated output
+/output/
+
 ##########################
 # Standard python ignores.
 
