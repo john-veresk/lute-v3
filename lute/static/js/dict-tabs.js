@@ -285,7 +285,7 @@ class CodexButton extends LookupButton {
     this.lookupLanguage = Number(LookupButton.LANG_ID);
     if (!this.lookupText.trim()) return;
     this.lookupId = newCodexLookupId();
-    this.payload = {language_id: this.lookupLanguage, text: this.lookupText, context: window.LUTE_LOOKUP_CONTEXT || '', kind: 'term'};
+    this.payload = {language_id: this.lookupLanguage, text: this.lookupText, context: window.LUTE_LOOKUP_CONTEXT || '', kind: 'term', autostart: container.dataset.termSaved !== 'true'};
     const params = new URLSearchParams({
       language_id: this.lookupLanguage,
       request_id: this.lookupId,
@@ -316,7 +316,10 @@ function applyCodexParent(container, parent) {
   const translationField = container.querySelector('#suggested_parent_translation');
   textField.value = parent.text;
   translationField.value = parent.translation;
+  const selectedField = container.querySelector('#suggested_parent_translation_selected');
+  if (selectedField) selectedField.value = parent.translationSelected === true ? 'y' : '';
   translationField.dispatchEvent(new Event('change', {bubbles: true}));
+  if (parent.translationSelected) return 'Selected dictionary translation will be saved with the term.';
   return parent.existingTranslation ? 'Existing dictionary translation kept.' : 'Parent and dictionary translation will be saved with the term.';
 }
 
@@ -451,8 +454,8 @@ function loadDictionaries() {
   dictContainer.style.display = "flex";
   dictContainer.style.flexDirection = "column";
   LookupButton.all.forEach(button => button.contentLoaded = false);
-  // Every new term starts its automatic translation, even if the reader
-  // previously opened the Sentences or Images tab.
+  // Open Codex for each term, even after visiting Sentences or Images.
+  // The panel waits for a separate button click for saved vocabulary cards.
   const active_button = LookupButton.all.find(button => button instanceof CodexButton) ||
     LookupButton.all.find(button => button.is_active);
   if (active_button) {

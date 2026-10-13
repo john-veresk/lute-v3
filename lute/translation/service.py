@@ -23,6 +23,18 @@ SCHEMA = {
         "lemma": {"type": "string"},
         "is_inflected": {"type": "boolean"},
         "lemma_translation": {"type": "string"},
+        "lemma_options": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "translation": {"type": "string"},
+                    "explanation": {"type": "string"},
+                },
+                "required": ["translation", "explanation"],
+                "additionalProperties": False,
+            },
+        },
         "words": {
             "type": "array",
             "items": {
@@ -57,32 +69,82 @@ SCHEMA = {
             },
         },
     },
-    "required": ["lemma", "is_inflected", "lemma_translation", "options", "words"],
+    "required": [
+        "lemma",
+        "is_inflected",
+        "lemma_translation",
+        "lemma_options",
+        "options",
+        "words",
+    ],
     "additionalProperties": False,
 }
 
 
-def available_models():
-    """Suggest model IDs from the CLI's local cache; custom IDs also work."""
+REASONING_EFFORTS = (
+    "none",
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "xhigh",
+    "max",
+    "ultra",
+)
+
+
+def _cached_models():
+    """Read public model metadata without requiring the CLI or a network call."""
     home = Path(os.environ.get("CODEX_HOME", str(Path.home() / ".codex")))
     try:
         data = json.loads((home / "models_cache.json").read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return []
-        return sorted(
-            {
-                m["slug"]
-                for m in data.get("models", [])
-                if isinstance(m, dict)
-                and m.get("slug")
-                and m.get("visibility", "list") == "list"
-            }
-        )
+        return [
+            m
+            for m in data.get("models", [])
+            if isinstance(m, dict)
+            and isinstance(m.get("slug"), str)
+            and m["slug"]
+            and m.get("visibility", "list") == "list"
+        ]
     except (OSError, ValueError, TypeError, KeyError):
         return []
 
 
-def translate(source, target, model, text, context, kind="term", word_texts=()):
+def available_models():
+    """Suggest model IDs from the CLI's local cache; custom IDs also work."""
+    return sorted({m["slug"] for m in _cached_models()})
+
+
+def available_model_efforts():
+    """Known models expose their supported reasoning levels in the CLI cache."""
+    efforts = {}
+    for model in _cached_models():
+        levels = model.get("supported_reasoning_levels", [])
+        if not isinstance(levels, list):
+            continue
+        supported = [
+            level["effort"]
+            for level in levels
+            if isinstance(level, dict) and level.get("effort") in REASONING_EFFORTS
+        ]
+        if supported:
+            efforts[model["slug"]] = supported
+    return efforts
+
+
+def translate(
+    source,
+    target,
+    model,
+    text,
+    context,
+    kind="term",
+    word_texts=(),
+    reasoning_effort="",
+    fast_mode=False,
+):
     """Run without a shell, in an empty read-only workspace, with JSON output."""
     executable = shutil.which(os.environ.get("LUTE_CODEX_CLI", "codex"))
     if not executable:
@@ -114,6 +176,10 @@ def translate(source, target, model, text, context, kind="term", word_texts=()):
         "of the lemma in target_language, in the base form (e.g. halusi: хотела, haluta: хотеть; "
         "kotiin: домой, koti: дом; children: дети, child: ребёнок). Use the best sense indicated by context, "
         "without inflecting the lemma translation to match the selected text. Limit it to 120 characters. "
+        "For an inflected term, also provide 1 to 4 distinct dictionary meanings in lemma_options, "
+        "each with translation and a brief explanation in target_language. Use the lemma's base form, "
+        "put the context's best meaning first, and set lemma_translation to its translation. "
+        "Otherwise lemma_options must be an empty array. Word cards do not have lemma_options. "
         "For a sentence, provide one natural translation, empty lemma and lemma_translation, and is_inflected=false. "
         "For a phrase, translate the complete phrase naturally in options, with empty lemma, lemma_translation "
         "and is_inflected=false. If words_to_translate is nonempty, also return a word card for EACH entry, "
@@ -148,6 +214,11 @@ def translate(source, target, model, text, context, kind="term", word_texts=()):
         ]
         if model:
             command.extend(["--model", model])
+        if reasoning_effort:
+            command.extend(["-c", f'model_reasoning_effort="{reasoning_effort}"'])
+        command.extend(
+            ["-c", 'service_tier="priority"' if fast_mode else 'service_tier="default"']
+        )
         command.append("-")
         try:
             result = subprocess.run(
@@ -175,6 +246,7 @@ def translate(source, target, model, text, context, kind="term", word_texts=()):
         try:
             data = json.loads(output.read_text(encoding="utf-8"))
             options = data["options"]
+            lemma_options = data["lemma_options"]
             if (
                 not isinstance(data["lemma"], str)
                 or not isinstance(data["is_inflected"], bool)
@@ -183,19 +255,25 @@ def translate(source, target, model, text, context, kind="term", word_texts=()):
                 or len(data["lemma"]) > 500
                 or not isinstance(options, list)
                 or not 1 <= len(options) <= 4
+                or not isinstance(lemma_options, list)
+                or len(lemma_options) > 4
+                or (data["is_inflected"] and not lemma_options)
             ):
                 raise ValueError("Invalid translation")
             if data["is_inflected"] and (
                 not data["lemma"].strip() or not data["lemma_translation"].strip()
             ):
                 raise ValueError("Missing parent translation")
-            for option in options:
+            for option in options + lemma_options:
                 if (
-                    not isinstance(option["translation"], str)
+                    not isinstance(option, dict)
+                    or not isinstance(option["translation"], str)
                     or not option["translation"].strip()
                     or not isinstance(option["explanation"], str)
                 ):
                     raise ValueError("Invalid option")
+            if any(len(option["translation"]) > 500 for option in lemma_options):
+                raise ValueError("Invalid parent option")
             words = data["words"]
             if not isinstance(words, list) or len(words) > 40:
                 raise ValueError("Invalid word cards")

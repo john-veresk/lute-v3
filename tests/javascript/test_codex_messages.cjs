@@ -10,16 +10,19 @@ const parentTags = {value: [], addTags(tags) {this.value.push(...tags);}};
 const parents = {_tagify: parentTags};
 const suggestedParent = {value: ''};
 const suggestedTranslation = {value: '', dispatchEvent() {}};
+const parentTranslationSelected = {value: ''};
 const source = {postMessage() {}};
 const container = {dataset: {}, querySelector(selector) {
   return {'#translation': translation, '#text': text, '#language_id': language,
     '#parentslist': parents, '#suggested_parent_text': suggestedParent,
-    '#suggested_parent_translation': suggestedTranslation}[selector];
+    '#suggested_parent_translation': suggestedTranslation,
+    '#suggested_parent_translation_selected': parentTranslationSelected}[selector];
 }};
 const context = vm.createContext({
   window: {location: {origin: 'http://localhost:5001'}, addEventListener(type, fn) {handlers.push(fn);}},
-  document: {getElementById() {return null;}},
+  document: {getElementById() {return null;}, querySelector() {return {style: {}};}},
   Event: class Event {},
+  URLSearchParams,
   container, source,
 });
 vm.runInContext(fs.readFileSync('lute/static/js/dict-tabs.js', 'utf8'), context);
@@ -67,6 +70,11 @@ assert.equal(suggestedTranslation.value, 'кошка', 'stages the separate dict
 send({text: 'cats', parent: {...parent, translation: 'кот'}});
 assert.equal(parentTags.value.length, 1, 'does not duplicate the parent');
 assert.equal(suggestedTranslation.value, 'кот', 'stages edits to the suggested dictionary meaning');
+send({text: 'cats', parent: {...parent, translation: 'кот', existingTranslation: true, translationSelected: true}});
+assert.equal(parentTranslationSelected.value, 'y', 'stages an explicit replacement of a saved parent translation');
+assert.equal(translation.value, 'my saved translation', 'choosing a parent meaning preserves the child translation');
+send({text: 'cats', parent: {...parent, existingTranslation: true}});
+assert.equal(parentTranslationSelected.value, '', 'automatic suggestions do not authorize overwriting a saved parent');
 parentTags.value = [];
 container.dataset.codexParentsEdited = 'true';
 send({text: 'cats', parent});
@@ -75,4 +83,24 @@ container.dataset.codexParentsEdited = '';
 parentTags.value = [{value: 'feline'}];
 send({text: 'cats', parent});
 assert.equal(parentTags.value[0].value, 'feline', 'preserves existing parents');
+
+vm.runInContext(`
+  LookupButton.LANG_ID = 1;
+  button.activate = () => {};
+`, context);
+for (const savedTranslation of ['', 'my saved translation']) {
+  translation.value = savedTranslation;
+  container.dataset.termSaved = 'true';
+  vm.runInContext('loadDictionaries()', context);
+  assert.equal(vm.runInContext('button.payload.autostart', context), false,
+    'saved cards require an explicit translation request, even with an empty translation');
+  const lookupId = vm.runInContext('button.lookupId', context);
+  vm.runInContext('button.do_lookup()', context);
+  assert.equal(vm.runInContext('button.lookupId', context), lookupId,
+    'reopening the Codex tab keeps the same waiting panel');
+}
+container.dataset.termSaved = 'false';
+vm.runInContext('loadDictionaries()', context);
+assert.equal(vm.runInContext('button.payload.autostart', context), true,
+  'new terms still request an automatic translation');
 console.log('Codex iframe regression checks passed');

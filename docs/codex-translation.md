@@ -4,6 +4,15 @@ In **Settings → Languages → Edit**, select **Codex CLI translation** under
 **Translation source**. Set **Translate into** (Russian by default), and choose
 a **Codex model** from the suggestions or enter a model ID. Leave the model
 blank to use the CLI's configured default. Save the language and reload the book.
+**Reasoning effort** can use the CLI setting or override it for this language.
+Known models show only the effort levels supported in the local CLI cache.
+**Fast mode** requests priority processing when checked; unchecked uses standard
+processing, overriding the CLI's service tier. Availability and increased usage
+depend on the selected model and your account. Both options apply to words,
+phrases, sentences and pages.
+**Show translation timer** displays elapsed request time beside the model in the
+Codex panel, including waiting for the result. It stops when the response is
+ready or fails. Uncheck it to hide the timer for that language.
 No website dictionaries are required in this mode. Existing website settings
 are retained for switching back.
 
@@ -13,16 +22,24 @@ four meanings with brief explanations and the dictionary form. The best meaning
 fills an empty Translation field automatically. Click another meaning to select
 it, then use the existing **Save** button to store it in your vocabulary.
 Saved translations and text typed while a request is running are preserved.
+For a word or phrase with an existing vocabulary card, opening the term or the
+Codex tab does not start a translation. Press **Translate with Codex** inside
+the tab to request one, even if the saved card has an empty Translation field.
+New terms still translate automatically, including unknown words that Lute
+has stored with status 0 while opening the book.
 Sentence and page translation commands also use Codex. Sentences and image
 lookup tabs remain available.
 
 For an unambiguous inflected word, Codex also adds the dictionary headword to
 **Parents** automatically: an infinitive for a verb, nominative singular for a
-noun, or the language's standard base form. The panel shows a separate editable
-**Dictionary translation** for that parent. For example, `halusi` can have
+noun, or the language's standard base form. Expand the collapsed **Parent**
+section to choose from up to four dictionary meanings, each with a brief
+explanation. For example, `halusi` can have
 `хотела`, while its parent `haluta` has `хотеть`. The parent and its translation
 are saved together with the child when you press **Save**. Looking up a word
-alone does not create vocabulary. Existing parents, parent translations, and
+alone does not create vocabulary. Existing parent translations are kept until
+you explicitly choose a different dictionary meaning;
+that change is saved with the child. Existing parents and
 parents changed or removed while the lookup was running are preserved. If the
 grammar is uncertain, Codex leaves Parents alone.
 
@@ -53,7 +70,9 @@ sandbox, ephemeral sessions, disabled shell/web search, and a JSON output schema
 The CLI's user configuration and authentication are reused. Each request has a
 90-second timeout. Two translations can run concurrently; the bounded queue and
 one-hour in-memory cache avoid repeated calls for the same term, context, target
-language and model. Errors appear in the panel with a Retry button.
+language, model, reasoning effort and Fast mode. Changing either option starts
+a new lookup instead of reusing a translation from the previous settings.
+Errors appear in the panel with a Retry button.
 
 Model suggestions come from the local CLI cache when it is available. The list
 can be empty until the CLI has fetched models; entering an ID still works.

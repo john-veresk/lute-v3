@@ -44,6 +44,11 @@ class Language(
         "LgTranslationTarget", db.String(80), default="Russian"
     )
     codex_model = db.Column("LgCodexModel", db.String(100), default="")
+    codex_reasoning_effort = db.Column(
+        "LgCodexReasoningEffort", db.String(20), default=""
+    )
+    codex_fast_mode = db.Column("LgCodexFastMode", db.Boolean, default=False)
+    codex_show_timer = db.Column("LgCodexShowTimer", db.Boolean, default=True)
 
     dictionaries = db.relationship(
         "LanguageDictionary",
@@ -73,6 +78,9 @@ class Language(
         self.translation_provider = "dictionaries"
         self.translation_target = "Russian"
         self.codex_model = ""
+        self.codex_reasoning_effort = ""
+        self.codex_fast_mode = False
+        self.codex_show_timer = True
 
     def __repr__(self):
         return f"<Language {self.id} '{self.name}'>"
@@ -140,6 +148,9 @@ class Language(
         ret["translation_provider"] = self.translation_provider
         ret["translation_target"] = self.translation_target
         ret["codex_model"] = self.codex_model
+        ret["codex_reasoning_effort"] = self.codex_reasoning_effort
+        ret["codex_fast_mode"] = self.codex_fast_mode
+        ret["codex_show_timer"] = self.codex_show_timer
         ret["dictionaries"] = []
         for d in self.dictionaries:
             dd = {}
@@ -181,6 +192,9 @@ class Language(
             "translation_provider": "translation_provider",
             "translation_target": "translation_target",
             "codex_model": "codex_model",
+            "codex_reasoning_effort": "codex_reasoning_effort",
+            "codex_fast_mode": "codex_fast_mode",
+            "codex_show_timer": "codex_show_timer",
             "show_romanization": "show_romanization",
             "right_to_left": "right_to_left",
             "parser_type": "parser_type",

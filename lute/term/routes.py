@@ -232,6 +232,10 @@ def handle_term_form(
     lives in an iframe in the reading frames and returns a different
     template on success.
     """
+    # Reading creates status-0 rows before the reader saves a vocabulary card.
+    term_is_saved = term.id is not None and term.status != 0
+    if term.status == 0:
+        term.status = 1
     form = TermForm(obj=term, session=session)
 
     # Flash messages get added on things like term imports.
@@ -273,6 +277,7 @@ def handle_term_form(
         form_template_name,
         form=form,
         term=term,
+        term_is_saved=term_is_saved,
         duplicated_term=form.duplicated_term,
         language_dicts=language_repo.all_dictionaries(),
         hide_pronunciation=hide_pronunciation,
@@ -297,8 +302,6 @@ def edit(termid):
     """
     repo = Repository(db.session)
     term = repo.load(termid)
-    if term.status == 0:
-        term.status = 1
     return _handle_form(term, repo)
 
 
@@ -309,8 +312,6 @@ def edit_by_text(langid, text):
     """
     repo = Repository(db.session)
     term = repo.find_or_new(langid, text)
-    if term.status == 0:
-        term.status = 1
     return _handle_form(term, repo)
 
 

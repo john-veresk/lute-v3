@@ -7,6 +7,7 @@
   let context = params.get('context') || '';
   const status = document.getElementById('codex-status');
   const options = document.getElementById('codex-options');
+  const translate = document.getElementById('codex-start');
   const retry = document.getElementById('codex-retry');
   document.getElementById('codex-text').textContent = text.replaceAll('\u200b', '');
   const contextElement = document.getElementById('codex-context');
@@ -17,11 +18,33 @@
   let resultOptions = [];
   let selectedIndex = 0;
   const parentSection = document.getElementById('codex-parent');
-  const parentTranslation = document.getElementById('codex-parent-translation');
+  const parentOptions = document.getElementById('codex-parent-options');
+  const timer = document.getElementById('codex-timer');
+  let timerInterval = null;
+  let timerStarted = 0;
   const wordsSection = document.getElementById('codex-words');
   const wordCards = document.getElementById('codex-word-cards');
   const addWords = document.getElementById('codex-add-words');
   const wordsStatus = document.getElementById('codex-words-status');
+
+  function updateTimer() {
+    if (timer) timer.textContent = ` · ${((performance.now() - timerStarted) / 1000).toFixed(1)} s`;
+  }
+
+  function startTimer() {
+    if (!timer) return;
+    clearInterval(timerInterval);
+    timerStarted = performance.now();
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 100);
+  }
+
+  function stopTimer() {
+    if (timerInterval === null) return;
+    updateTimer();
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
 
   function renderWordCards(words, jobId, current) {
     wordCards.replaceChildren();
@@ -104,13 +127,52 @@
   }
 
   function choose(option, index, automatic = false) {
-    const parent = parentSuggestion ? {...parentSuggestion, translation: parentTranslation.value} : null;
+    const parent = parentSuggestion ? {...parentSuggestion} : null;
     window.parent.postMessage({event: 'LuteCodexTranslation', request_id: params.get('request_id'), text, language_id: Number(params.get('language_id')), translation: option.translation, index, automatic, parent}, window.location.origin);
+  }
+
+  function updateParentSelection() {
+    parentOptions.querySelectorAll('button').forEach(button => {
+      const selected = button.dataset.translation === parentSuggestion?.translation;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+  }
+
+  function parentChanged() {
+    if (!parentSuggestion) return;
+    parentSuggestion.translationSelected = true;
+    updateParentSelection();
+    if (resultOptions.length) choose(resultOptions[selectedIndex], selectedIndex, true);
+  }
+
+  function renderParentOptions(choices, existingTranslation) {
+    const cards = [...choices];
+    if (existingTranslation.trim() && !cards.some(option => option.translation === existingTranslation)) {
+      cards.unshift({translation: existingTranslation, explanation: 'Saved dictionary translation.'});
+    }
+    cards.forEach(option => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'codex-option';
+      card.title = 'Use this dictionary translation';
+      card.dataset.translation = option.translation;
+      const translation = document.createElement('strong');
+      translation.textContent = option.translation;
+      const explanation = document.createElement('span');
+      explanation.textContent = option.explanation;
+      card.append(translation, explanation);
+      card.addEventListener('click', () => {
+        parentSuggestion.translation = option.translation;
+        parentChanged();
+      });
+      parentOptions.appendChild(card);
+    });
+    updateParentSelection();
   }
 
   window.addEventListener('message', event => {
     if (event.source !== window.parent || event.origin !== window.location.origin || event.data?.event !== 'LuteCodexTranslationSelected' || event.data.request_id !== params.get('request_id')) return;
-    if (event.data.parentStatus) document.getElementById('codex-parent-status').textContent = event.data.parentStatus;
     if (event.data.index === null) return;
     selectedIndex = event.data.index;
     options.querySelectorAll('button').forEach((button, index) => {
@@ -122,13 +184,19 @@
 
   async function start() {
     const current = ++generation;
+    translate.hidden = true;
     options.replaceChildren();
+    parentOptions.replaceChildren();
     parentSection.hidden = true;
+    parentSection.open = false;
     wordsSection.hidden = true;
     parentSuggestion = null;
+    resultOptions = [];
+    selectedIndex = 0;
     retry.hidden = true;
     document.getElementById('codex-hint').hidden = true;
     status.textContent = 'Translating with Codex…';
+    startTimer();
     try {
       const job = await readResponse(await fetch('/translation/jobs', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -151,9 +219,13 @@
           const query = new URLSearchParams({language_id: params.get('language_id'), text: data.result.lemma});
           const existing = await readResponse(await fetch(`/translation/parent?${query}`));
           if (current !== generation) return;
-          parentSuggestion = {text: data.result.lemma, status: existing.status, existingTranslation: !!existing.translation.trim()};
-          parentTranslation.value = existing.translation.trim() ? existing.translation : data.result.lemma_translation;
-          parentTranslation.readOnly = parentSuggestion.existingTranslation;
+          parentSuggestion = {
+            text: data.result.lemma,
+            status: existing.status,
+            existingTranslation: !!existing.translation.trim(),
+            translation: existing.translation.trim() ? existing.translation : data.result.lemma_translation,
+          };
+          renderParentOptions(data.result.lemma_options || [{translation: data.result.lemma_translation, explanation: ''}], existing.translation);
           document.getElementById('codex-parent-text').textContent = data.result.lemma;
           parentSection.hidden = false;
         } catch (error) {
@@ -185,13 +257,13 @@
       if (current !== generation) return;
       status.textContent = error.message;
       retry.hidden = false;
+    } finally {
+      if (current === generation) stopTimer();
     }
   }
+  translate.addEventListener('click', start);
   retry.addEventListener('click', start);
-  parentTranslation.addEventListener('input', () => {
-    if (resultOptions.length) choose(resultOptions[selectedIndex], selectedIndex, true);
-  });
-  window.addEventListener('pagehide', () => { generation++; });
+  window.addEventListener('pagehide', () => { generation++; stopTimer(); });
   if (params.has('request_id')) {
     let received = false;
     window.addEventListener('message', event => {
@@ -202,7 +274,12 @@
       document.getElementById('codex-text').textContent = text.replaceAll('\u200b', '');
       contextElement.textContent = context;
       contextElement.hidden = !context;
-      start();
+      if (event.data.payload.autostart === false) {
+        status.textContent = 'This term is already saved. Click Translate with Codex to request a translation.';
+        translate.hidden = false;
+      } else {
+        start();
+      }
     });
     window.parent.postMessage({event: 'LuteCodexReady', request_id: params.get('request_id')}, window.location.origin);
   } else {

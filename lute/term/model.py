@@ -39,6 +39,7 @@ class Term:  # pylint: disable=too-many-instance-attributes
         # written merely because a reader opens a word.
         self.suggested_parent_text = ""
         self.suggested_parent_translation = ""
+        self.suggested_parent_translation_selected = False
         self.current_image = None
 
         # When loading the Term from a DBTerm,
@@ -366,7 +367,10 @@ class Repository:
         )
         if has_dictionary_suggestion:
             dictionary_translation = (term.suggested_parent_translation or "").strip()
-        if dictionary_translation and not (p.translation or "").strip():
+        if dictionary_translation and (
+            term.suggested_parent_translation_selected
+            or not (p.translation or "").strip()
+        ):
             p.translation = dictionary_translation
 
         # Copy translation, image if missing, but _not_ if we're just

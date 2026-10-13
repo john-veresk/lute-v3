@@ -15,6 +15,7 @@ from wtforms import (
 )
 from wtforms.validators import DataRequired, Length, Optional, Regexp
 from lute.models.language import LanguageDictionary
+from lute.translation.service import REASONING_EFFORTS, available_model_efforts
 
 
 class LanguageDictionaryForm(Form):
@@ -64,6 +65,14 @@ class LanguageForm(FlaskForm):
             Regexp(r"^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$", message="Enter a valid model ID"),
         ],
     )
+    codex_reasoning_effort = SelectField(
+        "Reasoning effort",
+        choices=[("", "Default from Codex CLI")]
+        + [(effort, effort) for effort in REASONING_EFFORTS],
+        default="",
+    )
+    codex_fast_mode = BooleanField("Fast mode", default=False)
+    codex_show_timer = BooleanField("Show translation timer", default=True)
     dictionaries = FieldList(
         FormField(LanguageDictionaryForm, default=LanguageDictionary)
     )
@@ -112,3 +121,13 @@ class LanguageForm(FlaskForm):
         "Codex needs a target language."
         if self.translation_provider.data == "codex" and not (field.data or "").strip():
             raise ValidationError("Please enter a translation language")
+
+    def validate_codex_reasoning_effort(self, field):
+        "Reject unsupported explicit levels when model metadata is available."
+        if self.translation_provider.data != "codex" or not field.data:
+            return
+        supported = available_model_efforts().get(self.codex_model.data)
+        if supported and field.data not in supported:
+            raise ValidationError(
+                "This model does not support the selected reasoning effort"
+            )

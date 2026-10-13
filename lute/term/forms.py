@@ -36,6 +36,7 @@ class TermForm(FlaskForm):
     parentslist = StringField("Parents")
     suggested_parent_text = HiddenField(validators=[Length(max=500)])
     suggested_parent_translation = HiddenField(validators=[Length(max=500)])
+    suggested_parent_translation_selected = HiddenField()
 
     translation = TextAreaField(
         "Translation", render_kw={"placeholder": "Translation", "autofocus": True}
@@ -87,6 +88,9 @@ class TermForm(FlaskForm):
     def populate_obj(self, obj):
         "Call the populate_obj method from the parent class, then mine."
         super().populate_obj(obj)
+        obj.suggested_parent_translation_selected = (
+            self.suggested_parent_translation_selected.data == "y"
+        )
 
         def _values(field_data):
             "Convert field data to array."

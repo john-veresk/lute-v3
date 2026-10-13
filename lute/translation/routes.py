@@ -84,6 +84,8 @@ def submit():
         context,
         kind,
         word_texts,
+        language.codex_reasoning_effort,
+        language.codex_fast_mode,
     )
     try:
         job_id = _jobs().submit(key)
@@ -138,6 +140,7 @@ def save_word_cards():
         return jsonify(error="Translation expired. Translate the phrase again."), 404
     if (
         key[:3] != (language.name, language.translation_target, language.codex_model)
+        or key[7:] != (language.codex_reasoning_effort, language.codex_fast_mode)
         or key[5] != "term"
         or result["status"] != "complete"
     ):

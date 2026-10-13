@@ -13,28 +13,26 @@
   .codex-option span { display: block; margin-top: 6px; opacity: .8; }
   #codex-status { margin: 16px 0; }
   #codex-context { font-size: .9em; opacity: .75; max-height: 6em; overflow: auto; border-left: 3px solid currentColor; padding-left: 10px; }
-  #codex-retry { margin-top: 14px; }
+  #codex-start, #codex-retry { margin-top: 14px; }
   #codex-parent { margin: 16px 0; padding: 12px; border: 1px solid currentColor; border-radius: 8px; }
-  #codex-parent label { display: block; margin: 8px 0 4px; font-size: .9em; }
-  #codex-parent-translation { box-sizing: border-box; width: 100%; }
+  #codex-parent summary { cursor: pointer; font-weight: bold; }
   .codex-word { display: flex; align-items: start; gap: 10px; padding: 12px 0; border-bottom: 1px solid currentColor; }
   .codex-word-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
   .codex-word-translation { margin: 4px 0; }
   #codex-add-words { margin-top: 12px; }
 </style>
 <main class="codex-panel">
-  <div class="codex-meta">Codex · {{ language.codex_model or 'CLI default model' if language else 'CLI' }}{% if language %} · {{ language.translation_target }}{% endif %}</div>
+  <div class="codex-meta">Codex · {{ language.codex_model or 'CLI default model' if language else 'CLI' }}{% if language %} · {{ language.translation_target }}{% endif %}{% if language and language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off" title="Translation request duration"></span>{% endif %}</div>
   <h2 id="codex-text"></h2>
   <div id="codex-lemma" class="codex-hint"></div>
   <p id="codex-context" hidden></p>
-  <p id="codex-status" role="status" aria-live="polite">Translating…</p>
+  <p id="codex-status" role="status" aria-live="polite"></p>
+  <button id="codex-start" type="button" class="btn" hidden>Translate with Codex</button>
   <div id="codex-options" class="codex-options"></div>
-  <section id="codex-parent" hidden>
-    <strong>Parent: <span id="codex-parent-text"></span></strong>
-    <label for="codex-parent-translation">Dictionary translation</label>
-    <input id="codex-parent-translation" class="form-control" maxlength="500">
-    <p id="codex-parent-status" class="codex-hint" role="status">Saved together with the term. Existing parent translations are kept.</p>
-  </section>
+  <details id="codex-parent" hidden>
+    <summary>Parent: <span id="codex-parent-text"></span></summary>
+    <div id="codex-parent-options" class="codex-options" role="group" aria-label="Parent translation options"></div>
+  </details>
   <section id="codex-words" hidden>
     <h3>Words in phrase</h3>
     <p class="codex-hint">Save individual words to your Lute vocabulary, with their base forms. Existing translations and parents are kept.</p>
