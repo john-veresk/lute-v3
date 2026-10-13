@@ -266,6 +266,94 @@ class DictButton extends LookupButton {
 
 }  // end DictButton
 
+/** Local translator shown in the same slot as embedded dictionaries. */
+class CodexButton extends LookupButton {
+  constructor(frameName) {
+    super(frameName);
+    this.btn.textContent = 'Codex';
+    this.btn.title = 'Translate with local Codex CLI';
+    this.lookupText = '';
+    this.lookupLanguage = null;
+  }
+
+  do_lookup() {
+    const container = LookupButton.TERM_FORM_CONTAINER;
+    if (!container) return;
+    this.activate();
+    if (this.contentLoaded) return;
+    this.lookupText = container.querySelector('#text').value;
+    this.lookupLanguage = Number(LookupButton.LANG_ID);
+    if (!this.lookupText.trim()) return;
+    this.lookupId = newCodexLookupId();
+    this.payload = {language_id: this.lookupLanguage, text: this.lookupText, context: window.LUTE_LOOKUP_CONTEXT || '', kind: 'term'};
+    const params = new URLSearchParams({
+      language_id: this.lookupLanguage,
+      request_id: this.lookupId,
+      kind: 'term',
+    });
+    this.frame.src = `/translation/panel?${params}`;
+    this.contentLoaded = true;
+  }
+}
+
+function newCodexLookupId() {
+  return window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function applyCodexParent(container, parent) {
+  if (!parent || typeof parent.text !== 'string' || typeof parent.translation !== 'string') return '';
+  const input = container.querySelector('#parentslist');
+  const tagify = input?._tagify || container.ownerDocument?.defaultView?.parents_tagify;
+  if (!tagify) return 'Parent could not be added. Enter it in Parents.';
+  if (container.dataset.codexParentsEdited === 'true') return 'Your parent edits were kept.';
+  const clean = value => value.replaceAll('\u200b', '').trim().toLocaleLowerCase();
+  if (clean(parent.text) === clean(container.querySelector('#text').value)) return '';
+  if (tagify.value.length === 0) {
+    tagify.addTags([{value: parent.text, status: parent.status, codexSuggested: true}]);
+  }
+  if (tagify.value.length !== 1 || clean(tagify.value[0].value) !== clean(parent.text)) return 'Your existing Parents were kept.';
+  const textField = container.querySelector('#suggested_parent_text');
+  const translationField = container.querySelector('#suggested_parent_translation');
+  textField.value = parent.text;
+  translationField.value = parent.translation;
+  translationField.dispatchEvent(new Event('change', {bubbles: true}));
+  return parent.existingTranslation ? 'Existing dictionary translation kept.' : 'Parent and dictionary translation will be saved with the term.';
+}
+
+window.addEventListener('message', event => {
+  if (event.origin !== window.location.origin) return;
+  if (event.data?.event === 'LuteCodexReady') {
+    const button = LookupButton.all.find(b => b instanceof CodexButton && b.frame.contentWindow === event.source && b.lookupId === event.data.request_id);
+    if (button) event.source.postMessage({event: 'LuteCodexLookup', request_id: button.lookupId, payload: button.payload}, window.location.origin);
+    const sentence = window.LUTE_CODEX_SENTENCE_LOOKUP;
+    const wordFrame = document.getElementById('wordframeid');
+    if (sentence && wordFrame?.contentWindow === event.source && sentence.request_id === event.data.request_id) {
+      event.source.postMessage({event: 'LuteCodexLookup', request_id: sentence.request_id, payload: sentence.payload}, window.location.origin);
+    }
+    return;
+  }
+  if (!['LuteCodexTranslation', 'LuteCodexWordCardsSaved'].includes(event.data?.event)) return;
+  const button = LookupButton.all.find(b => b instanceof CodexButton && b.frame.contentWindow === event.source);
+  const container = LookupButton.TERM_FORM_CONTAINER;
+  if (!button || !container) return;
+  if (event.data.request_id !== button.lookupId) return;
+  if (event.data.event === 'LuteCodexWordCardsSaved') {
+    window.postMessage({event: 'LuteCodexWordsSaved'}, window.location.origin);
+    return;
+  }
+  if (event.data.text !== button.lookupText || event.data.language_id !== button.lookupLanguage) return;
+  if (container.querySelector('#text').value !== button.lookupText || Number(container.querySelector('#language_id').value) !== button.lookupLanguage) return;
+  const translation = container.querySelector('#translation');
+  if (typeof event.data.translation !== 'string') return;
+  const parentStatus = applyCodexParent(container, event.data.parent);
+  const selected = !event.data.automatic || !translation.value.trim();
+  if (selected) {
+    translation.value = event.data.translation;
+    translation.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  event.source.postMessage({event: 'LuteCodexTranslationSelected', request_id: button.lookupId, index: selected ? event.data.index : null, parentStatus}, window.location.origin);
+});
+
 
 /**
  * Load excess buttons in a separate div.
@@ -326,7 +414,10 @@ function createLookupButtons(tab_count = 5) {
   }
 
   // Make all DictButtons, which loads LookupButton.all.
-  LookupButton.TERM_DICTS.forEach((dict, index) => { new DictButton(dict,`dict${index}`); });
+  LookupButton.TERM_DICTS.forEach((dict, index) => {
+    if (dict.dicttype === 'codex') new CodexButton(`dict${index}`);
+    else new DictButton(dict, `dict${index}`);
+  });
   const tab_buttons = LookupButton.all.slice(0, tab_count);
   const list_buttons = LookupButton.all.slice(tab_count);
 
@@ -360,7 +451,10 @@ function loadDictionaries() {
   dictContainer.style.display = "flex";
   dictContainer.style.flexDirection = "column";
   LookupButton.all.forEach(button => button.contentLoaded = false);
-  const active_button = LookupButton.all.find(button => button.is_active);
+  // Every new term starts its automatic translation, even if the reader
+  // previously opened the Sentences or Images tab.
+  const active_button = LookupButton.all.find(button => button instanceof CodexButton) ||
+    LookupButton.all.find(button => button.is_active);
   if (active_button) {
     active_button.do_lookup();
   }

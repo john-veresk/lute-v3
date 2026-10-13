@@ -62,6 +62,7 @@ from lute.settings.routes import bp as settings_bp
 from lute.themes.routes import bp as themes_bp
 from lute.stats.routes import bp as stats_bp
 from lute.cli.commands import bp as cli_bp
+from lute.translation.routes import bp as translation_bp
 
 
 def _setup_app_dir(dirname, readme_content):
@@ -334,6 +335,7 @@ def _create_app(app_config, extra_config):
 
     _add_base_routes(app, app_config)
     app.register_blueprint(language_bp)
+    app.register_blueprint(translation_bp)
     app.register_blueprint(anki_bp)
     app.register_blueprint(book_bp)
     app.register_blueprint(bookmarks_bp)

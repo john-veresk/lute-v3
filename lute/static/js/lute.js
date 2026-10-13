@@ -196,7 +196,16 @@ function _show_wordframe_url(url) {
 
 function show_term_edit_form(el) {
   const wid = parseInt(el.data('wid'));
+  set_lookup_context(el);
   _show_wordframe_url(`/read/edit_term/${wid}`);
+}
+
+function set_lookup_context(el) {
+  const sentenceId = el.data('sentence-id');
+  const items = $('span.textitem').filter(function() {
+    return $(this).data('sentence-id') === sentenceId;
+  }).toArray();
+  window.LUTE_LOOKUP_CONTEXT = _get_textitems_text(items).slice(0, 4000);
 }
 
 function show_bulk_term_edit_form(count_of_terms) {
@@ -244,6 +253,7 @@ function show_multiword_term_edit_form(selected) {
   if (text == "")
     return;
   const lid = parseInt(selected.eq(0).data('lang-id'));
+  set_lookup_context(selected.eq(0));
   // "/" in the term cause problems with routing, so hack a fix.
   const sendtext = text.replace(/\//g, "LUTESLASH");
   _show_wordframe_url(`/read/termform/${lid}/${sendtext}`);
@@ -828,6 +838,16 @@ let show_translation_for_text = function(text) {
 
   const dict_index = _get_translation_dict_index(text);
   const dict = LUTE_SENTENCE_LOOKUP_DICTS[dict_index];
+
+  if (dict.dicttype === "codex") {
+    const request_id = newCodexLookupId();
+    window.LUTE_CODEX_SENTENCE_LOOKUP = {request_id, payload: {language_id: Number(LookupButton.LANG_ID), text, context: '', kind: 'sentence'}};
+    const params = new URLSearchParams({language_id: LookupButton.LANG_ID, request_id, kind: 'sentence'});
+    top.frames.wordframe.location.href = `/translation/panel?${params}`;
+    $('.dictcontainer').hide();
+    $('#read_pane_right').css('grid-template-rows', '1fr 0');
+    return;
+  }
 
   const lookup = encodeURIComponent(text);
   let url = dict.url.replace('[LUTE]', lookup);

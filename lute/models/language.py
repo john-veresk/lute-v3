@@ -37,6 +37,13 @@ class Language(
 
     id = db.Column("LgID", db.SmallInteger, primary_key=True)
     name = db.Column("LgName", db.String(40))
+    translation_provider = db.Column(
+        "LgTranslationProvider", db.String(20), default="dictionaries"
+    )
+    translation_target = db.Column(
+        "LgTranslationTarget", db.String(80), default="Russian"
+    )
+    codex_model = db.Column("LgCodexModel", db.String(100), default="")
 
     dictionaries = db.relationship(
         "LanguageDictionary",
@@ -63,6 +70,9 @@ class Language(
         self.show_romanization = False
         self.parser_type = "spacedel"
         self.dictionaries = []
+        self.translation_provider = "dictionaries"
+        self.translation_target = "Russian"
+        self.codex_model = ""
 
     def __repr__(self):
         return f"<Language {self.id} '{self.name}'>"
@@ -97,6 +107,8 @@ class Language(
 
     def active_dict_uris(self, use_for):
         "Get sorted uris for active dicts of correct type."
+        if self.translation_provider == "codex":
+            return [{"url": "/translation/panel", "dicttype": "codex"}]
         actives = [d for d in self.dictionaries if d.is_active and d.usefor == use_for]
         sorted_actives = sorted(actives, key=lambda x: x.sort_order)
         return [{"url": d.dicturi, "dicttype": d.dicttype} for d in sorted_actives]
@@ -125,6 +137,9 @@ class Language(
         "Return dictionary of data, for serialization."
         ret = {}
         ret["name"] = self.name
+        ret["translation_provider"] = self.translation_provider
+        ret["translation_target"] = self.translation_target
+        ret["codex_model"] = self.codex_model
         ret["dictionaries"] = []
         for d in self.dictionaries:
             dd = {}
@@ -163,6 +178,9 @@ class Language(
         # Define mappings for fields
         mappings = {
             "name": "name",
+            "translation_provider": "translation_provider",
+            "translation_target": "translation_target",
+            "codex_model": "codex_model",
             "show_romanization": "show_romanization",
             "right_to_left": "right_to_left",
             "parser_type": "parser_type",

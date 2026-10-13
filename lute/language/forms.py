@@ -13,7 +13,7 @@ from wtforms import (
     Form,
     ValidationError,
 )
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, Length, Optional, Regexp
 from lute.models.language import LanguageDictionary
 
 
@@ -44,6 +44,26 @@ class LanguageForm(FlaskForm):
     """
 
     name = StringField("Name", validators=[DataRequired()])
+    translation_provider = SelectField(
+        "Translation source",
+        choices=[
+            ("dictionaries", "Dictionary websites"),
+            ("codex", "Codex CLI translation"),
+        ],
+        default="dictionaries",
+    )
+    translation_target = StringField(
+        "Translate into", default="Russian", validators=[Length(max=80)]
+    )
+    codex_model = StringField(
+        "Codex model",
+        default="",
+        validators=[
+            Optional(),
+            Length(max=100),
+            Regexp(r"^[a-zA-Z0-9][a-zA-Z0-9._:/-]*$", message="Enter a valid model ID"),
+        ],
+    )
     dictionaries = FieldList(
         FormField(LanguageDictionaryForm, default=LanguageDictionary)
     )
@@ -69,6 +89,8 @@ class LanguageForm(FlaskForm):
 
     def validate_dictionaries(self, field):  # pylint: disable=unused-argument
         "Dictionaries must be valid."
+        if self.translation_provider.data == "codex":
+            return
 
         # raise ValueError(self.dictionaries.data) # debugging
         def _get_actives(usefor):
@@ -85,3 +107,8 @@ class LanguageForm(FlaskForm):
             raise ValidationError("Please add an active Terms dictionary")
         if len(sentence_dicts) == 0:
             raise ValidationError("Please add an active Sentences dictionary")
+
+    def validate_translation_target(self, field):
+        "Codex needs a target language."
+        if self.translation_provider.data == "codex" and not (field.data or "").strip():
+            raise ValidationError("Please enter a translation language")

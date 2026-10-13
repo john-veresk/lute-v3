@@ -1,0 +1,49 @@
+{% extends 'read/term_form_base.html' %}
+{% block include_term_form %}
+<style>
+  body { margin: 0; }
+  .codex-panel { padding: 18px; max-width: 720px; margin: auto; }
+  .codex-panel h2 { margin: 10px 0 4px; overflow-wrap: anywhere; }
+  .codex-meta, .codex-hint { opacity: .7; font-size: .9em; }
+  .codex-options { display: grid; gap: 10px; margin-top: 16px; }
+  .codex-option { display: block; width: 100%; padding: 14px; text-align: left; background: transparent; color: inherit; border: 1px solid currentColor; border-radius: 8px; cursor: pointer; }
+  .codex-option:hover, .codex-option.selected { background: rgba(100, 160, 220, .18); }
+  .codex-option.selected { outline: 2px solid currentColor; }
+  .codex-option strong { display: block; font-size: 1.1em; }
+  .codex-option span { display: block; margin-top: 6px; opacity: .8; }
+  #codex-status { margin: 16px 0; }
+  #codex-context { font-size: .9em; opacity: .75; max-height: 6em; overflow: auto; border-left: 3px solid currentColor; padding-left: 10px; }
+  #codex-retry { margin-top: 14px; }
+  #codex-parent { margin: 16px 0; padding: 12px; border: 1px solid currentColor; border-radius: 8px; }
+  #codex-parent label { display: block; margin: 8px 0 4px; font-size: .9em; }
+  #codex-parent-translation { box-sizing: border-box; width: 100%; }
+  .codex-word { display: flex; align-items: start; gap: 10px; padding: 12px 0; border-bottom: 1px solid currentColor; }
+  .codex-word-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .codex-word-translation { margin: 4px 0; }
+  #codex-add-words { margin-top: 12px; }
+</style>
+<main class="codex-panel">
+  <div class="codex-meta">Codex · {{ language.codex_model or 'CLI default model' if language else 'CLI' }}{% if language %} · {{ language.translation_target }}{% endif %}</div>
+  <h2 id="codex-text"></h2>
+  <div id="codex-lemma" class="codex-hint"></div>
+  <p id="codex-context" hidden></p>
+  <p id="codex-status" role="status" aria-live="polite">Translating…</p>
+  <div id="codex-options" class="codex-options"></div>
+  <section id="codex-parent" hidden>
+    <strong>Parent: <span id="codex-parent-text"></span></strong>
+    <label for="codex-parent-translation">Dictionary translation</label>
+    <input id="codex-parent-translation" class="form-control" maxlength="500">
+    <p id="codex-parent-status" class="codex-hint" role="status">Saved together with the term. Existing parent translations are kept.</p>
+  </section>
+  <section id="codex-words" hidden>
+    <h3>Words in phrase</h3>
+    <p class="codex-hint">Save individual words to your Lute vocabulary, with their base forms. Existing translations and parents are kept.</p>
+    <div id="codex-word-cards"></div>
+    <button id="codex-add-words" class="btn" type="button">Add selected words</button>
+    <p id="codex-words-status" role="status" aria-live="polite"></p>
+  </section>
+  <p id="codex-hint" class="codex-hint" hidden>Choose a translation to put it in the term form, then Save.</p>
+  <button id="codex-retry" type="button" class="btn" hidden>Retry translation</button>
+</main>
+<script src="{{ url_for('static', filename='js/codex-panel.js') }}"></script>
+{% endblock %}

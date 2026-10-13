@@ -190,6 +190,13 @@
       parentslist, lang_id_func, this_term_text, override_settings
     );
 
+    // A late Codex result must not restore a parent that the reader removed
+    // or replace parents the reader entered while the lookup was running.
+    parents_tagify.on('input add remove', function(e) {
+      if (e.type === 'add' && e.detail.data?.codexSuggested) return;
+      document.getElementById('term-form-container').dataset.codexParentsEdited = 'true';
+    });
+
     parents_tagify.on('click', function (e) {
       // Exit early if language not set - will not handle, too complicated.
       const langid = document.getElementById("language_id").value;

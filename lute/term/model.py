@@ -35,6 +35,10 @@ class Term:  # pylint: disable=too-many-instance-attributes
         self.term_tags = []
         self.flash_message = None
         self.parents = []
+        # Suggestions are staged in the form and saved with the child, never
+        # written merely because a reader opens a word.
+        self.suggested_parent_text = ""
+        self.suggested_parent_translation = ""
         self.current_image = None
 
         # When loading the Term from a DBTerm,
@@ -353,10 +357,22 @@ class Repository:
         if new_or_unknown_parent:
             p.status = term.status
 
+        dictionary_translation = ""
+        has_dictionary_suggestion = (
+            language.translation_provider == "codex"
+            and term.suggested_parent_text
+            and language.get_lowercase(pt)
+            == language.get_lowercase(term.suggested_parent_text)
+        )
+        if has_dictionary_suggestion:
+            dictionary_translation = (term.suggested_parent_translation or "").strip()
+        if dictionary_translation and not (p.translation or "").strip():
+            p.translation = dictionary_translation
+
         # Copy translation, image if missing, but _not_ if we're just
         # re-saving an existing term.
         if new_or_unknown_parent or new_term:
-            if (p.translation or "") == "":
+            if (p.translation or "") == "" and not has_dictionary_suggestion:
                 p.translation = term.translation
             if (p.get_current_image() or "") == "":
                 p.set_current_image(term.current_image)

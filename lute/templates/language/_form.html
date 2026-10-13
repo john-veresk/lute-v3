@@ -28,6 +28,25 @@
     </tr>
 
     <tr>
+      <td>{{ form.translation_provider.label(class="form-control-label") }}</td>
+      <td>{{ form.translation_provider(class="form-control") }}</td>
+    </tr>
+    <tr class="codex-setting">
+      <td>{{ form.translation_target.label(class="form-control-label") }}</td>
+      <td>{{ form.translation_target(class="form-control", placeholder="Russian") }}</td>
+    </tr>
+    <tr class="codex-setting">
+      <td>{{ form.codex_model.label(class="form-control-label") }}</td>
+      <td>
+        {{ form.codex_model(class="form-control", list="codex-models", placeholder="Default from Codex CLI") }}
+        <datalist id="codex-models">
+          {% for model in codex_models %}<option value="{{ model }}">{% endfor %}
+        </datalist>
+        <p class="small-flash-notice">Choose a local CLI model or enter its ID. Leave blank to use the CLI default.</p>
+        <p class="small-flash-notice">Codex CLI must be installed and logged in on the computer running Lute. Text is sent through your Codex account.</p>
+      </td>
+    </tr>
+    <tr id="website-dictionaries">
       <td>Dictionaries</td>
       <td>
         <div id="dictionary_entities">
@@ -63,7 +82,7 @@
     </tr>
 
     {% for field in form %}
-    {% if field.name not in ('name', 'csrf_token', 'dictionaries') %}
+    {% if field.name not in ('name', 'csrf_token', 'dictionaries', 'translation_provider', 'translation_target', 'codex_model') %}
     <tr>
       <td>{{ field.label(class="form-control-label") }}</td>
       <td>{{ field(class="form-control") }}</td>
@@ -79,6 +98,14 @@
 
 <script>
   $(document).ready(function() {
+    function updateTranslationSettings() {
+      const useCodex = $('#translation_provider').val() === 'codex';
+      $('.codex-setting').toggle(useCodex);
+      $('#website-dictionaries').toggle(!useCodex);
+      $('#dictionary_entities :input').prop('disabled', useCodex);
+    }
+    $('#translation_provider').on('change', updateTranslationSettings);
+    updateTranslationSettings();
     // Add leave page confirmation
     let dirty = false;
     function confirm_leave_page(event) {
@@ -95,7 +122,7 @@
       window.removeEventListener("beforeunload", confirm_leave_page);
     })
 
-    let edit_inputs = edit_form.querySelectorAll("input");
+    let edit_inputs = edit_form.querySelectorAll("input, select");
     edit_inputs.forEach(ele => {
       ele.addEventListener("change", e => {
         dirty = true;

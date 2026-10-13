@@ -4,13 +4,22 @@
 
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
-from flask import Blueprint, current_app, render_template, redirect, url_for, flash
+from flask import (
+    Blueprint,
+    current_app,
+    render_template,
+    redirect,
+    url_for,
+    flash,
+    request,
+)
 from lute.models.language import Language
 from lute.models.repositories import UserSettingRepository
 from lute.language.service import Service
 from lute.language.forms import LanguageForm
 from lute.db import db
 from lute.parse.registry import supported_parsers
+from lute.translation.service import available_models
 
 bp = Blueprint("language", __name__, url_prefix="/language")
 
@@ -53,7 +62,13 @@ def _handle_form(language, form) -> bool:
 
     if form.validate_on_submit():
         try:
+            dictionaries = list(language.dictionaries)
             form.populate_obj(language)
+            # Preserve disabled website controls when switching to Codex.
+            if form.translation_provider.data == "codex" and not any(
+                k.startswith("dictionaries-") for k in request.form
+            ):
+                language.dictionaries = dictionaries
             current_app.db.session.add(language)
             current_app.db.session.commit()
             flash(f"Language {language.name} updated", "success")
@@ -107,7 +122,12 @@ def edit(langid):
 
     _add_hidden_dictionary_template_entry(form)
 
-    return render_template("language/edit.html", form=form, language=language)
+    return render_template(
+        "language/edit.html",
+        form=form,
+        language=language,
+        codex_models=available_models(),
+    )
 
 
 @bp.route("/new", defaults={"langname": None}, methods=["GET", "POST"])
@@ -144,7 +164,11 @@ def new(langname):
     _add_hidden_dictionary_template_entry(form)
 
     return render_template(
-        "language/new.html", form=form, language=language, predefined=predefined
+        "language/new.html",
+        form=form,
+        language=language,
+        predefined=predefined,
+        codex_models=available_models(),
     )
 
 

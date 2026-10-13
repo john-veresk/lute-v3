@@ -14,7 +14,7 @@ from wtforms import (
     BooleanField,
 )
 from wtforms import ValidationError
-from wtforms.validators import DataRequired
+from wtforms.validators import DataRequired, Length
 
 from lute.models.term import Term
 from lute.models.repositories import LanguageRepository, TermRepository
@@ -34,6 +34,8 @@ class TermForm(FlaskForm):
         render_kw={"placeholder": "Term", "autofocus": True},
     )
     parentslist = StringField("Parents")
+    suggested_parent_text = HiddenField(validators=[Length(max=500)])
+    suggested_parent_translation = HiddenField(validators=[Length(max=500)])
 
     translation = TextAreaField(
         "Translation", render_kw={"placeholder": "Translation", "autofocus": True}
