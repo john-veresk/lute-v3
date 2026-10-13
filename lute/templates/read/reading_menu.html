@@ -102,6 +102,13 @@
     </a>
   </li>
   <li>
+    <a id="trainBookTerms" class="reading-menu-item"
+       href="{{ url_for('term.review', book_id=book.id, page_num=page_num) }}"
+       target="_blank" rel="noopener">
+      Train book terms
+    </a>
+  </li>
+  <li>
     <!-- mobile users need this link, since they don't have keyboard shortcuts. -->
     <a id="translateSentence" class="reading-menu-item" href="" onclick="handle_translate('sentence-id'); return false;">
       Translate sentence

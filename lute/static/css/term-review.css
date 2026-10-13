@@ -1,0 +1,89 @@
+.term-review {
+  max-width: 760px;
+  margin: 1rem auto 3rem;
+  line-height: 1.5;
+}
+
+.term-review [hidden] { display: none !important; }
+
+.review-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.review-heading h2, .review-heading p { overflow-wrap: anywhere; }
+.review-heading a { flex-shrink: 0; }
+#review-progress-bar { width: 100%; margin: .5rem 0 1rem; }
+#review-untranslated { margin-bottom: 1rem; }
+
+.review-card {
+  border: 1px solid var(--form-border-color);
+  border-radius: 14px;
+  padding: clamp(1rem, 4vw, 2.5rem);
+  min-height: 240px;
+  text-align: center;
+  background: var(--background-color);
+  color: var(--font-color);
+}
+
+.review-language, .review-help { opacity: .75; }
+.review-word {
+  font-size: clamp(2rem, 7vw, 3.5rem);
+  line-height: 1.25;
+  margin: 1.5rem 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.review-answer {
+  border-top: 1px solid var(--form-border-color);
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+}
+
+.review-meaning { font-size: 1.25rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-parent { font-weight: bold; margin-top: .75rem; }
+#review-current-status { margin: 1.5rem 0 .5rem; }
+
+.review-levels, .review-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: .5rem;
+  margin-top: .75rem;
+}
+
+.term-review button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: .5rem 1rem;
+  border: 1px solid var(--form-border-color);
+  border-radius: 7px;
+  background: var(--background-color);
+  color: var(--font-color);
+  font: inherit;
+  cursor: pointer;
+}
+
+.term-review button[data-review-status] { border-bottom: 4px solid var(--review-status-color); }
+.term-review button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
+.term-review button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.term-review button:disabled { opacity: .5; cursor: wait; }
+#review-error { margin-top: 1rem; }
+.review-help, .review-complete { text-align: center; margin-top: 1.25rem; }
+
+/* This stylesheet is loaded only on the practice page. Let its standard
+   navigation wrap instead of widening the viewport on phones and tablets. */
+@media (max-width: 980px) {
+  .menu-bar { flex-direction: column; align-items: stretch; gap: .75rem; padding: 1rem 0; }
+  .menu-bar .menu { flex-wrap: wrap; justify-content: flex-start; gap: .5rem; }
+  .menu-bar .menu-item { margin: 0; padding: .5rem; }
+}
+
+@media (max-width: 600px) {
+  .review-heading { flex-direction: column; gap: .5rem; }
+  .review-card { min-height: 200px; }
+}

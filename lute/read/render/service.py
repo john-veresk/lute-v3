@@ -20,7 +20,7 @@ class Service:
     def __init__(self, session):
         self.session = session
 
-    def find_all_Terms_in_string(self, s, language):  # pylint: disable=too-many-locals
+    def find_all_Terms_in_string(self, s, language, multiword_term_indexer=None):
         """
         Find all terms contained in the string s.
 
@@ -32,16 +32,14 @@ class Service:
         """
         cleaned = re.sub(r" +", " ", s)
         tokens = language.get_parsed_tokens(cleaned)
-        return self._find_all_terms_in_tokens(tokens, language)
+        return self._find_all_terms_in_tokens(tokens, language, multiword_term_indexer)
 
     def _get_multiword_terms(self, language):
         "Get all multiword terms."
-        sql = sqltext(
-            """
+        sql = sqltext("""
             SELECT WoID, WoTextLC FROM words
             WHERE WoLgID=:language_id and WoTokenCount>1
-            """
-        )
+            """)
         sql = sql.bindparams(language_id=language.id)
         return self.session.execute(sql).all()
 
@@ -61,7 +59,7 @@ class Service:
         # is negligible, so I'll use the first method which IMO is the clearest
         # code.
 
-        zws = "\u200B"  # zero-width space
+        zws = "\u200b"  # zero-width space
         content = zws + zws.join(text_lcs) + zws
 
         # Method 1:

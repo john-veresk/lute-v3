@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Train terms{% endblock %}
+{% block header %}Train terms{% endblock %}
+{% block preloadassets %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/term-review.css') }}">
+{% endblock %}
+
+{% block body %}
+<main class="term-review" data-term-review>
+  <div class="review-heading">
+    <div>
+      {% if book %}<h2>{{ book.title }}</h2>{% else %}<h2>Term practice</h2>{% endif %}
+      <p>Recall the translation, then show the answer and choose a level.</p>
+    </div>
+    <a href="{{ return_url }}">{% if book %}Back to book{% else %}Back to terms{% endif %}</a>
+  </div>
+  {% if review_error %}
+  <p role="alert">{{ review_error }}</p>
+  {% else %}
+  <p id="review-progress" role="status" aria-live="polite"></p>
+  <progress id="review-progress-bar" value="0" max="{{ queue.term_ids|length or 1 }}" aria-label="Review progress"></progress>
+  <p id="review-untranslated" {% if not queue.untranslated %}hidden{% endif %}>{{ queue.untranslated }} {{ 'term' if queue.untranslated == 1 else 'terms' }} skipped because no translation is available.</p>
+
+  <section id="review-card" class="review-card" aria-label="Term card">
+    <p id="review-language" class="review-language"></p>
+    <h2 id="review-word" class="review-word"></h2>
+    <p id="review-loading" role="status">Loading card…</p>
+    <button id="review-show-answer" type="button" hidden>Show answer</button>
+    <div id="review-answer" class="review-answer" hidden>
+      <div id="review-meanings"></div>
+      <p id="review-current-status"></p>
+      <p>Choose a learning level:</p>
+      <div class="review-levels" role="group" aria-label="Learning level">
+        {% for status in review_statuses %}
+        <button type="button" data-review-status="{{ status.id }}" title="{{ status.text }}" style="--review-status-color: var(--status-{{ status.id }}-color)">
+          {% if status.id == 99 %}Known{% elif status.id == 98 %}Ignored{% else %}{{ status.id }}{% endif %}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <p id="review-error" role="alert" hidden></p>
+  <div id="review-navigation" class="review-navigation">
+    <button id="review-retry" type="button" hidden>Retry loading</button>
+    <button id="review-skip" type="button">Skip</button>
+  </div>
+  <p id="review-help" class="review-help">Space: show answer · 1–5: save level · Skip leaves the level unchanged.</p>
+  <section id="review-complete" class="review-complete" hidden>
+    <h2 id="review-complete-title" tabindex="-1">Practice complete</h2>
+    <p id="review-summary"></p>
+  </section>
+  <script id="review-queue" type="application/json">{{ queue|tojson }}</script>
+  <script src="/static/js/never_cache/term-review.js"></script>
+  {% endif %}
+</main>
+{% endblock %}

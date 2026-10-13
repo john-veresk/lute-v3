@@ -14,6 +14,7 @@ from flask import (
     current_app,
     send_file,
     flash,
+    url_for,
 )
 from lute.models.language import Language
 from lute.models.term import Status
@@ -21,6 +22,7 @@ from lute.models.repositories import (
     LanguageRepository,
     TermRepository,
     UserSettingRepository,
+    BookRepository,
 )
 from lute.utils.data_tables import DataTablesFlaskParamParser
 from lute.term.datatables import get_data_tables_list
@@ -32,6 +34,7 @@ from lute.term.service import (
 )
 from lute.db import db
 from lute.term.forms import TermForm
+from lute.term.review import Service as ReviewService, card_data, parse_ids
 import lute.utils.formutils
 
 bp = Blueprint("term", __name__, url_prefix="/term")
@@ -89,6 +92,82 @@ def datatables_active_source():
     _load_term_custom_filters(request.form, parameters)
     data = get_data_tables_list(parameters, db.session)
     return jsonify(data)
+
+
+@bp.route("/review", methods=["GET", "POST"])
+def review():
+    "Start an in-memory review queue from a book or the term listing."
+    svc = ReviewService(db.session)
+    book = None
+    return_url = url_for("term.index")
+    error = None
+    response_status = 200
+    queue = {"term_ids": [], "untranslated": 0}
+    try:
+        if request.method == "GET":
+            book_id = int(request.args.get("book_id", "0"))
+            book = BookRepository(db.session).find(book_id)
+            if book is None:
+                error = "Book not found."
+                response_status = 404
+            elif not book.is_supported:
+                error = "The parser for this book's language is unavailable."
+                response_status = 400
+            else:
+                page_num = book.page_in_range(int(request.args.get("page_num", "1")))
+                return_url = url_for("read.read_page", bookid=book.id, pagenum=page_num)
+                queue = svc.from_book(book)
+        else:
+            selected_ids = parse_ids(request.form.get("selected_ids", ""))
+            parameters = DataTablesFlaskParamParser.parse_params(request.form)
+            _load_term_custom_filters(request.form, parameters)
+            defaults = {
+                "filtLanguage": "0",
+                "filtParentsOnly": "false",
+                "filtAgeMin": "",
+                "filtAgeMax": "",
+                "filtStatusMin": "1",
+                "filtStatusMax": "99",
+                "filtIncludeIgnored": "false",
+                "filtTermIDs": "",
+            }
+            for name, default in defaults.items():
+                if parameters.get(name) is None:
+                    parameters[name] = default
+            queue = svc.from_terms(parameters, selected_ids)
+    except (ValueError, TypeError):
+        error = "Invalid review selection. Return to the list and try again."
+        response_status = 400
+
+    statuses = db.session.query(Status).filter(Status.id != Status.UNKNOWN).all()
+    statuses.sort(key=lambda status: 100 if status.id == Status.IGNORED else status.id)
+    return (
+        render_template(
+            "term/review.html",
+            queue=queue,
+            book=book,
+            return_url=return_url,
+            review_error=error,
+            review_statuses=statuses,
+        ),
+        response_status,
+    )
+
+
+@bp.route("/review/card/<int:term_id>", methods=["GET"])
+def review_card(term_id):
+    "Load the current meaning and status, including synchronized family changes."
+    term = TermRepository(db.session).find(term_id)
+    if term is None:
+        return jsonify({"error": "This term was deleted."}), 404
+    if term.status == Status.UNKNOWN or not term.language.is_supported:
+        return jsonify({"error": "This term is no longer available for review."}), 410
+    card = card_data(term)
+    if not card["meanings"]:
+        return jsonify({"error": "This term no longer has a translation."}), 422
+    response = jsonify(card)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def get_bulk_update_from_form(form):

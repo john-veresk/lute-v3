@@ -80,6 +80,8 @@
   </div>
 </div>
 
+<button id="term_train" type="button" onclick="train_terms();">Train terms</button>
+
 <div id="bulkEditDiv" class="actionDiv" style="display: none;">
   <form id="term-form" name="term_bulk_form" method="POST" action="/term/bulk_edit_from_index">
     <div id="term-bulk-form-fields">
@@ -451,6 +453,28 @@
 
   function set_bulk_wordids() {
     $("#txtWordIds").val(_get_checked_wordids().join(","));
+  }
+
+  function train_terms() {
+    const table = $('#termtable').DataTable();
+    const parameters = {...table.ajax.params()};
+    const searchInput = table.table().container().querySelector('.dt-search input');
+    parameters.search = {value: searchInput?.value ?? table.search(), regex: false};
+    parameters.selected_ids = _get_checked_wordids().join(',');
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/term/review';
+    form.target = '_blank';
+    for (const [name, value] of new URLSearchParams($.param(parameters))) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+    document.body.appendChild(form);
+    form.submit();
+    form.remove();
   }
 
   /**
