@@ -37,7 +37,7 @@ class TermPopup:
 
     def _clean(self, t):
         "Clean text for popup usage."
-        zws = "\u200B"
+        zws = "\u200b"
         ret = (t or "").strip()
         ret = ret.replace(zws, "")
         ret = ret.replace("\n", "<br />")
@@ -109,7 +109,7 @@ class Service:
             for para in paragraphs
             for sentence in para
             for ti in sentence
-            if ti.is_word and ti.term.status == 0
+            if ti.is_word and ti.term.status == Status.UNKNOWN
         ]
 
         batch_size = 100
@@ -145,7 +145,7 @@ class Service:
             for para in paragraphs
             for sentence in para
             for ti in sentence
-            if ti.is_word and ti.term.id is None and ti.term.status == 0
+            if ti.is_word and ti.term.id is None and ti.term.status == Status.UNKNOWN
         ]
 
         for ti in tis_with_new_terms:

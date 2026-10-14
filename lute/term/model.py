@@ -8,7 +8,7 @@ them in the database.
 import re
 import sqlalchemy
 
-from lute.models.term import Term as DBTerm, TermTag
+from lute.models.term import Term as DBTerm, TermTag, Status
 from lute.models.repositories import (
     LanguageRepository,
     TermRepository,
@@ -340,7 +340,7 @@ class Repository:
         if t.sync_status and len(termparents) == 1:
             p = termparents[0]
             # pylint: disable=protected-access
-            if term._status_explicitly_set or p.status == 0:
+            if term._status_explicitly_set or p.status == Status.UNKNOWN:
                 p.status = t.status
             else:
                 t.status = p.status
@@ -349,7 +349,7 @@ class Repository:
 
     def _find_or_create_parent(self, pt, language, term, termtags) -> DBTerm:
         p = self._find_by_spec(language.id, pt)
-        new_or_unknown_parent = p is None or p.status == 0
+        new_or_unknown_parent = p is None or p.status == Status.UNKNOWN
         new_term = term.id is None
 
         if p is None:
@@ -520,8 +520,7 @@ class ReferencesRepository:
             only_include_read = "1=1"  # include everything.
 
         term_lc = term.text_lc
-        query = sqlalchemy.text(
-            f"""
+        query = sqlalchemy.text(f"""
             SELECT DISTINCT
                 texts.TxBkID,
                 TxID,
@@ -542,8 +541,7 @@ class ReferencesRepository:
             AND BkLgID = {term.language.id}
             ORDER BY TxReadDate desc, TxID desc
             LIMIT {self.limit}
-        """
-        )
+        """)
         # print(query)
 
         pattern = f"%{chr(0x200B)}{term_lc}{chr(0x200B)}%"

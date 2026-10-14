@@ -1,5 +1,7 @@
 """Word and phrase cards suggested by Codex, saved into the vocabulary."""
 
+from lute.models.term import Status
+
 
 def _is_inflected_word(language, card, card_type):
     return (
@@ -16,10 +18,10 @@ def save_card(repo, language, card, card_type):
     The caller commits the repository.
     """
     term = repo.find_or_new(language.id, card["text"])
-    already_saved = term.id is not None and term.status != 0
+    already_saved = term.id is not None and term.status != Status.UNKNOWN
     if not (term.translation or "").strip():
         term.translation = card["translation"]
-    if term.status == 0:
+    if term.status == Status.UNKNOWN:
         term.status = 1
     is_inflected = _is_inflected_word(language, card, card_type)
     if is_inflected and not term.parents:
@@ -27,7 +29,7 @@ def save_card(repo, language, card, card_type):
         term.parents = [card["lemma"]]
         if not already_saved:
             term.sync_status = True
-            if parent_term is not None and parent_term.status != 0:
+            if parent_term is not None and parent_term.status != Status.UNKNOWN:
                 term.status = parent_term.status
     if is_inflected:
         term.suggested_parent_text = card["lemma"]
