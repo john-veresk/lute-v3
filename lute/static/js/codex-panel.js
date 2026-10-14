@@ -59,14 +59,23 @@ class CodexTimer {
  * Term lookups are connected to the term form through `form`;
  * sentence lookups only show the translation.
  */
+/** The term form for one word of a phrase. Slashes match the reading-pane route. */
+function wordTermUrl(languageId, text, embedded) {
+  const encoded = encodeURIComponent(withoutZeroWidth(text).trim().replaceAll('/', 'LUTESLASH'));
+  const path = embedded ? 'read/termform' : 'term/editbytext';
+  return `/${path}/${languageId}/${encoded}`;
+}
+
 class CodexPanel {
-  constructor({window, languageId, kind = 'term', form = null, onCardsSaved = () => {}}) {
+  constructor({window, languageId, kind = 'term', form = null, onCardsSaved = () => {}, embedded = false, openWord = null}) {
     this.win = window;
     this.doc = window.document;
     this.languageId = languageId;
     this.kind = kind;
     this.form = form;
     this.onCardsSaved = onCardsSaved;
+    this.embedded = embedded;
+    this.openWord = openWord;
     this.text = '';
     this.context = '';
     this.generation = 0;
@@ -343,7 +352,8 @@ class CodexPanel {
 
     cards.forEach((card, index) => {
       const alreadySaved = cardType === 'words' && card.saved === true;
-      const row = this.cardRow(card, `codex-${cardType}-select-${current}-${index}`, alreadySaved, label);
+      const openUrl = cardType === 'words' ? wordTermUrl(this.languageId, card.text, this.embedded) : '';
+      const row = this.cardRow(card, `codex-${cardType}-select-${current}-${index}`, alreadySaved, label, openUrl);
       if (alreadySaved) this.markSaved(row, label);
       row.checkbox.addEventListener('change', updateButtons);
       row.button.addEventListener('click', () => save([index]));
@@ -380,7 +390,7 @@ class CodexPanel {
       }));
   }
 
-  cardRow(card, id, checked, label) {
+  cardRow(card, id, checked, label, openUrl = '') {
     const element = this.doc.createElement('div');
     element.className = 'codex-word';
     const checkbox = this.doc.createElement('input');
@@ -391,8 +401,19 @@ class CodexPanel {
     const body = this.doc.createElement('label');
     body.className = 'codex-word-body';
     body.htmlFor = id;
-    const title = this.doc.createElement('strong');
+    const title = this.doc.createElement(openUrl ? 'a' : 'strong');
     title.textContent = card.text;
+    if (openUrl) {
+      title.className = 'codex-word-open';
+      title.href = openUrl;
+      title.setAttribute('href', openUrl);
+      title.setAttribute('aria-label', `Open ${card.text}`);
+      title.addEventListener('click', event => {
+        if (!this.openWord) return;
+        event.preventDefault();
+        this.openWord(openUrl);
+      });
+    }
     const translation = this.doc.createElement('span');
     translation.className = 'codex-word-translation';
     translation.textContent = card.translation;

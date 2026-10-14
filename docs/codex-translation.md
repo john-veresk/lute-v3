@@ -73,7 +73,9 @@ learning statuses are preserved. The section stays hidden when there is no
 useful phrase, no sentence context, or you selected several words.
 
 For a phrase with 2–40 distinct words, **Words** shows individual word
-cards, translations and any inflected words' base forms. Use **Add** on one
+cards, translations and any inflected words' base forms. Click a word to open
+its term card; the phrase stays in the vocabulary. Unsaved edits to the phrase
+are saved first, after confirmation. Use **Add** on one
 card, or select checkboxes and press **Add selected**. These buttons save
 the selected word cards to the Lute vocabulary immediately, independently of
 saving the complete phrase, and refresh reading highlights. Existing word

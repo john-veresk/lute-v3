@@ -317,7 +317,29 @@
     );
 
     const in_reading_frame = ("{{ embedded_in_reading_frame }}" == "True");
-    startTermCodex(window, in_reading_frame ? (window.parent.LUTE_LOOKUP_CONTEXT || '') : '');
+    const openPhraseWord = url => {
+      const go = () => {
+        if (in_reading_frame) window.location.replace(url);
+        else window.location.href = url;
+      };
+      if (!form_changed) {
+        go();
+        return;
+      }
+      const msg = 'You have unsaved changes. Click OK to save these changes and open the word, or Cancel to continue editing.';
+      if (!confirm(msg))
+        return;
+      const frm = $('#term-form');
+      $.post(frm.attr('action'), frm.serialize(), function() {
+        window.parent.postMessage({ event: "LuteTermFormPosted", keepOpen: true }, "*");
+        go();
+      });
+    };
+    startTermCodex(
+      window,
+      in_reading_frame ? (window.parent.LUTE_LOOKUP_CONTEXT || '') : '',
+      {embedded: in_reading_frame, openWord: openPhraseWord}
+    );
     $('#term-sentences-btn').click(toggle_sentences);
     $('#term-image-btn').click(toggle_image_search);
     

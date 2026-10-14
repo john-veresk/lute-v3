@@ -368,7 +368,18 @@ div.codex-option { cursor: auto; padding-inline: 0; }
 
 .codex-word input:disabled + .codex-word-body { cursor: default; }
 
-.codex-word-body strong { font-family: var(--read-font); font-size: 1rem; font-weight: 600; }
+.codex-word-body strong,
+a.codex-word-open {
+    color: inherit;
+    font-family: var(--read-font);
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+a.codex-word-open { cursor: pointer; width: fit-content; }
+a.codex-word-open:hover,
+a.codex-word-open:focus { text-decoration: underline; text-underline-offset: 3px; }
 .codex-word-translation { color: var(--ink-2); font-size: .88rem; }
 .codex-word-parent { color: var(--ink-3); font-size: .78rem; }
 

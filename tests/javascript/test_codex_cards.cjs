@@ -27,7 +27,7 @@ function makeForm(text = 'looked') {
   };
 }
 
-function makePanel({words = [], phraseCards = phrases, saveResponse, form = makeForm()} = {}) {
+function makePanel({words = [], phraseCards = phrases, saveResponse, form = makeForm(), embedded = false, openWord = null} = {}) {
   const win = makeWindow(async (url, body) => {
     if (url === '/translation/jobs') return {job_id: 'job', saved: false};
     if (url === '/translation/jobs/job') return {
@@ -39,7 +39,7 @@ function makePanel({words = [], phraseCards = phrases, saveResponse, form = make
     return {saved: body.indices.map(index => ({index, ...cards[index]}))};
   });
   let cardsSaved = 0;
-  const panel = new CodexPanel({window: win, form, onCardsSaved: () => { cardsSaved++; }});
+  const panel = new CodexPanel({window: win, form, embedded, openWord, onCardsSaved: () => { cardsSaved++; }});
   panel.setLookup('looked', 'He looked after the cats.');
   panel.start('auto');
   return {win, panel, form, el: id => win.document.getElementById(id), cardsSaved: () => cardsSaved};
@@ -110,6 +110,23 @@ async function checks() {
   assert.equal(knownRow.children[2].textContent, 'Saved');
   assert.equal(knownRow.children[2].disabled, true);
   assert.deepEqual(known.form.words, [], 'a saved word is not posted again');
+  assert.equal(knownRow.children[1].children[0].getAttribute('href'), '/term/editbytext/1/cats', 'a saved word opens its card');
+
+  let opened = '';
+  let prevented = false;
+  const reading = makePanel({
+    phraseCards: [], embedded: true, openWord: url => { opened = url; },
+    words: [{text: 'a/b', translation: 'дробь'}],
+  });
+  await settle();
+  const readingRow = reading.el('codex-word-cards').children[0];
+  const wordLink = readingRow.children[1].children[0];
+  assert.equal(wordLink.getAttribute('href'), '/read/termform/1/aLUTESLASHb');
+  wordLink.handlers.click({preventDefault() { prevented = true; }});
+  assert.equal(prevented, true);
+  assert.equal(opened, '/read/termform/1/aLUTESLASHb', 'the word opens in the reading pane');
+  assert.equal(readingRow.children[0].checked, false, 'opening a word does not select it for saving');
+  assert.equal(card.el('codex-phrase-cards').children[0].children[1].children[0].tagName, 'STRONG', 'a phrase name stays plain text');
 
   const failed = makePanel({saveResponse: async () => ({ok: false, json: async () => ({error: 'Translation expired. Translate again.'})})});
   await settle();

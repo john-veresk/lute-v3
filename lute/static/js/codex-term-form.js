@@ -54,10 +54,10 @@ class CodexTermForm {
  * Show Codex in the term card.  A saved translation is shown without a new
  * request; an empty Translation is translated automatically.
  */
-function startTermCodex(window, context) {
+function startTermCodex(window, context, {embedded = false, openWord = null} = {}) {
   const form = new CodexTermForm(window.document.getElementById('term-form-container'));
   const panel = new CodexPanel({
-    window, form,
+    window, form, embedded, openWord,
     onCardsSaved: () => window.parent.postMessage({event: 'LuteCodexWordsSaved'}, window.location.origin),
   });
   panel.setLookup(form.text(), context);
