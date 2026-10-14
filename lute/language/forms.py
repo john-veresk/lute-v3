@@ -5,38 +5,12 @@ Flask-wtf forms.
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
-    IntegerField,
     BooleanField,
     SelectField,
-    FormField,
-    FieldList,
-    Form,
     ValidationError,
 )
 from wtforms.validators import DataRequired, Length, Optional, Regexp
-from lute.models.language import LanguageDictionary
 from lute.translation.service import REASONING_EFFORTS, available_model_efforts
-
-
-class LanguageDictionaryForm(Form):
-    """
-    Language dictionary form, nested in Language form.
-    """
-
-    usefor = SelectField(
-        choices=[("terms", "Terms"), ("sentences", "Sentences")],
-        render_kw={"title": "Use dictionary for"},
-    )
-    dicttype = SelectField(
-        choices=[
-            ("embeddedhtml", "Embedded"),
-            ("popuphtml", "Pop-up window"),
-        ],
-        render_kw={"title": "Show as"},
-    )
-    dicturi = StringField("URL", validators=[DataRequired()])
-    is_active = BooleanField("Is active", render_kw={"title": "Is active?"})
-    sort_order = IntegerField("Sort", render_kw={"style": "display: none"})
 
 
 class LanguageForm(FlaskForm):
@@ -45,14 +19,6 @@ class LanguageForm(FlaskForm):
     """
 
     name = StringField("Name", validators=[DataRequired()])
-    translation_provider = SelectField(
-        "Translation source",
-        choices=[
-            ("dictionaries", "Dictionary websites"),
-            ("codex", "Codex CLI translation"),
-        ],
-        default="dictionaries",
-    )
     translation_target = StringField(
         "Translate into", default="Russian", validators=[Length(max=80)]
     )
@@ -73,9 +39,6 @@ class LanguageForm(FlaskForm):
     )
     codex_fast_mode = BooleanField("Fast mode", default=False)
     codex_show_timer = BooleanField("Show translation timer", default=True)
-    dictionaries = FieldList(
-        FormField(LanguageDictionaryForm, default=LanguageDictionary)
-    )
     show_romanization = BooleanField("Show Pronunciation field")
     right_to_left = BooleanField("Right-to-left")
 
@@ -96,35 +59,14 @@ class LanguageForm(FlaskForm):
         "Word characters (default: all Unicode letters and marks)"
     )
 
-    def validate_dictionaries(self, field):  # pylint: disable=unused-argument
-        "Dictionaries must be valid."
-        if self.translation_provider.data == "codex":
-            return
-
-        # raise ValueError(self.dictionaries.data) # debugging
-        def _get_actives(usefor):
-            "Return dictionaries."
-            return [
-                d
-                for d in self.dictionaries.data
-                if d.get("usefor", "") == usefor and d.get("is_active")
-            ]
-
-        term_dicts = _get_actives("terms")
-        sentence_dicts = _get_actives("sentences")
-        if len(term_dicts) == 0:
-            raise ValidationError("Please add an active Terms dictionary")
-        if len(sentence_dicts) == 0:
-            raise ValidationError("Please add an active Sentences dictionary")
-
     def validate_translation_target(self, field):
         "Codex needs a target language."
-        if self.translation_provider.data == "codex" and not (field.data or "").strip():
+        if not (field.data or "").strip():
             raise ValidationError("Please enter a translation language")
 
     def validate_codex_reasoning_effort(self, field):
         "Reject unsupported explicit levels when model metadata is available."
-        if self.translation_provider.data != "codex" or not field.data:
+        if not field.data:
             return
         supported = available_model_efforts().get(self.codex_model.data)
         if supported and field.data not in supported:

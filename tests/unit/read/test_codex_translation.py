@@ -148,7 +148,6 @@ def test_translation_cache_changes_with_settings(
     client, spanish, monkeypatch, setting, value
 ):
     monkeypatch.setattr(service, "translate", lambda *args: RESULT)
-    spanish.translation_provider = "codex"
     db.session.commit()
     jobs = client.application.extensions["codex_translation_jobs"]
     payload = {"language_id": spanish.id, "text": "gato"}
@@ -219,10 +218,9 @@ def test_background_jobs_deduplicate_and_cache(monkeypatch):
 def test_translation_api(client, spanish, monkeypatch):
     monkeypatch.setattr(service, "translate", lambda *args: RESULT)
     payload = {"language_id": spanish.id, "text": "gato", "context": "El gato duerme."}
-    assert client.post("/translation/jobs", json=payload).status_code == 400
-    spanish.translation_provider = "codex"
-    spanish.translation_target = "Russian"
-    db.session.commit()
+    assert (
+        client.post("/translation/jobs", json={**payload, "language_id": 999})
+    ).status_code == 404
     response = client.post("/translation/jobs", json=payload)
     assert response.status_code == 202
     job = response.json["job_id"]
@@ -241,7 +239,6 @@ def test_timer_visibility_does_not_invalidate_translation_cache(
     client, spanish, monkeypatch
 ):
     monkeypatch.setattr(service, "translate", lambda *args: RESULT)
-    spanish.translation_provider = "codex"
     db.session.commit()
     jobs = client.application.extensions["codex_translation_jobs"]
     payload = {"language_id": spanish.id, "text": "gato"}

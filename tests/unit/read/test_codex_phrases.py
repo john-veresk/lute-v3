@@ -49,7 +49,6 @@ def test_candidates_support_languages_without_spaces(classical_chinese):
 def test_only_single_word_jobs_offer_context_phrases(
     client, english, monkeypatch, text, context, kind, has_phrases
 ):
-    english.translation_provider = "codex"
     db.session.commit()
     monkeypatch.setattr(service, "translate", lambda *args: RESULT)
     response = client.post(
@@ -131,7 +130,6 @@ def test_cli_rejects_invalid_or_invented_phrases(monkeypatch, phrases):
 
 
 def _phrase_job(client, language, monkeypatch, phrases=PHRASES):
-    language.translation_provider = "codex"
     language.translation_target = "Russian"
     db.session.commit()
     monkeypatch.setattr(
@@ -224,7 +222,6 @@ def test_bad_phrase_selection_is_rejected_before_writes(
 
 
 def test_expired_phrase_job_is_rejected(client, english):
-    english.translation_provider = "codex"
     db.session.commit()
     response = client.post(
         "/translation/phrases",

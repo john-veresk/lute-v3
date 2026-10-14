@@ -360,8 +360,7 @@ class Repository:
 
         dictionary_translation = ""
         has_dictionary_suggestion = (
-            language.translation_provider == "codex"
-            and term.suggested_parent_text
+            term.suggested_parent_text
             and language.get_lowercase(pt)
             == language.get_lowercase(term.suggested_parent_text)
         )

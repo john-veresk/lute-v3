@@ -63,7 +63,7 @@ def panel():
 
 @bp.route("/jobs", methods=["POST"])
 def submit():
-    """Only translate for languages that explicitly select Codex."""
+    """Queue a Codex translation of a term or sentence."""
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify(error="Expected a JSON object"), 400
@@ -73,13 +73,6 @@ def submit():
     language = db.session.get(Language, lang_id)
     if language is None:
         return jsonify(error="Language not found"), 404
-    if language.translation_provider != "codex":
-        return (
-            jsonify(
-                error="Select Codex CLI translation in the language settings first"
-            ),
-            400,
-        )
     text = data.get("text", "")
     context = data.get("context", "")
     kind = data.get("kind", "term")
@@ -180,7 +173,6 @@ def _save_cards(card_type):
     indices = data.get("indices")
     if (
         language is None
-        or language.translation_provider != "codex"
         or not isinstance(job_id, str)
         or not isinstance(indices, list)
         or not 1 <= len(indices) <= (3 if card_type == "phrases" else 40)

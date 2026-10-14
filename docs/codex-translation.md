@@ -1,7 +1,7 @@
 # Translation with local Codex CLI
 
-In **Settings → Languages → Edit**, select **Codex CLI translation** under
-**Translation source**. Set **Translate into** (Russian by default), and choose
+Codex is the only translation source; languages no longer use dictionary websites.
+In **Settings → Languages → Edit**, set **Translate into** (Russian by default), and choose
 a **Codex model** from the suggestions or enter a model ID. Leave the model
 blank to use the CLI's configured default. Save the language and reload the book.
 **Reasoning effort** can use the CLI setting or override it for this language.
@@ -13,8 +13,6 @@ phrases, sentences and pages.
 **Show translation timer** displays elapsed request time beside the model in the
 Codex panel, including waiting for the result. It stops when the response is
 ready or fails. Uncheck it to hide the timer for that language.
-No website dictionaries are required in this mode. Existing website settings
-are retained for switching back.
 
 Clicking a word or selecting a phrase opens a **Codex** tab in the dictionary
 panel. It translates the term using the sentence from the book and shows its main
@@ -91,6 +89,6 @@ Errors appear in the panel with a Retry button.
 Model suggestions come from the local CLI cache when it is available. The list
 can be empty until the CLI has fetched models; entering an ID still works.
 Startup automatically migrates the database and makes the usual migration
-backup. Existing languages keep their dictionary provider until changed.
+backup.
 
 [Official documentation for non-interactive Codex](https://developers.openai.com/codex/noninteractive/)

@@ -11,7 +11,6 @@ from flask import (
     redirect,
     url_for,
     flash,
-    request,
 )
 from lute.models.language import Language
 from lute.models.repositories import UserSettingRepository
@@ -62,13 +61,7 @@ def _handle_form(language, form) -> bool:
 
     if form.validate_on_submit():
         try:
-            dictionaries = list(language.dictionaries)
             form.populate_obj(language)
-            # Preserve disabled website controls when switching to Codex.
-            if form.translation_provider.data == "codex" and not any(
-                k.startswith("dictionaries-") for k in request.form
-            ):
-                language.dictionaries = dictionaries
             current_app.db.session.add(language)
             current_app.db.session.commit()
             flash(f"Language {language.name} updated", "success")
@@ -81,21 +74,6 @@ def _handle_form(language, form) -> bool:
             flash(msg, "error")
 
     return result
-
-
-def _add_hidden_dictionary_template_entry(form):
-    "Add a dummy placeholder dictionary to be used as a template."
-    # Add a dummy dictionary entry with dicturi __TEMPLATE__.
-    #
-    # This entry is used as a "template" when adding a new dictionary
-    # to the list of dictionaries (see templates/language/_form.html).
-    # This is the easiest way to ensure that new dictionary entries
-    # have the correct controls.
-    #
-    # This dummy entry is not rendered on the form, or submitted
-    # when the form is submitted.  Search for __TEMPLATE__ in
-    # templates/language/_form.html to see where it is handled.
-    form.dictionaries.append_entry({"dicturi": "__TEMPLATE__"})
 
 
 def _dropdown_parser_choices():
@@ -119,8 +97,6 @@ def edit(langid):
 
     if _handle_form(language, form):
         return redirect("/")
-
-    _add_hidden_dictionary_template_entry(form)
 
     return render_template(
         "language/edit.html",
@@ -161,8 +137,6 @@ def new(langname):
         repo.set_value("current_language_id", 0)
         db.session.commit()
         return redirect("/")
-
-    _add_hidden_dictionary_template_entry(form)
 
     return render_template(
         "language/new.html",

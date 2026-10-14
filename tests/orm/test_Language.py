@@ -3,7 +3,6 @@ Language mapping tests.
 """
 
 from lute.models.language import Language, LanguageDictionary
-from lute.models.repositories import LanguageRepository
 from lute.read.service import Service as ReadService
 from lute.db import db
 from tests.dbasserts import assert_sql_result, assert_record_count_equals
@@ -85,19 +84,6 @@ def test_language_dictionaries_smoke_test(empty_db):
     ld = retrieved.dictionaries[0]
     assert ld.dicttype == "embeddedhtml", "type"
     assert ld.dicturi == "1?[LUTE]", "uri"
-
-    exp = {
-        1: {
-            "term": [
-                {"url": "1?[LUTE]", "dicttype": "embeddedhtml"},
-                {"url": "2?[LUTE]", "dicttype": "popuphtml"},
-            ],
-            "sentence": [{"url": "3?[LUTE]", "dicttype": "popuphtml"}],
-        }
-    }
-    repo = LanguageRepository(db.session)
-    dicts = repo.all_dictionaries()
-    assert dicts == exp
 
 
 def test_delete_language_removes_book_and_terms(app_context, spanish):

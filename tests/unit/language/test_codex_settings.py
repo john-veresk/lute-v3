@@ -1,4 +1,4 @@
-"""Codex is a complete replacement for website dictionaries."""
+"""Codex is the only translation source; languages have no website dictionaries."""
 
 import json
 import pytest
@@ -6,13 +6,12 @@ from lute.db import db
 from lute.models.language import Language
 
 
-def test_save_codex_without_dictionaries(client, app_context):
+def test_save_codex_settings(client, app_context):
     response = client.post(
         "/language/new",
         data={
             "name": "Codex Finnish",
             "parser_type": "spacedel",
-            "translation_provider": "codex",
             "translation_target": "Russian",
             "codex_model": "custom-model",
             "codex_reasoning_effort": "low",
@@ -27,7 +26,6 @@ def test_save_codex_without_dictionaries(client, app_context):
     assert language.codex_reasoning_effort == "low"
     assert language.codex_fast_mode is True
     assert language.codex_show_timer is True
-    assert language.sentence_dict_uris[0]["dicttype"] == "codex"
     assert Language.from_dict(language.to_dict()).to_dict() == language.to_dict()
     page = client.get(f"/language/edit/{language.id}").data
     assert b'<option selected value="low">low</option>' in page
@@ -43,7 +41,6 @@ def test_save_codex_without_dictionaries(client, app_context):
         data={
             "name": language.name,
             "parser_type": "spacedel",
-            "translation_provider": "codex",
             "translation_target": "Russian",
             "codex_model": "custom-model",
             "codex_reasoning_effort": "",
@@ -81,7 +78,6 @@ def test_unsupported_effort_is_rejected(client, monkeypatch, tmp_path, effort):
         data={
             "name": "Invalid effort",
             "parser_type": "spacedel",
-            "translation_provider": "codex",
             "translation_target": "Russian",
             "codex_model": "test-luna",
             "codex_reasoning_effort": effort,
@@ -104,17 +100,10 @@ def test_new_language_timer_is_checked_by_default(client):
     assert b'checked id="codex_show_timer"' in client.get("/language/new").data
 
 
-def test_websites_still_require_dictionaries(client):
-    response = client.post(
-        "/language/new",
-        data={
-            "name": "No dictionaries",
-            "parser_type": "spacedel",
-            "translation_provider": "dictionaries",
-        },
-    )
-    assert response.status_code == 200
-    assert b"Please add an active Terms dictionary" in response.data
+def test_settings_have_no_dictionary_controls(client, spanish):
+    page = client.get(f"/language/edit/{spanish.id}").data
+    assert b"translation_provider" not in page
+    assert b"dictionary_entities" not in page
 
 
 def test_codex_requires_target_language(client):
@@ -123,27 +112,22 @@ def test_codex_requires_target_language(client):
         data={
             "name": "No target",
             "parser_type": "spacedel",
-            "translation_provider": "codex",
             "translation_target": "",
         },
     )
     assert b"Please enter a translation language" in response.data
 
 
-def test_switching_provider_preserves_website_settings(client, spanish):
+def test_saving_settings_keeps_stored_dictionary_data(client, spanish):
     before = spanish.to_dict()["dictionaries"]
     response = client.post(
         f"/language/edit/{spanish.id}",
         data={
             "name": spanish.name,
             "parser_type": spanish.parser_type,
-            "translation_provider": "codex",
             "translation_target": "Russian",
         },
     )
     assert response.status_code == 302
     db.session.refresh(spanish)
     assert spanish.to_dict()["dictionaries"] == before
-    assert spanish.active_dict_uris("terms") == [
-        {"url": "/translation/panel", "dicttype": "codex"}
-    ]

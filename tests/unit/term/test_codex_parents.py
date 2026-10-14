@@ -10,7 +10,6 @@ from lute.translation import service
 
 @pytest.fixture
 def codex_english(english):
-    english.translation_provider = "codex"
     english.translation_target = "Russian"
     db.session.commit()
     return english
