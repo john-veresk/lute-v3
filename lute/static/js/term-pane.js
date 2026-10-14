@@ -59,16 +59,11 @@ class TermPane {
   }
 
   /**
-   * A frame navigation sits above the pane's entry, so the first Back only
-   * reloads the frame. Step back once more, and clear the flag first: another
-   * load during that Back must not leave the reading page.
+   * Back can reload the term frame before the pane entry has actually gone.
+   * Do not step back again: that next entry is often Review, when the book
+   * was opened from there.
    */
   onFrameTraversed() {
-    if (!this.unwinding || this.isOpen) {
-      this.unwinding = false;
-      return;
-    }
     this.unwinding = false;
-    if (this.ownsHistoryEntry) this.history.back();
   }
 }

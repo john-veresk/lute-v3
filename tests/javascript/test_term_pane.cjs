@@ -65,8 +65,8 @@ phone.termPane.open();
 phone.history.frameNavigation();
 phone.termPane.close();
 phone.settle();
-assert.equal(phone.entries.length, 1, 'a saved form frame entry is unwound too');
-assert.equal(phone.entries[0].state, null);
+assert.equal(phone.entries.length, 2, 'a frame reload does not walk Back out of the book');
+assert.equal(phone.entries.at(-1).state.luteTermPane, true);
 
 phone.termPane.open();
 phone.history.frameNavigation();
@@ -82,16 +82,15 @@ phone.termPane.onFrameTraversed();
 phone.termPane.onFrameTraversed();
 assert.equal(phone.entries.length, 1, 'stray frame loads never step back past the reading page');
 
-const race = fixture();
-race.termPane.open();
-race.history.frameNavigation();
-race.termPane.close();
-race.history.backCalls = 0;
-race.history.delayPop = true;
-race.termPane.onFrameTraversed();
-race.termPane.onFrameTraversed();
-assert.equal(race.history.backCalls, 1, 'a second frame load during Back steps back only once');
-assert.equal(race.entries.length, 2, 'that Back has not left the reading page yet');
+const fromReview = fixture();
+fromReview.entries.unshift({state: {page: 'review'}});
+fromReview.termPane.open();
+fromReview.history.delayPop = true;
+fromReview.history.backCalls = 0;
+fromReview.termPane.close();
+fromReview.termPane.onFrameTraversed();
+assert.equal(fromReview.history.backCalls, 1, 'Save takes only the pane Back while the frame reloads');
+assert.equal(fromReview.entries.at(-1).state.luteTermPane, true, 'that reload does not return to Review');
 
 const desktop = fixture(false);
 desktop.termPane.request();
