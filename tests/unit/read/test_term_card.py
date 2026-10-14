@@ -36,3 +36,4 @@ def test_reading_page_pretranslates_only_when_enabled(client, spanish, enabled):
     db.session.commit()
     page = client.get(f"/read/{book.id}").data.decode()
     assert f"var LUTE_CODEX_PRETRANSLATE = {str(enabled).lower()};" in page
+    assert ('id="pretranslate-progress"' in page) is enabled

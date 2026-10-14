@@ -575,6 +575,81 @@ span.textitem.word { border-radius: 2px; }
 
 .reading-footer-actions .btn { min-height: 40px; padding: 0 1.1rem; }
 
+body.pretranslate-active #reading-footer { padding-bottom: 4.5rem; }
+
+#pretranslate-progress {
+    position: fixed;
+    z-index: 1000;
+    bottom: calc(1.15rem + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    padding: .45rem .8rem .45rem .75rem;
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    background: color-mix(in oklab, var(--background-color) 84%, transparent);
+    box-shadow: var(--shadow-pop);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    transform: translateX(-50%);
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity .45s ease, transform .45s ease;
+}
+
+#pretranslate-progress[hidden] { display: none !important; }
+
+#pretranslate-progress.is-leaving {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+}
+
+.pretranslate-progress-label {
+    color: var(--ink-2);
+    font-size: .75rem;
+    font-weight: 500;
+    letter-spacing: .01em;
+}
+
+.pretranslate-progress-bar {
+    width: 4.75rem;
+    height: 3px;
+    border-radius: 99px;
+    background: var(--line);
+    overflow: hidden;
+}
+
+.pretranslate-progress-bar span {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: inherit;
+    background: var(--accent);
+    transition: width .35s ease;
+}
+
+.pretranslate-progress-count {
+    color: var(--ink-3);
+    font-size: .75rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.sticky-player #pretranslate-progress {
+    bottom: calc(var(--player-height) + .75rem);
+}
+
+@media screen and (max-width: 980px) {
+    .term-pane-open #pretranslate-progress { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #pretranslate-progress,
+    .pretranslate-progress-bar span { transition: none; }
+}
+
 .reading-finished {
     display: flex;
     justify-content: center;

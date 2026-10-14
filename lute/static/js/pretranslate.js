@@ -6,12 +6,16 @@
  * The server skips words that already have one.
  */
 class Pretranslator {
-  constructor({fetch, wait, languageId}) {
+  constructor({fetch, wait, languageId, onProgress = () => {}}) {
     this.fetch = fetch;
     this.wait = wait;
     this.languageId = languageId;
+    this.onProgress = onProgress;
     this.queue = [];
     this.draining = null;
+    this.done = 0;
+    this.total = 0;
+    this.generation = 0;
   }
 
   /** Replace the waiting words; the word being translated finishes first. */
@@ -21,12 +25,22 @@ class Pretranslator {
       const key = word.text.toLocaleLowerCase();
       return !seen.has(key) && seen.add(key);
     });
+    this.generation += 1;
+    this.done = 0;
+    this.total = this.queue.length;
+    this.onProgress({done: this.done, total: this.total});
     this.draining ||= this.drain();
     return this.draining;
   }
 
   async drain() {
-    while (this.queue.length) await this.translate(this.queue.shift());
+    while (this.queue.length) {
+      const generation = this.generation;
+      await this.translate(this.queue.shift());
+      if (generation !== this.generation) continue;
+      this.done += 1;
+      this.onProgress({done: this.done, total: this.total});
+    }
     this.draining = null;
   }
 

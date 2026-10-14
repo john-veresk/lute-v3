@@ -10,13 +10,14 @@ const Pretranslator = vm.runInContext('Pretranslator', context);
 
 const response = (data, status = 200) => ({ok: status < 400, status, json: async () => data});
 
-function makePretranslator(reply) {
+function makePretranslator(reply, onProgress) {
   const requests = [];
   let inFlight = 0;
   let maxInFlight = 0;
   const pretranslator = new Pretranslator({
     languageId: 1,
     wait: async () => {},
+    onProgress,
     fetch: async (url, options) => {
       const body = options && JSON.parse(options.body);
       requests.push({url, body});
@@ -74,6 +75,29 @@ async function checks() {
   await Promise.all([first, second]);
   const texts = paging.requests.filter(r => r.url === '/translation/jobs').map(r => r.body.text);
   assert.deepEqual(texts, ['Kissa', 'koira'], 'a new page replaces the waiting words after the current one finishes');
+
+  const progress = [];
+  const tracked = makePretranslator(async (url, body) => {
+    if (url === '/translation/jobs') return response({job_id: body.text}, 202);
+    return response({status: 'complete'});
+  }, event => progress.push(`${event.done}/${event.total}`));
+  await tracked.pretranslator.run(words);
+  assert.deepEqual(progress, ['0/2', '1/2', '2/2'], 'each unique word on the page advances the progress');
+
+  const pageProgress = [];
+  let releaseProgress;
+  const pagingProgress = makePretranslator(async (url) => {
+    if (url === '/translation/jobs') return response({job_id: 'job'}, 202);
+    if (pageProgress.length === 1) await new Promise(resolve => { releaseProgress = resolve; });
+    return response({status: 'complete'});
+  }, event => pageProgress.push(`${event.done}/${event.total}`));
+  const oldPage = pagingProgress.pretranslator.run([words[0]]);
+  await new Promise(resolve => setImmediate(resolve));
+  const newPage = pagingProgress.pretranslator.run([{text: 'koira', context: 'Koira.'}, {text: 'koira', context: 'Iso koira.'}]);
+  releaseProgress();
+  await Promise.all([oldPage, newPage]);
+  assert.deepEqual(pageProgress, ['0/1', '0/1', '1/1'], 'a new page starts over and ignores the word already in flight');
+
   console.log('Pretranslation checks passed');
 }
 checks().catch(error => { console.error(error); process.exitCode = 1; });
