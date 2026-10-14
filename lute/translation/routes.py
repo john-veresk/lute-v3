@@ -13,6 +13,41 @@ def _jobs():
     return current_app.extensions["codex_translation_jobs"]
 
 
+def _phrase_candidates(language, word, context):
+    """Bounded, verbatim spans of 2–6 words around a single selected word."""
+    tokens = language.get_parsed_tokens(context)
+    selected = language.get_lowercase(word)
+    candidates = []
+    for start, token in enumerate(tokens):
+        if not token.is_word:
+            continue
+        parts = []
+        count = 0
+        contains_word = False
+        for following in tokens[start:]:
+            if following.is_end_of_sentence:
+                break
+            parts.append(following.token)
+            if not following.is_word:
+                continue
+            count += 1
+            if count > 6:
+                break
+            contains_word |= language.get_lowercase(following.token) == selected
+            phrase = "".join(parts)
+            if (
+                contains_word
+                and count > 1
+                and len(phrase) <= 250
+                and phrase in context
+                and phrase not in candidates
+            ):
+                candidates.append(phrase)
+                if len(candidates) == 80:
+                    return tuple(candidates)
+    return tuple(candidates)
+
+
 @bp.record_once
 def setup(state):
     """One bounded job manager per application."""
@@ -64,6 +99,7 @@ def submit():
         )
     clean_text = text.replace("\u200b", "").strip()
     word_texts = ()
+    phrase_texts = ()
     if kind == "term":
         tokens = language.get_parsed_tokens(clean_text)
         seen = set()
@@ -76,6 +112,10 @@ def submit():
         # Keep long selections usable without generating an unbounded set of cards.
         if 1 < len(words) <= 40:
             word_texts = tuple(words)
+        if sum(token.is_word for token in tokens) == 1 and context.strip():
+            phrase_texts = _phrase_candidates(
+                language, words[0], context.replace("\u200b", "")
+            )
     key = (
         language.name,
         language.translation_target,
@@ -86,6 +126,7 @@ def submit():
         word_texts,
         language.codex_reasoning_effort,
         language.codex_fast_mode,
+        phrase_texts,
     )
     try:
         job_id = _jobs().submit(key)
@@ -119,10 +160,21 @@ def parent():
 
 @bp.route("/words", methods=["POST"])
 def save_word_cards():
-    """Save explicitly selected phrase cards and their parents in one transaction."""
+    """Save explicitly selected word cards and their parents."""
+    return _save_cards("words")
+
+
+@bp.route("/phrases", methods=["POST"])
+def save_phrase_cards():
+    """Save only the explicitly selected contextual phrases."""
+    return _save_cards("phrases")
+
+
+def _save_cards(card_type):
+    """Save reviewed cards together, preserving existing vocabulary edits."""
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or not isinstance(data.get("language_id"), int):
-        return jsonify(error="Invalid word card request"), 400
+        return jsonify(error="Invalid card request"), 400
     language = db.session.get(Language, data["language_id"])
     job_id = data.get("job_id")
     indices = data.get("indices")
@@ -131,16 +183,16 @@ def save_word_cards():
         or language.translation_provider != "codex"
         or not isinstance(job_id, str)
         or not isinstance(indices, list)
-        or not 1 <= len(indices) <= 40
+        or not 1 <= len(indices) <= (3 if card_type == "phrases" else 40)
     ):
-        return jsonify(error="Invalid word card request"), 400
+        return jsonify(error="Invalid card request"), 400
     key = _jobs().key_for(job_id)
     result = _jobs().get(job_id)
     if key is None or result is None:
-        return jsonify(error="Translation expired. Translate the phrase again."), 404
+        return jsonify(error="Translation expired. Translate again."), 404
     if (
         key[:3] != (language.name, language.translation_target, language.codex_model)
-        or key[7:] != (language.codex_reasoning_effort, language.codex_fast_mode)
+        or key[7:9] != (language.codex_reasoning_effort, language.codex_fast_mode)
         or key[5] != "term"
         or result["status"] != "complete"
     ):
@@ -150,9 +202,13 @@ def save_word_cards():
             ),
             400,
         )
-    cards = result["result"]["words"]
+    cards = result["result"].get(card_type, [])
     if any(type(index) is not int or not 0 <= index < len(cards) for index in indices):
-        return jsonify(error="Invalid selected words"), 400
+        return jsonify(error="Invalid selected cards"), 400
+    if card_type == "phrases" and any(
+        cards[index]["text"] not in key[9] for index in indices
+    ):
+        return jsonify(error="Phrase does not match the sentence context"), 400
     repo = Repository(db.session)
     saved = []
     for index in dict.fromkeys(indices):
@@ -163,9 +219,12 @@ def save_word_cards():
             term.translation = card["translation"]
         if term.status == 0:
             term.status = 1
-        is_inflected = card["is_inflected"] and language.get_lowercase(
-            card["lemma"]
-        ) != language.get_lowercase(card["text"])
+        is_inflected = (
+            card_type == "words"
+            and card["is_inflected"]
+            and language.get_lowercase(card["lemma"])
+            != language.get_lowercase(card["text"])
+        )
         if is_inflected and not term.parents:
             parent_term = repo.find(language.id, card["lemma"])
             term.parents = [card["lemma"]]

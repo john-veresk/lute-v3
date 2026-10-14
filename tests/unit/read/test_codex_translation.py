@@ -17,6 +17,7 @@ RESULT = {
     "lemma_translation": "кошка",
     "lemma_options": [],
     "words": [],
+    "phrases": [],
     "options": [
         {"translation": "кошка", "explanation": "В этом предложении"},
         {"translation": "кот", "explanation": "Самец"},
@@ -158,7 +159,7 @@ def test_translation_cache_changes_with_settings(
         db.session.commit()
         second = client.post("/translation/jobs", json=payload).json["job_id"]
         assert second != first
-        assert jobs.key_for(second)[7:] == (
+        assert jobs.key_for(second)[7:9] == (
             spanish.codex_reasoning_effort,
             spanish.codex_fast_mode,
         )

@@ -22,10 +22,10 @@
   const timer = document.getElementById('codex-timer');
   let timerInterval = null;
   let timerStarted = 0;
-  const wordsSection = document.getElementById('codex-words');
-  const wordCards = document.getElementById('codex-word-cards');
-  const addWords = document.getElementById('codex-add-words');
-  const wordsStatus = document.getElementById('codex-words-status');
+  const cardGroups = {
+    words: {label: 'word', section: document.getElementById('codex-words'), cards: document.getElementById('codex-word-cards'), add: document.getElementById('codex-add-words'), status: document.getElementById('codex-words-status')},
+    phrases: {label: 'phrase', section: document.getElementById('codex-phrases'), cards: document.getElementById('codex-phrase-cards'), add: document.getElementById('codex-add-phrases'), status: document.getElementById('codex-phrases-status')},
+  };
 
   function updateTimer() {
     if (timer) timer.textContent = ` · ${((performance.now() - timerStarted) / 1000).toFixed(1)} s`;
@@ -46,21 +46,27 @@
     timerInterval = null;
   }
 
-  function renderWordCards(words, jobId, current) {
-    wordCards.replaceChildren();
-    wordsSection.hidden = words.length === 0;
-    wordsStatus.textContent = '';
+  function renderCards(cards, jobId, current, cardType) {
+    const group = cardGroups[cardType];
+    group.cards.replaceChildren();
+    group.section.hidden = cards.length === 0;
+    group.status.textContent = '';
     const rows = [];
     let saving = false;
+
+    function updateButtons() {
+      if (current !== generation) return;
+      group.add.disabled = saving || !rows.some(row => row.checkbox.checked && !row.saved);
+      rows.forEach(row => { row.button.disabled = saving || row.saved; });
+    }
 
     async function save(indices) {
       if (saving || !indices.length || current !== generation) return;
       saving = true;
-      addWords.disabled = true;
-      rows.forEach(row => { row.button.disabled = true; });
-      wordsStatus.textContent = 'Saving word cards…';
+      updateButtons();
+      group.status.textContent = `Saving ${group.label} cards…`;
       try {
-        const data = await readResponse(await fetch('/translation/words', {
+        const data = await readResponse(await fetch(`/translation/${cardType}`, {
           method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({language_id: Number(params.get('language_id')), job_id: jobId, indices}),
         }));
@@ -71,27 +77,27 @@
           row.checkbox.checked = false;
           row.checkbox.disabled = true;
           row.button.textContent = 'Saved';
-          row.button.setAttribute('aria-label', `Saved word ${item.text}`);
+          row.button.setAttribute('aria-label', `Saved ${group.label} ${item.text}`);
           row.translation.textContent = item.translation;
         });
-        wordsStatus.textContent = `${data.saved.length} word card(s) saved to Lute.`;
+        group.status.textContent = `${data.saved.length} ${group.label} card(s) saved to Lute.`;
         window.parent.postMessage({event: 'LuteCodexWordCardsSaved', request_id: params.get('request_id')}, window.location.origin);
       } catch (error) {
-        if (current === generation) wordsStatus.textContent = error.message;
+        if (current === generation) group.status.textContent = error.message;
       } finally {
         saving = false;
-        addWords.disabled = rows.every(row => row.saved);
-        rows.forEach(row => { row.button.disabled = row.saved; });
+        updateButtons();
       }
     }
 
-    words.forEach((word, index) => {
+    cards.forEach((word, index) => {
       const card = document.createElement('div');
       card.className = 'codex-word';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
-      checkbox.checked = true;
+      checkbox.checked = cardType === 'words';
       checkbox.setAttribute('aria-label', `Select ${word.text}`);
+      checkbox.addEventListener('change', updateButtons);
       const body = document.createElement('div');
       body.className = 'codex-word-body';
       const title = document.createElement('strong');
@@ -109,15 +115,15 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'btn';
-      button.textContent = 'Add word';
-      button.setAttribute('aria-label', `Add word ${word.text}`);
+      button.textContent = `Add ${group.label}`;
+      button.setAttribute('aria-label', `Add ${group.label} ${word.text}`);
       button.addEventListener('click', () => save([index]));
       rows.push({checkbox, button, translation, saved: false});
       card.append(checkbox, body, button);
-      wordCards.appendChild(card);
+      group.cards.appendChild(card);
     });
-    addWords.disabled = false;
-    addWords.onclick = () => save(rows.map((row, index) => row.checkbox.checked && !row.saved ? index : -1).filter(index => index >= 0));
+    updateButtons();
+    group.add.onclick = () => save(rows.map((row, index) => row.checkbox.checked && !row.saved ? index : -1).filter(index => index >= 0));
   }
 
   async function readResponse(response) {
@@ -189,7 +195,7 @@
     parentOptions.replaceChildren();
     parentSection.hidden = true;
     parentSection.open = false;
-    wordsSection.hidden = true;
+    Object.values(cardGroups).forEach(group => { group.section.hidden = true; });
     parentSuggestion = null;
     resultOptions = [];
     selectedIndex = 0;
@@ -233,7 +239,8 @@
         }
       }
       resultOptions = data.result.options;
-      renderWordCards(data.result.words || [], job.job_id, current);
+      renderCards(data.result.words || [], job.job_id, current, 'words');
+      renderCards(data.result.phrases || [], job.job_id, current, 'phrases');
       status.textContent = kind === 'term' ? 'Translation options' : 'Translation';
       data.result.options.forEach((option, index) => {
         const card = document.createElement(kind === 'term' ? 'button' : 'div');

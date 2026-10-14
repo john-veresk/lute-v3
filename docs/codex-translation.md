@@ -47,6 +47,16 @@ that change is saved with the child. Existing parents and
 parents changed or removed while the lookup was running are preserved. If the
 grammar is uncertain, Codex leaves Parents alone.
 
+When you click a single word with sentence context, **Phrases with this word**
+can suggest up to three useful phrases or collocations from nearby words, with
+translations. Each phrase contains the clicked word and is copied from the
+sentence. Press **Add phrase** to save one, or select checkboxes and use
+**Add selected phrases**. Phrase checkboxes start unchecked; nothing is saved
+until you choose it. These cards are saved independently of the clicked word,
+and reading highlights refresh after saving. Existing translations, parents and
+learning statuses are preserved. The section stays hidden when there is no
+useful phrase, no sentence context, or you selected several words.
+
 For a phrase with 2–40 distinct words, **Words in phrase** shows individual word
 cards, translations and any inflected words' base forms. Use **Add word** on one
 card, or select checkboxes and press **Add selected words**. These buttons save

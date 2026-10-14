@@ -56,6 +56,18 @@ SCHEMA = {
                 "additionalProperties": False,
             },
         },
+        "phrases": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "text": {"type": "string"},
+                    "translation": {"type": "string"},
+                },
+                "required": ["text", "translation"],
+                "additionalProperties": False,
+            },
+        },
         "options": {
             "type": "array",
             "items": {
@@ -76,6 +88,7 @@ SCHEMA = {
         "lemma_options",
         "options",
         "words",
+        "phrases",
     ],
     "additionalProperties": False,
 }
@@ -144,6 +157,7 @@ def translate(
     word_texts=(),
     reasoning_effort="",
     fast_mode=False,
+    phrase_texts=(),
 ):
     """Run without a shell, in an empty read-only workspace, with JSON output."""
     executable = shutil.which(os.environ.get("LUTE_CODEX_CLI", "codex"))
@@ -161,6 +175,7 @@ def translate(
             "words_to_translate": (
                 list(word_texts) if kind == "term" and len(word_texts) > 1 else []
             ),
+            "phrase_candidates": list(phrase_texts) if kind == "term" else [],
         },
         ensure_ascii=False,
     )
@@ -190,6 +205,13 @@ def translate(
         "preserving its exact text and order. Each word card has one short translation of that word in this phrase "
         "plus its lemma, is_inflected and lemma_translation under the same grammar rules above. "
         "Do not invent or omit words. Otherwise words must be an empty array. "
+        "When phrase_candidates is nonempty, select up to three useful collocations, idioms or short phrases "
+        "with the selected word from these candidates, and return them in phrases. Prefer natural phrases "
+        "of 2–4 words that help the reader learn the word in context, not arbitrary sentence fragments. "
+        "Copy each candidate's exact text, without changing case, grammar, spacing or word order, "
+        "and give one concise natural translation of the complete phrase in target_language. "
+        "Do not repeat candidates or invent phrases. If no useful phrase fits, or phrase_candidates is empty, "
+        "phrases must be an empty array. "
         "Return only the requested JSON.\n" + payload
     )
     with tempfile.TemporaryDirectory(prefix="lute-codex-") as workdir:
@@ -304,6 +326,23 @@ def translate(
                     )
                 ):
                     raise ValueError("Invalid word card")
+            phrases = data["phrases"]
+            if not isinstance(phrases, list) or len(phrases) > 3:
+                raise ValueError("Invalid phrase cards")
+            seen_phrases = set()
+            for phrase in phrases:
+                if (
+                    not isinstance(phrase, dict)
+                    or not isinstance(phrase["text"], str)
+                    or kind != "term"
+                    or phrase["text"] not in phrase_texts
+                    or phrase["text"] in seen_phrases
+                    or not isinstance(phrase["translation"], str)
+                    or not phrase["translation"].strip()
+                    or len(phrase["translation"]) > 500
+                ):
+                    raise ValueError("Phrase card does not match the sentence context")
+                seen_phrases.add(phrase["text"])
             return data
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise TranslationError(
