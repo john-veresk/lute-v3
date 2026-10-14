@@ -14,7 +14,10 @@ def _contains(haystack, needle):
     if not needle or len(needle) > len(haystack):
         return False
     width = len(needle)
-    return any(haystack[index : index + width] == needle for index in range(len(haystack) - width + 1))
+    return any(
+        haystack[index : index + width] == needle
+        for index in range(len(haystack) - width + 1)
+    )
 
 
 def sequences_overlap(current, other):
@@ -87,7 +90,7 @@ def overlapping_phrases(current_text_lc, phrases, embedded):
 
 def load_overlapping_phrases(session, language, text_lc, embedded):
     "Saved multiword terms in this language that overlap the open phrase."
-    if language is None or not text_lc:
+    if language is None or len(word_tokens(text_lc)) < 2:
         return []
     rows = (
         session.query(DBTerm)
