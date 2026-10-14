@@ -104,7 +104,10 @@ def review():
     response_status = 200
     queue = {"term_ids": [], "untranslated": 0}
     try:
-        if request.method == "GET":
+        if request.method == "GET" and "book_id" not in request.args:
+            language_id = lute.utils.formutils.valid_current_language_id(db.session)
+            queue = svc.from_learning(language_id)
+        elif request.method == "GET":
             book_id = int(request.args.get("book_id", "0"))
             book = BookRepository(db.session).find(book_id)
             if book is None:

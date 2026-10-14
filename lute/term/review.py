@@ -95,6 +95,17 @@ class Service:
         ids = {row["WoID"] for row in rows}
         return self._queue(self._terms(ids))
 
+    def from_learning(self, language_id):
+        """Every learning term (1–5), optionally limited to one language."""
+        query = (
+            self.session.query(Term)
+            .filter(Term.status.between(1, 5))
+            .options(selectinload(Term.parents), selectinload(Term.language))
+        )
+        if language_id:
+            query = query.filter(Term.language_id == language_id)
+        return self._queue(query.all())
+
     def from_book(self, book):
         """Find forms and their direct parents across all pages, including unread."""
         renderer = RenderService(self.session)

@@ -216,6 +216,29 @@ def test_entire_book_includes_unread_pages_and_deduplicated_direct_parents(
     assert b"My book" in review_page.data
 
 
+def test_review_without_book_uses_learning_terms_of_current_language(
+    client, spanish, english
+):
+    terms = save_terms(
+        spanish,
+        [
+            ("learning", "learn", 1),
+            ("almost", "almost", 5),
+            ("known", "know", 99),
+            ("ignored", "ignore", 98),
+            ("unknown", "?", 0),
+        ],
+    )
+    other = save_terms(english, [("cat", "кошка", 2)])
+    all_learning = {terms["learning"].id, terms["almost"].id, other["cat"].id}
+    client.post("/settings/set/current_language_id/0")
+    assert set(queue_from(client.get("/term/review"))["term_ids"]) == all_learning
+
+    client.post(f"/settings/set/current_language_id/{spanish.id}")
+    queue = queue_from(client.get("/term/review"))
+    assert set(queue["term_ids"]) == {terms["learning"].id, terms["almost"].id}
+
+
 def test_book_parent_statuses_are_filtered_independently(spanish):
     terms = save_terms(
         spanish,
