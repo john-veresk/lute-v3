@@ -13,7 +13,7 @@ from lute.book.service import Service
 def get_test_files():
     "Return test files pair."
     thisdir = os.path.dirname(os.path.realpath(__file__))
-    sample_files = os.path.join(thisdir, "..", "..", "acceptance", "sample_files")
+    sample_files = os.path.join(thisdir, "..", "..", "sample_files")
     text_path = os.path.join(sample_files, "hola.txt")
     mp3_path = os.path.join(sample_files, "fake.mp3")
     with open(text_path, "r", encoding="utf-8") as fp:

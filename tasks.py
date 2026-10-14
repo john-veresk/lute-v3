@@ -92,7 +92,7 @@ def test(c):
     """
     Unit tests only.
     """
-    c.run("pytest --ignore=./tests/acceptance")
+    c.run("pytest")
 
 
 def _site_is_running(useport=None):
@@ -137,7 +137,7 @@ def _run_browser_tests(port, run_test):
             print(f"[{label}] {line.decode().strip()}", flush=True)
         pipe.close()
 
-    cmd = ["python", "-m", "tests.acceptance.start_acceptance_app", f"{port}"]
+    cmd = ["python", "-m", "tests.playwright.start_app", f"{port}"]
     with subprocess.Popen(
         cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
     ) as app_process:
@@ -165,109 +165,6 @@ def _run_browser_tests(port, run_test):
         raise RuntimeError("tests failed")
 
 
-def _run_acceptance(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    c,
-    port=5001,
-    show=False,
-    noheadless=False,
-    kflag=None,
-    mobile=False,
-    exitfirst=False,
-    verbose=False,
-):
-    """
-    Start lute, run tests/acceptance tests, screenshot fails.
-
-    If no port specified, use default 5001.
-
-    If Lute's not running on specified port, start a server.
-    """
-    run_test = [
-        "pytest",
-        "tests/acceptance",
-        f"--port={port}",
-    ]
-
-    if show:
-        run_test.append("-s")
-    if not noheadless:
-        run_test.append("--headless")
-    if kflag:
-        run_test.append("-k")
-        run_test.append(kflag)
-    if exitfirst:
-        run_test.append("--exitfirst")
-    if verbose:
-        run_test.append("-vv")
-    if mobile:
-        run_test.append("-m mobile")
-        run_test.append("--mobile")
-
-    _run_browser_tests(5001, run_test)
-
-
-acceptance_help = {
-    "port": "optional port to run on; creates server if needed.",
-    "show": "print data",
-    "noheadless": "run as non-headless (default is headless, i.e. not shown)",
-    "kflag": "optional -k flag argument",
-    "exitfirst": "exit on first failure",
-    "verbose": "make verbose",
-}
-
-
-@task(
-    pre=[_ensure_test_db],
-    help=acceptance_help,
-)
-def accept(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    c,
-    port=5001,
-    show=False,
-    noheadless=False,
-    kflag=None,
-    exitfirst=False,
-    verbose=False,
-):
-    "Run acceptance tests, full browser."
-    _run_acceptance(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        c,
-        port=port,
-        show=show,
-        noheadless=noheadless,
-        kflag=kflag,
-        mobile=False,
-        exitfirst=exitfirst,
-        verbose=verbose,
-    )
-
-
-@task(
-    pre=[_ensure_test_db],
-    help=acceptance_help,
-)
-def acceptmobile(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-    c,
-    port=5001,
-    show=False,
-    noheadless=False,
-    kflag=None,
-    exitfirst=False,
-    verbose=False,
-):
-    "Run acceptance tests, mobile emulation, tests marked @mobile."
-    _run_acceptance(  # pylint: disable=too-many-arguments,too-many-positional-arguments
-        c,
-        port=port,
-        show=show,
-        noheadless=noheadless,
-        kflag=kflag,
-        mobile=True,
-        exitfirst=exitfirst,
-        verbose=verbose,
-    )
-
-
 @task(pre=[_ensure_test_db])
 def playwright(c):
     """
@@ -284,10 +181,9 @@ def playwright(c):
 @task(pre=[_ensure_test_db], help={"html": "open html report"})
 def coverage(c, html=False):
     """
-    Run coverage (using non-acceptance tests only), open report if needed.
+    Run coverage, open report if needed.
 
-    Running tests including the acceptance tests is slow,
-    and doesn't affect the coverage stats enough to justify it.
+    The Playwright smoke test is slow and is left out of this run.
     """
     c.run("coverage run -m pytest tests/")
     if html:
@@ -304,7 +200,7 @@ def black(c):
     c.run("python -m black .")
 
 
-@task(pre=[test, accept, acceptmobile, playwright])
+@task(pre=[test, playwright])
 def fulltest(c):  # pylint: disable=unused-argument
     """
     Run full tests check.
@@ -326,8 +222,6 @@ ns.add_task(full)
 ns.add_task(lint)
 ns.add_task(lint_changed)
 ns.add_task(test)
-ns.add_task(accept)
-ns.add_task(acceptmobile)
 ns.add_task(playwright)
 ns.add_task(coverage)
 ns.add_task(todos)
