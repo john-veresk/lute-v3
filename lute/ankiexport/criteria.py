@@ -75,32 +75,22 @@ def evaluate_criteria(s, term):
         }
         return opMap[opstring]
 
+    def compare(args, left):
+        "Apply the criteria operator to a number on the term."
+        opstring, val = args
+        return get_binary_operator(opstring)(left, val)
+
     def check_parent_count(args):
         "Check parents."
-        opstring, val = args
-        oplambda = get_binary_operator(opstring)
-        pcount = len(term.parents)
-        return oplambda(pcount, val)
+        return compare(args, len(term.parents))
 
     def check_status_val(args):
         "Check status."
-        opstring, val = args
-        oplambda = get_binary_operator(opstring)
-        return oplambda(term.status, val)
-
-    ### class BoolNot:
-    ###     "Not unary operator."
-    ###     def __init__(self, t):
-    ###         self.arg = t[0][1]
-    ###     def __bool__(self) -> bool:
-    ###         v = bool(self.arg)
-    ###         return not v
-    ###     def __str__(self) -> str:
-    ###         return "~" + str(self.arg)
-    ###     __repr__ = __str__
+        return compare(args, term.status)
 
     class BoolBinOp:
         "Binary operation."
+
         repr_symbol: str = ""
         eval_fn: Callable[[Iterable[bool]], bool] = lambda _: False
 
