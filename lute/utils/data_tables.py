@@ -212,32 +212,18 @@ class DataTablesSqliteQuery:
     @staticmethod
     def get_data(base_sql, parameters, conn):
         "Return dict required for datatables rendering."
-        recordsTotal = None
-        recordsFiltered = None
+        sql_dict = DataTablesSqliteQuery.get_sql(base_sql, parameters)
 
-        try:
-            sql_dict = DataTablesSqliteQuery.get_sql(base_sql, parameters)
+        def runqry(name, use_params=True):
+            "Run the given query from the datatables list of queries."
+            prms = sql_dict["params"] if use_params else None
+            return conn.execute(text(sql_dict[name]), prms)
 
-            def runqry(name, use_params=True):
-                "Run the given query from the datatables list of queries."
-                prms = None
-                if use_params:
-                    prms = sql_dict["params"]
-                return conn.execute(text(sql_dict[name]), prms)
-
-            recordsTotal = runqry("recordsTotal", False).fetchone()[0]
-            recordsFiltered = runqry("recordsFiltered").fetchone()[0]
-            res = runqry("data")
-            column_names = res.keys()
-            # Convert each row into a dict, { fieldname: value ... }
-            ret = [dict(zip(column_names, row)) for row in res.fetchall()]
-
-        except Exception as e:
-            raise e
-
-        result = {
-            "recordsTotal": recordsTotal,
-            "recordsFiltered": recordsFiltered,
-            "data": ret,
+        records_total = runqry("recordsTotal", False).fetchone()[0]
+        records_filtered = runqry("recordsFiltered").fetchone()[0]
+        res = runqry("data")
+        return {
+            "recordsTotal": records_total,
+            "recordsFiltered": records_filtered,
+            "data": [dict(zip(res.keys(), row)) for row in res.fetchall()],
         }
-        return result
