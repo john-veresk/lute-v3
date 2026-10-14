@@ -23,6 +23,10 @@ See the [Lute v3 manual](https://luteorg.github.io/lute-manual/).  Hop onto the 
 
 For more information on building and developing, please see [Development](../../wiki/Development).
 
+To restart the local server automatically after edits, run
+`.venv/bin/python -m lute.main --port 5001 --reload --local`.
+See [automatic server reload](docs/local-development.md) for details.
+
 ## Contributing
 
 If you'd like to contribute code to Lute (hooray!), check out the [Contribution Guidelines](../../wiki/Contributing).  And with every repo star, an angel gets its wings.
