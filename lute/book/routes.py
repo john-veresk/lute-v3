@@ -25,11 +25,9 @@ from lute.db import db
 from lute.models.language import Language
 from lute.models.repositories import (
     BookRepository,
-    UserSettingRepository,
     LanguageRepository,
 )
 from lute.book.model import Book, Repository
-
 
 bp = Blueprint("book", __name__, url_prefix="/book")
 
@@ -133,9 +131,7 @@ def new():
             flash(e.message, "notice")
 
     # Don't set the current language before submit.
-    usrepo = UserSettingRepository(db.session)
-    current_language_id = int(usrepo.get_value("current_language_id"))
-    form.language_id.data = current_language_id
+    form.language_id.data = lute.utils.formutils.valid_current_language_id(db.session)
 
     return render_template(
         "book/create_new.html",
