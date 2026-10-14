@@ -12,11 +12,14 @@ const suggestedParent = {value: ''};
 const suggestedTranslation = {value: '', dispatchEvent() {}};
 const parentTranslationSelected = {value: ''};
 const source = {postMessage() {}};
+let saveClicks = 0;
+const saveButton = {click() {saveClicks++;}};
 const container = {dataset: {}, querySelector(selector) {
   return {'#translation': translation, '#text': text, '#language_id': language,
     '#parentslist': parents, '#suggested_parent_text': suggestedParent,
     '#suggested_parent_translation': suggestedTranslation,
-    '#suggested_parent_translation_selected': parentTranslationSelected}[selector];
+    '#suggested_parent_translation_selected': parentTranslationSelected,
+    '#btnsubmit': saveButton}[selector];
 }};
 const context = vm.createContext({
   window: {location: {origin: 'http://localhost:5001'}, addEventListener(type, fn) {handlers.push(fn);}},
@@ -83,6 +86,12 @@ container.dataset.codexParentsEdited = '';
 parentTags.value = [{value: 'feline'}];
 send({text: 'cats', parent});
 assert.equal(parentTags.value[0].value, 'feline', 'preserves existing parents');
+
+handlers[0]({origin: 'http://localhost:5001', source, data: {event: 'LuteCodexSave', request_id: 'previous'}});
+handlers[0]({origin: 'https://untrusted.example', source, data: {event: 'LuteCodexSave', request_id: 'current'}});
+assert.equal(saveClicks, 0, 'stale or cross-origin save requests are ignored');
+handlers[0]({origin: 'http://localhost:5001', source, data: {event: 'LuteCodexSave', request_id: 'current'}});
+assert.equal(saveClicks, 1, 'the Codex panel can save the term form');
 
 vm.runInContext(`
   LookupButton.LANG_ID = 1;

@@ -812,6 +812,97 @@ div#read_pane_right {
 
 .dictframe { border-top: 0; }
 
+/* Term form (also shown inside the reading pane frame). */
+
+#term-form-container { padding: 1rem 1.25rem .75rem; }
+
+#term { gap: .5rem; }
+
+#term-form #text {
+    width: calc(100% + .5rem);
+    margin-left: -.5rem;
+    padding: .15rem .5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-s);
+    background: transparent;
+    color: var(--font-color);
+    font-family: var(--read-font);
+    font-size: 1.35rem;
+    font-weight: 600;
+}
+
+#term-form #text:hover { border-color: var(--line); }
+
+#term-form #translation,
+#term-form #romanization {
+    width: 100%;
+    padding: .5rem .65rem;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-s);
+    background: var(--background-color);
+    color: var(--font-color);
+    font-family: var(--ui-font);
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+#term-form #translation { min-height: 64px; resize: vertical; }
+
+form input:focus,
+form textarea:focus,
+form select:focus,
+#term-form #text:focus {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+#term-form .tagify {
+    --tags-border-color: var(--line-strong);
+    --tags-hover-border-color: var(--line-strong);
+    --tags-focus-border-color: var(--accent);
+    --tag-bg: var(--accent-soft);
+    --tag-hover: var(--accent-soft);
+    --tag-text-color: var(--font-color);
+    --placeholder-color: var(--ink-3);
+    border-radius: var(--radius-s);
+    font-size: .9rem;
+}
+
+#status-container { gap: .75rem; flex-wrap: wrap; }
+
+#status { gap: 0; --status-select-color: var(--font-color); --status-hover-color: var(--ink-3); }
+
+#status label {
+    width: 32px;
+    height: 30px;
+    border-color: var(--line-strong);
+    font-size: .85rem;
+    font-weight: 500;
+}
+
+#sync-status-container {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    color: var(--ink-2);
+    font-size: .85rem;
+}
+
+#term-button-container { gap: .5rem; margin-top: .4rem; }
+
+#term-button-container #delete {
+    margin-right: auto;
+    border-color: transparent;
+    background: none;
+    color: var(--danger);
+}
+
+#term-button-container #delete:hover { background: color-mix(in oklab, var(--danger) 10%, var(--background-color)); }
+
+#term-button-container #btnsubmit { min-width: 6rem; }
+
+::placeholder { color: var(--ink-3); font-size: .9rem; opacity: 1; }
+
 @media screen and (max-width: 980px) {
     #reading-header { position: fixed; }
     .reading_header_container { padding: .5rem .75rem; }

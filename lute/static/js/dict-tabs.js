@@ -335,13 +335,17 @@ window.addEventListener('message', event => {
     }
     return;
   }
-  if (!['LuteCodexTranslation', 'LuteCodexWordCardsSaved'].includes(event.data?.event)) return;
+  if (!['LuteCodexTranslation', 'LuteCodexWordCardsSaved', 'LuteCodexSave'].includes(event.data?.event)) return;
   const button = LookupButton.all.find(b => b instanceof CodexButton && b.frame.contentWindow === event.source);
   const container = LookupButton.TERM_FORM_CONTAINER;
   if (!button || !container) return;
   if (event.data.request_id !== button.lookupId) return;
   if (event.data.event === 'LuteCodexWordCardsSaved') {
     window.postMessage({event: 'LuteCodexWordsSaved'}, window.location.origin);
+    return;
+  }
+  if (event.data.event === 'LuteCodexSave') {
+    container.querySelector('#btnsubmit')?.click();
     return;
   }
   if (event.data.text !== button.lookupText || event.data.language_id !== button.lookupLanguage) return;

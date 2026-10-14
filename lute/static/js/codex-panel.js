@@ -9,10 +9,9 @@
   const options = document.getElementById('codex-options');
   const translate = document.getElementById('codex-start');
   const retry = document.getElementById('codex-retry');
-  document.getElementById('codex-text').textContent = text.replaceAll('\u200b', '');
+  const skeleton = document.getElementById('codex-skeleton');
+  const savebar = document.getElementById('codex-savebar');
   const contextElement = document.getElementById('codex-context');
-  contextElement.textContent = context;
-  contextElement.hidden = !context;
   let generation = 0;
   let parentSuggestion = null;
   let resultOptions = [];
@@ -27,8 +26,29 @@
     phrases: {label: 'phrase', section: document.getElementById('codex-phrases'), cards: document.getElementById('codex-phrase-cards'), add: document.getElementById('codex-add-phrases'), status: document.getElementById('codex-phrases-status')},
   };
 
+  const withoutZeroWidth = value => value.replaceAll('\u200b', '');
+
+  /** Split the sentence around the first case-insensitive match of the term. */
+  function splitContext(sentence, term) {
+    const plain = withoutZeroWidth(sentence);
+    const target = withoutZeroWidth(term).trim();
+    const index = target ? plain.toLocaleLowerCase().indexOf(target.toLocaleLowerCase()) : -1;
+    if (index < 0) return [plain, '', ''];
+    return [plain.slice(0, index), plain.slice(index, index + target.length), plain.slice(index + target.length)];
+  }
+
+  function showLookup() {
+    document.getElementById('codex-text').textContent = withoutZeroWidth(text);
+    const parts = splitContext(context, text);
+    ['before', 'word', 'after'].forEach((name, index) => {
+      document.getElementById(`codex-context-${name}`).textContent = parts[index];
+    });
+    contextElement.hidden = !context;
+    savebar.hidden = kind !== 'term';
+  }
+
   function updateTimer() {
-    if (timer) timer.textContent = ` · ${((performance.now() - timerStarted) / 1000).toFixed(1)} s`;
+    if (timer) timer.textContent = `${((performance.now() - timerStarted) / 1000).toFixed(1)} s`;
   }
 
   function startTimer() {
@@ -64,7 +84,7 @@
       if (saving || !indices.length || current !== generation) return;
       saving = true;
       updateButtons();
-      group.status.textContent = `Saving ${group.label} cards…`;
+      group.status.textContent = 'Saving…';
       try {
         const data = await readResponse(await fetch(`/translation/${cardType}`, {
           method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -80,7 +100,7 @@
           row.button.setAttribute('aria-label', `Saved ${group.label} ${item.text}`);
           row.translation.textContent = item.translation;
         });
-        group.status.textContent = `${data.saved.length} ${group.label} card(s) saved to Lute.`;
+        group.status.textContent = `${data.saved.length} saved`;
         window.parent.postMessage({event: 'LuteCodexWordCardsSaved', request_id: params.get('request_id')}, window.location.origin);
       } catch (error) {
         if (current === generation) group.status.textContent = error.message;
@@ -110,14 +130,14 @@
       body.append(title, translation);
       if (word.is_inflected && word.lemma !== word.text) {
         const parent = document.createElement('span');
-        parent.className = 'codex-hint';
+        parent.className = 'codex-word-parent';
         parent.textContent = `Parent: ${word.lemma} — ${word.lemma_translation}`;
         body.appendChild(parent);
       }
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'btn';
-      button.textContent = `Add ${group.label}`;
+      button.className = 'btn codex-word-add';
+      button.textContent = 'Add';
       button.setAttribute('aria-label', `Add ${group.label} ${word.text}`);
       button.addEventListener('click', () => save([index]));
       rows.push({checkbox, button, translation, saved: false});
@@ -139,12 +159,17 @@
     window.parent.postMessage({event: 'LuteCodexTranslation', request_id: params.get('request_id'), text, language_id: Number(params.get('language_id')), translation: option.translation, index, automatic, parent}, window.location.origin);
   }
 
+  function saveTerm() {
+    window.parent.postMessage({event: 'LuteCodexSave', request_id: params.get('request_id')}, window.location.origin);
+  }
+
   function updateParentSelection() {
     parentOptions.querySelectorAll('button').forEach(button => {
       const selected = button.dataset.translation === parentSuggestion?.translation;
       button.classList.toggle('selected', selected);
       button.setAttribute('aria-pressed', String(selected));
     });
+    document.getElementById('codex-parent-choice').textContent = parentSuggestion?.translation || '';
   }
 
   function parentChanged() {
@@ -157,13 +182,13 @@
   function renderParentOptions(choices, existingTranslation) {
     const cards = [...choices];
     if (existingTranslation.trim() && !cards.some(option => option.translation === existingTranslation)) {
-      cards.unshift({translation: existingTranslation, explanation: 'Saved dictionary translation.'});
+      cards.unshift({translation: existingTranslation, explanation: 'Saved in your vocabulary.'});
     }
     cards.forEach(option => {
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'codex-option';
-      card.title = 'Use this dictionary translation';
+      card.title = 'Use this meaning for the base form';
       card.dataset.translation = option.translation;
       const translation = document.createElement('strong');
       translation.textContent = option.translation;
@@ -179,6 +204,29 @@
     updateParentSelection();
   }
 
+  function renderOption(option, index) {
+    const card = document.createElement(kind === 'term' ? 'button' : 'div');
+    card.className = 'codex-option';
+    const translation = document.createElement('strong');
+    translation.textContent = option.translation;
+    const explanation = document.createElement('span');
+    explanation.textContent = option.explanation;
+    if (kind === 'term') {
+      const key = document.createElement('span');
+      key.className = 'codex-key';
+      key.textContent = index < 9 ? String(index + 1) : '';
+      card.append(key, translation, explanation);
+      card.type = 'button';
+      card.title = 'Click to use, double-click to use and save';
+      card.setAttribute('aria-pressed', 'false');
+      card.addEventListener('click', () => choose(option, index));
+      card.addEventListener('dblclick', () => { choose(option, index); saveTerm(); });
+    } else {
+      card.append(translation, explanation);
+    }
+    return card;
+  }
+
   window.addEventListener('message', event => {
     if (event.source !== window.parent || event.origin !== window.location.origin || event.data?.event !== 'LuteCodexTranslationSelected' || event.data.request_id !== params.get('request_id')) return;
     if (event.data.index === null) return;
@@ -188,6 +236,21 @@
       button.classList.toggle('selected', selected);
       button.setAttribute('aria-pressed', String(selected));
     });
+  });
+
+  window.addEventListener('keydown', event => {
+    if (kind !== 'term' || event.altKey) return;
+    if (event.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      saveTerm();
+      return;
+    }
+    if (event.ctrlKey || event.metaKey) return;
+    const index = Number(event.key) - 1;
+    if (!(index >= 0 && index < Math.min(resultOptions.length, 9))) return;
+    event.preventDefault();
+    choose(resultOptions[index], index);
   });
 
   async function start() {
@@ -202,8 +265,8 @@
     resultOptions = [];
     selectedIndex = 0;
     retry.hidden = true;
-    document.getElementById('codex-hint').hidden = true;
-    status.textContent = 'Translating with Codex…';
+    skeleton.hidden = false;
+    status.textContent = 'Translating…';
     startTimer();
     try {
       const job = await readResponse(await fetch('/translation/jobs', {
@@ -220,9 +283,10 @@
         if (Date.now() > deadline) throw new Error('Translation timed out. Try again.');
         await new Promise(resolve => setTimeout(resolve, 700));
       } while (true);
-      document.getElementById('codex-lemma').textContent = data.result.lemma ? `Dictionary form: ${data.result.lemma}` : '';
-      const clean = value => value.replaceAll('\u200b', '').trim().toLocaleLowerCase();
-      if (kind === 'term' && data.result.is_inflected && clean(data.result.lemma) !== clean(text)) {
+      const clean = value => withoutZeroWidth(value).trim().toLocaleLowerCase();
+      const isNewLemma = data.result.lemma && clean(data.result.lemma) !== clean(text);
+      document.getElementById('codex-lemma').textContent = isNewLemma ? data.result.lemma : '';
+      if (kind === 'term' && data.result.is_inflected && isNewLemma) {
         try {
           const query = new URLSearchParams({language_id: params.get('language_id'), text: data.result.lemma});
           const existing = await readResponse(await fetch(`/translation/parent?${query}`));
@@ -233,45 +297,33 @@
             existingTranslation: !!existing.translation.trim(),
             translation: existing.translation.trim() ? existing.translation : data.result.lemma_translation,
           };
-          renderParentOptions(data.result.lemma_options || [{translation: data.result.lemma_translation, explanation: ''}], existing.translation);
           document.getElementById('codex-parent-text').textContent = data.result.lemma;
+          renderParentOptions(data.result.lemma_options || [{translation: data.result.lemma_translation, explanation: ''}], existing.translation);
           parentSection.hidden = false;
         } catch (error) {
-          document.getElementById('codex-lemma').textContent += ' — parent lookup failed; enter it manually in Parents.';
+          document.getElementById('codex-lemma').textContent += ' (base form lookup failed; add it in Parents)';
         }
       }
       resultOptions = data.result.options;
       renderCards(data.result.words || [], job.job_id, current, 'words');
       renderCards(data.result.phrases || [], job.job_id, current, 'phrases');
-      status.textContent = kind === 'term' ? 'Translation options' : 'Translation';
-      data.result.options.forEach((option, index) => {
-        const card = document.createElement(kind === 'term' ? 'button' : 'div');
-        card.className = 'codex-option';
-        const translation = document.createElement('strong');
-        translation.textContent = option.translation;
-        const explanation = document.createElement('span');
-        explanation.textContent = option.explanation;
-        card.append(translation, explanation);
-        if (kind === 'term') {
-          card.type = 'button';
-          card.title = 'Use this translation';
-          card.setAttribute('aria-pressed', 'false');
-          card.addEventListener('click', () => choose(option, index));
-        }
-        options.appendChild(card);
-      });
-      document.getElementById('codex-hint').hidden = kind !== 'term';
+      status.textContent = '';
+      data.result.options.forEach((option, index) => options.appendChild(renderOption(option, index)));
       if (kind === 'term') choose(data.result.options[0], 0, true);
     } catch (error) {
       if (current !== generation) return;
       status.textContent = error.message;
       retry.hidden = false;
     } finally {
-      if (current === generation) stopTimer();
+      if (current === generation) {
+        skeleton.hidden = true;
+        stopTimer();
+      }
     }
   }
   translate.addEventListener('click', start);
   retry.addEventListener('click', start);
+  document.getElementById('codex-save').addEventListener('click', saveTerm);
   window.addEventListener('pagehide', () => { generation++; stopTimer(); });
   if (params.has('request_id')) {
     let received = false;
@@ -280,11 +332,9 @@
       received = true;
       text = event.data.payload.text;
       context = event.data.payload.context;
-      document.getElementById('codex-text').textContent = text.replaceAll('\u200b', '');
-      contextElement.textContent = context;
-      contextElement.hidden = !context;
+      showLookup();
       if (event.data.payload.autostart === false) {
-        status.textContent = 'This term already has a translation. Click Translate with Codex to request a new translation.';
+        status.textContent = 'Already translated.';
         translate.hidden = false;
       } else {
         start();
@@ -292,6 +342,7 @@
     });
     window.parent.postMessage({event: 'LuteCodexReady', request_id: params.get('request_id')}, window.location.origin);
   } else {
+    showLookup();
     start();
   }
 })();

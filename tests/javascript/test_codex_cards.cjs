@@ -64,7 +64,7 @@ function makePanel({words = [], phraseCards = phrases, saveResponse} = {}) {
     origin: context.window.location.origin, source: parent,
     data: {event: 'LuteCodexLookup', request_id: 'current', payload: {text: 'looked', context: 'He looked after the cats.', autostart: true}},
   });
-  return {getElement, requests, messages};
+  return {getElement, requests, messages, handlers};
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));
@@ -117,7 +117,7 @@ async function checks() {
   await failedRow.children[2].handlers.click();
   assert.equal(failed.getElement('codex-phrases-status').textContent, 'Translation expired. Translate again.');
   assert.equal(failedRow.children[2].disabled, false, 'failed saves can be retried');
-  assert.equal(failedRow.children[2].textContent, 'Add phrase');
+  assert.equal(failedRow.children[2].textContent, 'Add');
   assert.equal(failed.messages.filter(message => message.event === 'LuteCodexWordCardsSaved').length, 0);
 
   let releaseSave;
@@ -131,8 +131,32 @@ async function checks() {
   releaseSave({ok: true, json: async () => ({saved: [{index: 0, ...phrases[0]}]})});
   await pendingSave;
   assert.equal(stale.getElement('codex-add-phrases').disabled, false, 'a late save cannot change a newer lookup');
-  assert.equal(newRow.children[2].textContent, 'Add phrase');
+  assert.equal(newRow.children[2].textContent, 'Add');
   assert.equal(stale.messages.filter(message => message.event === 'LuteCodexWordCardsSaved').length, 0);
+
+  const quick = makePanel();
+  await settle();
+  assert.deepEqual(['codex-context-before', 'codex-context-word', 'codex-context-after'].map(id => quick.getElement(id).textContent),
+    ['He ', 'looked', ' after the cats.'], 'the selected word is marked in its sentence');
+  const saves = () => quick.messages.filter(message => message.event === 'LuteCodexSave' && message.request_id === 'current').length;
+  const translations = () => quick.messages.filter(message => message.event === 'LuteCodexTranslation');
+  const press = (key, target = {closest: () => null}) => {
+    let prevented = false;
+    quick.handlers.get('keydown').forEach(fn => fn({key, target, preventDefault() {prevented = true;}}));
+    return prevented;
+  };
+  quick.getElement('codex-save').handlers.click();
+  assert.equal(saves(), 1, 'Save in the panel submits the term form');
+  assert.equal(press('1'), true);
+  assert.equal(translations().at(-1).automatic, false, 'number keys choose a meaning deliberately');
+  assert.equal(press('9'), false, 'missing meanings are ignored');
+  press('Enter');
+  assert.equal(saves(), 2, 'Enter saves');
+  press('1', {closest: () => ({})});
+  assert.equal(translations().length, 2, 'typing in a field is not a shortcut');
+  quick.getElement('codex-options').children[0].handlers.dblclick();
+  assert.equal(saves(), 3, 'double-click chooses and saves');
+  assert.equal(translations().length, 3);
   console.log('Codex optional card checks passed');
 }
 checks().catch(error => {console.error(error); process.exitCode = 1;});

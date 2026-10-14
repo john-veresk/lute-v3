@@ -1,57 +1,55 @@
 {% extends 'read/term_form_base.html' %}
 {% block include_term_form %}
-<style>
-  body { margin: 0; }
-  .codex-panel { padding: 18px; max-width: 720px; margin: auto; }
-  .codex-panel h2 { margin: 10px 0 4px; overflow-wrap: anywhere; }
-  .codex-meta, .codex-hint { opacity: .7; font-size: .9em; }
-  .codex-options { display: grid; gap: 10px; margin-top: 16px; }
-  .codex-option { display: block; width: 100%; padding: 14px; text-align: left; background: transparent; color: inherit; border: 1px solid currentColor; border-radius: 8px; cursor: pointer; }
-  .codex-option:hover, .codex-option.selected { background: rgba(100, 160, 220, .18); }
-  .codex-option.selected { outline: 2px solid currentColor; }
-  .codex-option strong { display: block; font-size: 1.1em; }
-  .codex-option span { display: block; margin-top: 6px; opacity: .8; }
-  #codex-status { margin: 16px 0; }
-  #codex-context { font-size: .9em; opacity: .75; max-height: 6em; overflow: auto; border-left: 3px solid currentColor; padding-left: 10px; }
-  #codex-start, #codex-retry { margin-top: 14px; }
-  #codex-parent { margin: 16px 0; padding: 12px; border: 1px solid currentColor; border-radius: 8px; }
-  #codex-parent summary { cursor: pointer; font-weight: bold; }
-  #codex-phrases { margin-top: 20px; }
-  .codex-word { display: flex; align-items: start; gap: 10px; padding: 12px 0; border-bottom: 1px solid currentColor; }
-  .codex-word-body { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
-  .codex-word-body > span { display: block; }
-  .codex-word input:disabled + .codex-word-body { cursor: default; color: inherit; }
-  .codex-word-translation { margin: 4px 0; }
-  #codex-add-words, #codex-add-phrases { margin-top: 12px; }
-</style>
-<main class="codex-panel">
-  <div class="codex-meta">Codex · {{ language.codex_model or 'CLI default model' if language else 'CLI' }}{% if language %} · {{ language.translation_target }}{% endif %}{% if language and language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off" title="Translation request duration"></span>{% endif %}</div>
-  <h2 id="codex-text"></h2>
-  <div id="codex-lemma" class="codex-hint"></div>
-  <p id="codex-context" hidden></p>
-  <p id="codex-status" role="status" aria-live="polite"></p>
-  <button id="codex-start" type="button" class="btn" hidden>Translate with Codex</button>
-  <div id="codex-options" class="codex-options"></div>
-  <details id="codex-parent" hidden>
-    <summary>Parent: <span id="codex-parent-text"></span></summary>
-    <div id="codex-parent-options" class="codex-options" role="group" aria-label="Parent translation options"></div>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/codex-panel.css') }}">
+<main class="codex-panel" data-kind="{{ request.args.get('kind', 'term') }}">
+  <header class="codex-head">
+    <h2 id="codex-text"></h2>
+    <div class="codex-meta" title="Codex model{% if language %}, translating into {{ language.translation_target }}{% endif %}">
+      {{ (language.codex_model or 'Codex') if language else 'Codex' }}{% if language and language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off"></span>{% endif %}
+    </div>
+  </header>
+  <div id="codex-lemma" class="codex-lemma"></div>
+  <p id="codex-context" class="codex-context" hidden><span id="codex-context-before"></span><mark id="codex-context-word"></mark><span id="codex-context-after"></span></p>
+
+  <p id="codex-status" class="codex-status" role="status" aria-live="polite"></p>
+  <button id="codex-retry" type="button" class="btn" hidden>Retry</button>
+  <div id="codex-skeleton" class="codex-skeleton" aria-hidden="true" hidden><span></span><span></span><span></span></div>
+  <button id="codex-start" type="button" class="btn btn-primary" hidden>Translate with Codex</button>
+
+  <div id="codex-options" class="codex-options" role="group" aria-label="Meanings"></div>
+
+  <details id="codex-parent" class="codex-parent" hidden>
+    <summary>
+      <span class="codex-section-label">Base form</span>
+      <strong id="codex-parent-text"></strong>
+      <span id="codex-parent-choice" class="codex-parent-choice"></span>
+    </summary>
+    <div id="codex-parent-options" class="codex-options codex-options-compact" role="group" aria-label="Base form meanings"></div>
   </details>
-  <section id="codex-phrases" hidden>
-    <h3>Phrases with this word</h3>
-    <p class="codex-hint">Optional cards from nearby words in this sentence. Add a phrase on its own, or select phrases to save together.</p>
+
+  <section id="codex-phrases" class="codex-cards" hidden>
+    <h3>Phrases</h3>
     <div id="codex-phrase-cards"></div>
-    <button id="codex-add-phrases" class="btn" type="button" disabled>Add selected phrases</button>
-    <p id="codex-phrases-status" role="status" aria-live="polite"></p>
+    <div class="codex-cards-foot">
+      <p id="codex-phrases-status" role="status" aria-live="polite"></p>
+      <button id="codex-add-phrases" class="btn" type="button" disabled>Add selected</button>
+    </div>
   </section>
-  <section id="codex-words" hidden>
-    <h3>Words in phrase</h3>
-    <p class="codex-hint">Save individual words to your Lute vocabulary, with their base forms. Existing translations and parents are kept.</p>
+
+  <section id="codex-words" class="codex-cards" hidden>
+    <h3>Words</h3>
     <div id="codex-word-cards"></div>
-    <button id="codex-add-words" class="btn" type="button">Add selected words</button>
-    <p id="codex-words-status" role="status" aria-live="polite"></p>
+    <div class="codex-cards-foot">
+      <p id="codex-words-status" role="status" aria-live="polite"></p>
+      <button id="codex-add-words" class="btn" type="button">Add selected</button>
+    </div>
   </section>
-  <p id="codex-hint" class="codex-hint" hidden>Choose a translation to put it in the term form, then Save.</p>
-  <button id="codex-retry" type="button" class="btn" hidden>Retry translation</button>
+
+  <div class="codex-spacer"></div>
+  <footer id="codex-savebar" class="codex-savebar" hidden>
+    <button id="codex-save" type="button" class="btn btn-primary">Save</button>
+    <span class="codex-keys"><span><kbd>1</kbd>–<kbd>9</kbd> choose</span><span><kbd>Enter</kbd> save</span></span>
+  </footer>
 </main>
 <script src="{{ url_for('static', filename='js/codex-panel.js') }}"></script>
 {% endblock %}
