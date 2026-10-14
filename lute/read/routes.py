@@ -12,7 +12,6 @@ from lute.models.book import Text
 from lute.models.repositories import BookRepository
 from lute.db import db
 
-
 bp = Blueprint("read", __name__, url_prefix="/read")
 
 
@@ -44,6 +43,12 @@ def _find_book(bookid):
     return br.find(bookid)
 
 
+def _missing_book(bookid):
+    "Flash and redirect home when the book id is unknown."
+    flash(f"No book matching id {bookid}")
+    return redirect("/", 302)
+
+
 @bp.route("/<int:bookid>", methods=["GET"])
 def read(bookid):
     """
@@ -53,8 +58,7 @@ def read(bookid):
     """
     book = _find_book(bookid)
     if book is None:
-        flash(f"No book matching id {bookid}")
-        return redirect("/", 302)
+        return _missing_book(bookid)
 
     page_num = 1
     text = book.texts[0]
@@ -72,8 +76,7 @@ def read_page(bookid, pagenum):
     """
     book = _find_book(bookid)
     if book is None:
-        flash(f"No book matching id {bookid}")
-        return redirect("/", 302)
+        return _missing_book(bookid)
 
     pagenum = book.page_in_range(pagenum)
     return _render_book_page(book, pagenum)
@@ -86,8 +89,7 @@ def peek_page(bookid, pagenum):
     """
     book = _find_book(bookid)
     if book is None:
-        flash(f"No book matching id {bookid}")
-        return redirect("/", 302)
+        return _missing_book(bookid)
 
     pagenum = book.page_in_range(pagenum)
     return _render_book_page(book, pagenum, track_page_open=False)
@@ -113,8 +115,7 @@ def delete_page(bookid, pagenum):
     """
     book = _find_book(bookid)
     if book is None:
-        flash(f"No book matching id {bookid}")
-        return redirect("/", 302)
+        return _missing_book(bookid)
 
     if len(book.texts) == 1:
         flash("Cannot delete only page in book.")
@@ -174,8 +175,7 @@ def start_reading(bookid, pagenum):
     "Called by ajax.  Update the text.start_date, and render page."
     book = _find_book(bookid)
     if book is None:
-        flash(f"No book matching id {bookid}")
-        return redirect("/", 302)
+        return _missing_book(bookid)
     service = Service(db.session)
     paragraphs = service.start_reading(book, pagenum)
     return render_template("read/page_content.html", paragraphs=paragraphs)
@@ -186,8 +186,7 @@ def refresh_page(bookid, pagenum):
     "Refreshes the page content, but doesn't set the text's start_date."
     book = _find_book(bookid)
     if book is None:
-        flash(f"No book matching id {bookid}")
-        return redirect("/", 302)
+        return _missing_book(bookid)
     service = Service(db.session)
     paragraphs = service.get_paragraphs(book, pagenum)
     return render_template("read/page_content.html", paragraphs=paragraphs)
