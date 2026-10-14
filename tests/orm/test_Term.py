@@ -6,6 +6,7 @@ import pytest
 from lute.models.term import Term, TermTag, TermTextChangedException
 from lute.db import db
 from tests.dbasserts import assert_sql_result
+from tests.utils import mecab_installed
 
 
 def test_save_and_remove(empty_db, english):
@@ -245,6 +246,7 @@ def test_changing_text_of_saved_Term_throws(english):
 
 
 @pytest.mark.term_case
+@pytest.mark.skipif(not mecab_installed(), reason="MeCab is not installed")
 def test_changing_text_to_same_thing_does_not_throw(japanese):
     """
     New terms get created on page open, and when parsed

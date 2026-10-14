@@ -2,10 +2,37 @@
 Utility methods for tests.
 """
 
+import sys
+from io import StringIO
+
 from lute.models.term import Term
 from lute.models.book import Book, Text
 from lute.read.render.service import Service
 from lute.db import db
+
+
+def mecab_installed():
+    """
+    True when natto can start MeCab.
+
+    Leaves MECAB_PATH alone. JapaneseParser.is_supported() clears that
+    variable when the saved setting is empty.
+    """
+    try:
+        from natto import MeCab
+    except ImportError:
+        return False
+
+    errors = StringIO()
+    previous = sys.stderr
+    try:
+        sys.stderr = errors
+        MeCab()
+        return True
+    except Exception:  # pylint: disable=broad-except
+        return False
+    finally:
+        sys.stderr = previous
 
 
 def add_terms(language, term_array):
@@ -49,7 +76,7 @@ def get_rendered_string(text, imploder="/", overridestringize=None):
     "Get the stringized rendered content after parsing."
 
     def stringize(ti):
-        zws = "\u200B"
+        zws = "\u200b"
         status = ""
         if ti.wo_status not in [None, 0]:
             status = f"({ti.wo_status})"

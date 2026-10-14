@@ -2,10 +2,18 @@
 JapaneseParser tests.
 """
 
+import pytest
+
 from lute.parse.mecab_parser import JapaneseParser
 from lute.models.term import Term
 from lute.settings.current import current_settings
 from lute.parse.base import ParsedToken
+from tests.utils import mecab_installed
+
+pytestmark = pytest.mark.skipif(
+    not mecab_installed(),
+    reason="MeCab is not installed",
+)
 
 
 def test_token_count(japanese):
@@ -83,7 +91,7 @@ def test_readings(app_context):
     for c in no_reading:
         assert p.get_reading(c) is None, c
 
-    zws = "\u200B"
+    zws = "\u200b"
     cases = [
         ("強い", "つよい"),
         ("二人", "ににん"),  # ah well, not perfect :-)
