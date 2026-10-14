@@ -141,16 +141,6 @@ class LanguageRepository:
             .first()
         )
 
-    def all_dictionaries(self):
-        "All dictionaries for all languages."
-        lang_dicts = {}
-        for lang in db.session.query(Language).all():
-            lang_dicts[lang.id] = {
-                "term": lang.active_dict_uris("terms"),
-                "sentence": lang.active_dict_uris("sentences"),
-            }
-        return lang_dicts
-
 
 class TermTagRepository:
     "Repository."

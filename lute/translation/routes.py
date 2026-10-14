@@ -61,7 +61,7 @@ def setup(state):
 
 @bp.route("/panel")
 def panel():
-    """The Codex tab occupies the existing dictionary iframe."""
+    """Sentence and page translations, shown in the term frame."""
     language = db.session.get(Language, request.args.get("language_id", type=int))
     return render_template("read/codex_panel.html", language=language)
 

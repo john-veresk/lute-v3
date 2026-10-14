@@ -1,6 +1,6 @@
-/* Codex translation panel, shown in the reading pane's lookup frame. */
+/* Codex in the term card, and the sentence translation panel. */
 
-body { margin: 0; }
+body:has(> .codex-panel) { margin: 0; }
 
 .codex-panel {
     display: flex;
@@ -12,13 +12,73 @@ body { margin: 0; }
     box-sizing: border-box;
 }
 
-.codex-panel [hidden] { display: none !important; }
+.codex-panel [hidden],
+#term-form-container [hidden] { display: none !important; }
 
-.codex-head {
+.codex-head,
+.term-head {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: .75rem;
+}
+
+.term-head #text { flex: 1; min-width: 0; }
+
+.term-head-actions {
+    display: flex;
+    align-items: center;
+    gap: .15rem;
+    flex-shrink: 0;
+}
+
+.term-head-actions .codex-meta { margin-right: .35rem; }
+
+.term-icon-btn {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 99px;
+    background: none;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: background-color .12s, color .12s;
+}
+
+.term-icon-btn:hover,
+.term-icon-btn[aria-expanded="true"] {
+    background: var(--surface-2);
+    color: var(--font-color);
+}
+
+.term-icon-btn:disabled { cursor: default; }
+
+.term-icon-btn svg {
+    width: 19px;
+    height: 19px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.term-icon-btn.busy { color: var(--accent); background: none; }
+.term-icon-btn.busy svg { animation: codex-spin .9s linear infinite; }
+
+@keyframes codex-spin { to { transform: rotate(360deg); } }
+
+.codex-card:has(#codex-options:empty):has(#codex-status:empty):has(#codex-skeleton[hidden]):has(#codex-context[hidden]) { display: none; }
+
+.term-image-search {
+    width: 100%;
+    height: 22rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    box-sizing: border-box;
 }
 
 #codex-text {
@@ -33,12 +93,19 @@ body { margin: 0; }
 
 .codex-meta {
     display: flex;
-    gap: .5rem;
-    flex-shrink: 0;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
     color: var(--ink-3);
     font-size: .75rem;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+.codex-model {
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 #codex-timer:not(:empty) {
@@ -56,10 +123,11 @@ body { margin: 0; }
 }
 
 .codex-lemma:empty,
-.codex-panel:has(#codex-parent:not([hidden])) .codex-lemma { display: none; }
+.codex-panel:has(#codex-parent:not([hidden])) .codex-lemma,
+#term:has(#codex-parent:not([hidden])) .codex-lemma { display: none; }
 
 .codex-context {
-    margin: .8rem 0 .9rem;
+    margin: .3rem 0 .6rem;
     padding: .6rem .8rem;
     border-radius: var(--radius-m);
     background: var(--surface);
@@ -87,7 +155,6 @@ body { margin: 0; }
 
 .codex-status:empty { display: none; }
 
-#codex-start,
 #codex-retry { align-self: flex-start; margin-bottom: .75rem; }
 
 /* Loading placeholder rows. */
@@ -322,32 +389,39 @@ div.codex-option { cursor: auto; padding-inline: 0; }
     margin-top: .3rem;
 }
 
-.codex-cards-foot p { margin: 0; color: var(--ink-3); font-size: .8rem; }
+.codex-cards-status { margin: 0 .3rem; color: var(--ink-3); font-size: .8rem; }
+.codex-cards-status:empty { display: none; }
 .codex-cards-foot .btn { min-height: 30px; font-size: .82rem; }
 
-/* Save stays reachable at the bottom of the lookup frame. */
+/* Save stays reachable at the bottom of the card. */
 
-.codex-savebar {
+#term-form-container #term-button-container {
     position: sticky;
     bottom: 0;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin: 0 -1.25rem;
-    padding: .7rem 1.25rem .85rem;
+    z-index: 1;
+    margin: .4rem -1.25rem -.75rem;
+    padding: .65rem 1.25rem .8rem;
     border-top: 1px solid var(--line);
     background: var(--background-color);
 }
 
-.codex-spacer { flex: 1 0 1.25rem; }
-
-#codex-save { min-width: 6.5rem; min-height: 36px; }
+#term-form-container #btnsubmit { min-width: 6.5rem; min-height: 36px; }
 
 .codex-keys {
     display: flex;
     gap: .9rem;
+    margin-left: auto;
+    margin-right: .5rem;
     color: var(--ink-3);
     font-size: .78rem;
+}
+
+@media screen and (max-width: 600px) {
+    #term-form-container #term-button-container {
+        margin: .2rem -.9rem -.5rem;
+        padding: .55rem .9rem calc(.6rem + env(safe-area-inset-bottom));
+    }
+    .codex-model { display: none; }
 }
 
 @media (max-width: 420px), (hover: none) {

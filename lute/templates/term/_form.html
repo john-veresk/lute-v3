@@ -1,7 +1,8 @@
 {# This form is "included" into other .html files. #}
 
-<script type="text/javascript" src="{{ url_for('static', filename='js/lute-popus.js') }}" charset="utf-8"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/dict-tabs.js') }}" charset="utf-8"></script>
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/codex-panel.css') }}" />
+<script type="text/javascript" src="{{ url_for('static', filename='js/codex-panel.js') }}" charset="utf-8"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/codex-term-form.js') }}" charset="utf-8"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/lute-hotkey-utils.js') }}" charset="utf-8"></script>
 <script type="text/javascript">
   /**
@@ -51,12 +52,42 @@
         style="display:none;"
         {% endif %}>
         {{ form.language_id(class="form-control") }}
-        <button id="load-dicts-btn" title="Load dictionaries for the new term" type="button"></button>
       </div>
   
       {{ form.original_text }}
 
-      <div>{{ form.text(class="form-control", autoFocus=True, value=(form.original_text.data or '')) }}</div>
+      <div class="term-head">
+        {{ form.text(class="form-control", autoFocus=True, value=(form.original_text.data or '')) }}
+        <div class="term-head-actions">
+          <span class="codex-meta" title="Codex model{% if term_language %}, translating into {{ term_language.translation_target }}{% endif %}">
+            <span class="codex-model">{{ (term_language.codex_model if term_language else '') or 'Codex' }}</span>
+            {% if not term_language or term_language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off"></span>{% endif %}
+          </span>
+          <button id="term-image-btn" type="button" class="term-icon-btn" title="Find an image" aria-label="Find an image" aria-expanded="false">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m20.5 16-4.8-4.8-8.2 7.8"/></svg>
+          </button>
+          <button id="codex-refresh" type="button" class="term-icon-btn" title="Translate again with Codex" aria-label="Translate again with Codex">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4.2h-4.2"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <section class="codex-card" aria-label="Codex translation">
+        <div id="codex-lemma" class="codex-lemma"></div>
+        <p id="codex-context" class="codex-context" hidden><span id="codex-context-before"></span><mark id="codex-context-word"></mark><span id="codex-context-after"></span></p>
+        <p id="codex-status" class="codex-status" role="status" aria-live="polite"></p>
+        <button id="codex-retry" type="button" class="btn" hidden>Retry</button>
+        <div id="codex-skeleton" class="codex-skeleton" aria-hidden="true" hidden><span></span><span></span><span></span></div>
+        <div id="codex-options" class="codex-options" role="group" aria-label="Meanings"></div>
+        <details id="codex-parent" class="codex-parent" hidden>
+          <summary>
+            <span class="codex-section-label">Base form</span>
+            <strong id="codex-parent-text"></strong>
+            <span id="codex-parent-choice" class="codex-parent-choice"></span>
+          </summary>
+          <div id="codex-parent-options" class="codex-options codex-options-compact" role="group" aria-label="Base form meanings"></div>
+        </details>
+      </section>
 
       <div>{{ form.parentslist(class="form-control") }}</div>
   
@@ -74,6 +105,7 @@
              onclick="clicked_zoomable_image(this);"
              />
       </div>
+      <iframe id="term-image-search" class="term-image-search" title="Image search" src="about:blank" hidden></iframe>
 
       <div id="status-container">
         {{ form.status(class="form-control") }}
@@ -87,10 +119,26 @@
 
       <div>{{ form.termtagslist(class="form-control") }}</div>
 
+      <section id="codex-phrases" class="codex-cards" hidden>
+        <h3>Phrases</h3>
+        <div id="codex-phrase-cards"></div>
+        <p id="codex-phrases-status" class="codex-cards-status" role="status" aria-live="polite"></p>
+      </section>
+
+      <section id="codex-words" class="codex-cards" hidden>
+        <h3>Words</h3>
+        <div id="codex-word-cards"></div>
+        <div class="codex-cards-foot">
+          <p id="codex-words-status" class="codex-cards-status" role="status" aria-live="polite"></p>
+          <button id="codex-add-words" class="btn" type="button">Add selected</button>
+        </div>
+      </section>
+
       <div id="term-button-container">
           {% if term.id %}
           <button id="delete" type="button" class="btn" onclick="deleteTerm()">Delete</button>
           {% endif %}
+          <span class="codex-keys"><span><kbd>1</kbd>–<kbd>9</kbd> choose</span><span><kbd>Enter</kbd> save</span></span>
           <button id="btnsubmit" type="submit" title="Shortcut: Control+Enter" class="btn btn-primary">Save</button>
       </div>
     </div>
@@ -266,6 +314,10 @@
     var termtags_tagify = lute_tagify_utils_setup_term_tag_tagify(
       termtagslist, TAGS, overrides
     );
+
+    const in_reading_frame = ("{{ embedded_in_reading_frame }}" == "True");
+    startTermCodex(window, in_reading_frame ? (window.parent.LUTE_LOOKUP_CONTEXT || '') : '');
+    $('#term-image-btn').click(toggle_image_search);
     
     // Post message re form opened.
     // Note have to use this rather than the better
@@ -275,6 +327,31 @@
 
     enable_disable_sync_status_checkbox();
   });  // end $(document).ready
+
+
+  // =============================
+  // Images.
+
+  // Bing image search opens inside the card; a single parent is the better query.
+  function toggle_image_search() {
+    const frame = document.getElementById('term-image-search');
+    const opening = frame.hidden;
+    const lang_id = parseInt($('#language_id').val());
+    const parents = get_parents();
+    const text = parents.length == 1 ? parents[0] : $('#text').val();
+    if (opening && (!lang_id || !text)) {
+      alert('Please select a language and enter the term.');
+      return;
+    }
+    frame.hidden = !opening;
+    $('#term-image-btn').attr('aria-expanded', String(opening));
+    if (!opening)
+      return;
+    const binghash = 'q=[LUTE]&form=HDRSC2&first=1&tsc=ImageHoverTitle';
+    const url = `/bing/search_page/${lang_id}/${encodeURIComponent(text)}/${encodeURIComponent(binghash)}`;
+    // Replacing keeps the image search out of the reading page's Back history.
+    frame.contentWindow.location.replace(url);
+  }
 
 
   // =============================

@@ -109,14 +109,6 @@ class Language(
     def word_characters(self, s):
         self._word_characters = self._get_python_regex_pattern(s)
 
-    def active_dict_uris(self, use_for):
-        "Codex replaces dictionary websites for every lookup."
-        return [{"url": "/translation/panel", "dicttype": "codex"}]
-
-    @property
-    def sentence_dict_uris(self):
-        return self.active_dict_uris("sentences")
-
     @property
     def parser(self):
         "Note: this throws if the parser is not supported!!!"

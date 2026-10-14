@@ -723,94 +723,24 @@ span.textitem.word { border-radius: 2px; }
     box-shadow: 0 1px 2px color-mix(in oklab, var(--font-color) 15%, transparent);
 }
 
-/* Right pane: term form above, lookup tabs below. */
+/* Right pane: the term card fills the whole pane. */
 
 div#read_pane_right {
+    grid-template-rows: minmax(0, 1fr);
     border-left: 1px solid var(--line);
     background: var(--background-color);
 }
 
-#read_pane_right::after,
-.dictcontainer::after {
+.wordframecontainer { min-height: 0; }
+
+#read_pane_right::after {
     background-color: transparent;
     transition: background-color .15s;
 }
 
-#read_pane_right:hover::after,
-.dictcontainer:hover::after {
+#read_pane_right:hover::after {
     background-color: color-mix(in oklab, var(--accent) 35%, transparent);
 }
-
-#dicttabs {
-    align-items: center;
-    gap: .5rem;
-    padding: .45rem .75rem;
-    border-top: 1px solid var(--line);
-    background: var(--background-color);
-}
-
-#dicttabslayout { gap: .25rem; }
-
-.dict-btn,
-.dict-btn:not(.dict-btn-select):not(#dict-image-btn),
-#dicttabsstatic .dict-btn.dict-sentences-btn {
-    height: 30px;
-    padding: 0 .75rem;
-    border: 0 !important;
-    border-radius: 99px;
-    background: transparent;
-    color: var(--ink-2);
-    font: 500 .85rem/1 var(--ui-font);
-    box-shadow: none !important;
-}
-
-#dicttabsstatic .dict-btn.dict-sentences-btn { width: auto; }
-
-.dict-btn:not(.dict-btn-active):hover,
-.dict-btn:hover + #dict-select {
-    background: var(--surface-2);
-    color: var(--font-color);
-}
-
-.dict-btn.dict-btn-active,
-.dict-btn.dict-btn-active + #dict-select {
-    background: var(--accent-soft);
-    color: var(--accent);
-}
-
-#dicttabslayout .dict-btn::after,
-#dicttabslayout .dict-menu-item::after { display: none; }
-
-#dict-image-btn {
-    width: 30px;
-    margin: 0;
-    padding: 0;
-    background-size: 60%;
-    filter: none;
-    opacity: .6;
-}
-
-#dict-image-btn:hover,
-#dict-image-btn.dict-btn-active {
-    background-color: var(--surface-2);
-    filter: none;
-    opacity: 1;
-}
-
-#dict-menu-container { border: 0; left: 0; }
-
-#dict-list-container {
-    padding: .25rem;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-m);
-    background: var(--background-color);
-    box-shadow: var(--shadow-pop);
-}
-
-.dict-menu-item { border-radius: var(--radius-s); }
-.dict-menu-item:hover { background: var(--surface-2); color: var(--font-color); }
-
-.dictframe { border-top: 0; }
 
 /* Term form (also shown inside the reading pane frame). */
 
@@ -1017,19 +947,6 @@ form select:focus,
         from { transform: translateX(6px); opacity: 0; }
         to { transform: none; opacity: 1; }
     }
-
-    .dictcontainer::after { background-color: var(--line); }
-
-    .dictcontainer::before {
-        top: 6px;
-        width: 40px;
-        height: 4px;
-        border-radius: 99px;
-        background: var(--line-strong);
-        transform: translateX(-50%);
-    }
-
-    #dicttabs { padding-top: .9rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

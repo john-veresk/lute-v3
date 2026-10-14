@@ -50,7 +50,6 @@ function start_hover_mode() {
   reset_cursor_marker();
   _hide_element_message_tooltips();
   _hide_term_edit_form();
-  _hide_dictionaries();
   clear_newmultiterm_elements();
 }
 
@@ -234,10 +233,6 @@ function show_bulk_term_edit_form(count_of_terms) {
     updateSpanContent();
 }
 
-function _hide_dictionaries() {
-  $('.dictcontainer').hide();
-}
-
 /* Hide word editing form. */
 function _hide_term_edit_form() {
   if (top.frames.wordframe) _replace_wordframe_url('/read/empty');
@@ -366,7 +361,6 @@ let word_clicked = function(el, e) {
       show_term_edit_form(el);
     }
     else {
-      _hide_dictionaries();
       _hide_term_edit_form();
     }
     return;
@@ -379,7 +373,6 @@ let word_clicked = function(el, e) {
     start_hover_mode();
   }
   else {
-    _hide_dictionaries();
     show_bulk_term_edit_form(count_marked);
   }
 }
@@ -801,77 +794,15 @@ let _move_cursor = function(selector, direction = 1) {
 
 /** SENTENCE TRANSLATIONS *************************/
 
-// LUTE_SENTENCE_LOOKUP_DICTS is rendered in templates/read/index.html.
-// Hitting "t" repeatedly cycles through the uris.  Moving to a new
-// sentence resets the order.
-
-var LUTE_LAST_SENTENCE_TRANSLATION_TEXT = '';
-var LUTE_CURR_SENTENCE_TRANSLATION_DICT_INDEX = 0;
-
-/** Cycle through the LUTE_SENTENCE_LOOKUP_DICTS.
- * If the current sentence is the same as the last translation,
- * move to the next sentence dictionary; otherwise start the cycle
- * again (from index 0).
- */
-let _get_translation_dict_index = function(sentence) {
-  const dict_count = LUTE_SENTENCE_LOOKUP_DICTS.length;
-  if (dict_count == 0)
-    return 0;
-  let new_index = LUTE_CURR_SENTENCE_TRANSLATION_DICT_INDEX;
-  if (LUTE_LAST_SENTENCE_TRANSLATION_TEXT != sentence) {
-    // New sentence, start at beginning.
-    new_index = 0;
-  }
-  else {
-    // Same sentence, next dict.
-    new_index += 1;
-    if (new_index >= dict_count)
-      new_index = 0;
-  }
-  LUTE_LAST_SENTENCE_TRANSLATION_TEXT = sentence;
-  LUTE_CURR_SENTENCE_TRANSLATION_DICT_INDEX = new_index;
-  return new_index;
-}
-
-
+// The Codex panel in the term frame reads the text from
+// LUTE_CODEX_SENTENCE: a page can be too long for its URL.
 let show_translation_for_text = function(text) {
   if (text == '')
     return;
-
-  if (LUTE_SENTENCE_LOOKUP_DICTS.length == 0) {
-    console.log('No sentence translation dictionaries configured.');
-    return;
-  }
-
-  const dict_index = _get_translation_dict_index(text);
-  const dict = LUTE_SENTENCE_LOOKUP_DICTS[dict_index];
-
-  if (dict.dicttype === "codex") {
-    const request_id = newCodexLookupId();
-    window.LUTE_CODEX_SENTENCE_LOOKUP = {request_id, payload: {language_id: Number(LookupButton.LANG_ID), text, context: '', kind: 'sentence'}};
-    const params = new URLSearchParams({language_id: LookupButton.LANG_ID, request_id, kind: 'sentence'});
-    _replace_wordframe_url(`/translation/panel?${params}`);
-    $('.dictcontainer').hide();
-    $('#read_pane_right').css('grid-template-rows', '1fr 0');
-    window.LUTE_TERM_PANE?.open();
-    return;
-  }
-
-  const lookup = encodeURIComponent(text);
-  let url = dict.url.replace('[LUTE]', lookup);
-  url = url.replace('###', lookup);  // TODO remove_old_###_placeholder: remove
-  if (dict.dicttype == "popuphtml") {
-    let settings = 'width=800, height=600, scrollbars=yes, menubar=no, resizable=yes, status=no';
-    if (LUTE_USER_SETTINGS.open_popup_in_new_tab)
-      settings = null;
-    LutePopups.open_popup(url, settings);
-  }
-  else {
-    _replace_wordframe_url(url);
-    $('#read_pane_right').css('grid-template-rows', '1fr 0');
-    window.LUTE_TERM_PANE?.open();
-  }
-
+  window.LUTE_CODEX_SENTENCE = text;
+  const params = new URLSearchParams({language_id: LUTE_READING_LANGUAGE_ID, kind: 'sentence'});
+  _replace_wordframe_url(`/translation/panel?${params}`);
+  window.LUTE_TERM_PANE?.open();
 };
 
 

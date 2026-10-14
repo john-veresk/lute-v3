@@ -14,22 +14,30 @@ phrases, sentences and pages.
 Codex panel, including waiting for the result. It stops when the response is
 ready or fails. Uncheck it to hide the timer for that language.
 
-Clicking a word or selecting a phrase opens a **Codex** tab in the dictionary
-panel. It translates the term using the sentence from the book and shows its main
+Clicking a word or selecting a phrase opens its term card. Codex is part of the
+card, without separate tabs or a divider: it translates the term using the sentence
+from the book and shows its main
 common meanings with brief explanations and the dictionary form. There is no fixed
 number of options: words with one main meaning show one, while words with several
 also show common meanings outside the sentence's context. Synonyms are grouped
 within a meaning, and rare senses are not added just to lengthen the list. The best
 meaning fills an empty Translation field automatically. Click another meaning to select
-it, then use the existing **Save** button to store it in your vocabulary.
+it, then press **Save** at the bottom of the card to store it in your vocabulary.
 Saved translations and text typed while a request is running are preserved.
-An empty **Translation** field starts Codex automatically, regardless of whether
-the word or phrase already has a database record or is marked as known.
-Whitespace alone counts as empty. If **Translation** is filled, opening the term
-or the Codex tab does not start a translation. Press **Translate with Codex**
-inside the tab to request a new one.
-Sentence and page translation commands also use Codex. Sentences and image
-lookup tabs remain available.
+
+Every term translation from Codex is kept in a translation store in the Lute
+database, one entry per word or phrase. Opening a term with a stored translation
+shows it immediately, marked **saved** beside the model, even if the term card
+already exists. An empty **Translation** field otherwise starts Codex
+automatically, regardless of whether the word or phrase already has a database
+record or is marked as known. Whitespace alone counts as empty. If **Translation**
+is filled and nothing is stored, opening the term does not start a translation.
+The ↻ icon at the top right of the card always asks Codex again and replaces the
+stored translation. Phrase suggestions stored from another sentence are shown
+only if they occur in the current one.
+
+Sentence and page translation commands also use Codex. The image icon beside ↻
+opens the Bing image search inside the card.
 
 For an unambiguous inflected word, Codex also adds the dictionary headword to
 **Parents** automatically: an infinitive for a verb, nominative singular for a
@@ -45,19 +53,18 @@ that change is saved with the child. Existing parents and
 parents changed or removed while the lookup was running are preserved. If the
 grammar is uncertain, Codex leaves Parents alone.
 
-When you click a single word with sentence context, **Phrases with this word**
+When you click a single word with sentence context, **Phrases**
 can suggest up to three useful phrases or collocations from nearby words, with
 translations. Each phrase contains the clicked word and is copied from the
-sentence. Press **Add phrase** to save one, or select checkboxes and use
-**Add selected phrases**. Phrase checkboxes start unchecked; nothing is saved
-until you choose it. These cards are saved independently of the clicked word,
+sentence. Press **Add** to save one at once. Phrase checkboxes start unchecked;
+nothing is saved until you choose it. These cards are saved independently of the clicked word,
 and reading highlights refresh after saving. Existing translations, parents and
 learning statuses are preserved. The section stays hidden when there is no
 useful phrase, no sentence context, or you selected several words.
 
-For a phrase with 2–40 distinct words, **Words in phrase** shows individual word
-cards, translations and any inflected words' base forms. Use **Add word** on one
-card, or select checkboxes and press **Add selected words**. These buttons save
+For a phrase with 2–40 distinct words, **Words** shows individual word
+cards, translations and any inflected words' base forms. Use **Add** on one
+card, or select checkboxes and press **Add selected**. These buttons save
 the selected word cards to the Lute vocabulary immediately, independently of
 saving the complete phrase, and refresh reading highlights. Existing word
 translations, parents and learning statuses are preserved; missing translations

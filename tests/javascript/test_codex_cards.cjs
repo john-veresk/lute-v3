@@ -1,162 +1,130 @@
-// Optional context phrases and existing phrase-word cards use explicit saves.
+// node tests/javascript/test_codex_cards.cjs
+// Meanings, optional phrase and word cards, and shortcuts in the term card.
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const vm = require('node:vm');
-const script = fs.readFileSync('lute/static/js/codex-panel.js', 'utf8');
+const {makeWindow, loadCodex, settle} = require('./fake-dom.cjs');
+
+const {CodexPanel} = loadCodex();
 const phrases = [
   {text: 'looked after', translation: 'присматривал за'},
   {text: 'looked after the cats', translation: 'присматривал за кошками'},
 ];
 
-function makePanel({words = [], phraseCards = phrases, saveResponse} = {}) {
-  const elements = new Map();
-  const handlers = new Map();
-  const requests = [];
-  const messages = [];
-  const parent = {postMessage(message) {messages.push(message);}};
-  function element() {
-    return {
-      hidden: true, disabled: false, textContent: '', children: [], handlers: {}, dataset: {},
-      classList: {toggle() {}},
-      addEventListener(type, fn) {this.handlers[type] = fn;},
-      append(...children) {this.children.push(...children);},
-      appendChild(child) {this.children.push(child);},
-      replaceChildren() {this.children = [];},
-      setAttribute(key, value) {this[key] = value;},
-      querySelectorAll(type) {return this.children.filter(child => child.type === type);},
-    };
-  }
-  function getElement(id) {
-    if (!elements.has(id)) elements.set(id, element());
-    return elements.get(id);
-  }
-  const context = vm.createContext({
-    URLSearchParams,
-    window: {
-      location: {origin: 'http://localhost:5001', search: '?language_id=1&request_id=current'},
-      parent,
-      addEventListener(type, fn) {
-        if (!handlers.has(type)) handlers.set(type, []);
-        handlers.get(type).push(fn);
-      },
+function makeForm(text = 'looked') {
+  return {
+    saves: 0, translation: '', choices: [],
+    text: () => text,
+    languageId: () => 1,
+    useTranslation(value, automatic) {
+      this.choices.push({value, automatic});
+      if (automatic && this.translation) return false;
+      this.translation = value;
+      return true;
     },
-    document: {getElementById: getElement, createElement: element},
-    performance: {now: () => 0},
-    setInterval() {return 1;}, clearInterval() {},
-    async fetch(url, options) {
-      requests.push({url, body: options && JSON.parse(options.body)});
-      let data;
-      if (url === '/translation/jobs') data = {job_id: 'job'};
-      else if (url === '/translation/jobs/job') data = {
-        status: 'complete',
-        result: {lemma: '', is_inflected: false, options: [{translation: 'смотрел', explanation: ''}], words, phrases: phraseCards},
-      };
-      else if (saveResponse) return saveResponse();
-      else {
-        const cards = url === '/translation/phrases' ? phraseCards : words;
-        data = {saved: JSON.parse(options.body).indices.map(index => ({index, ...cards[index]}))};
-      }
-      return {ok: true, json: async () => data};
-    },
-  });
-  vm.runInContext(script, context);
-  for (const fn of handlers.get('message')) fn({
-    origin: context.window.location.origin, source: parent,
-    data: {event: 'LuteCodexLookup', request_id: 'current', payload: {text: 'looked', context: 'He looked after the cats.', autostart: true}},
-  });
-  return {getElement, requests, messages, handlers};
+    useParent() {},
+    save() { this.saves++; },
+  };
 }
 
-const settle = () => new Promise(resolve => setImmediate(resolve));
+function makePanel({words = [], phraseCards = phrases, saveResponse, form = makeForm()} = {}) {
+  const win = makeWindow(async (url, body) => {
+    if (url === '/translation/jobs') return {job_id: 'job', saved: false};
+    if (url === '/translation/jobs/job') return {
+      status: 'complete',
+      result: {lemma: '', is_inflected: false, options: [{translation: 'смотрел', explanation: ''}], words, phrases: phraseCards},
+    };
+    if (saveResponse) return saveResponse();
+    const cards = url === '/translation/phrases' ? phraseCards : words;
+    return {saved: body.indices.map(index => ({index, ...cards[index]}))};
+  });
+  let cardsSaved = 0;
+  const panel = new CodexPanel({window: win, form, onCardsSaved: () => { cardsSaved++; }});
+  panel.setLookup('looked', 'He looked after the cats.');
+  panel.start('auto');
+  return {win, panel, form, el: id => win.document.getElementById(id), cardsSaved: () => cardsSaved};
+}
 
 async function checks() {
-  const panel = makePanel();
+  const card = makePanel();
   await settle();
-  assert.equal(panel.getElement('codex-phrases').hidden, false);
-  assert.equal(panel.getElement('codex-words').hidden, true);
-  const rows = panel.getElement('codex-phrase-cards').children;
+  assert.equal(card.el('codex-phrases').hidden, false);
+  assert.equal(card.el('codex-words').hidden, true);
+  const rows = card.el('codex-phrase-cards').children;
   assert.equal(rows.length, 2);
   assert.equal(rows[0].children[1].children[0].textContent, 'looked after');
   assert.equal(rows[0].children[1].children[1].textContent, 'присматривал за');
   assert.equal(rows[0].children[0].checked, false, 'context phrases start unchecked');
-  assert.equal(panel.getElement('codex-add-phrases').disabled, true);
-  assert.equal(panel.requests.length, 2, 'rendering suggestions does not save cards');
-  assert.equal(panel.messages.filter(message => message.event === 'LuteCodexTranslation').length, 1);
-  assert.equal(panel.messages.find(message => message.event === 'LuteCodexTranslation').text, 'looked');
+  assert.equal(card.win.requests.length, 2, 'rendering suggestions does not save cards');
+  assert.deepEqual(card.form.choices, [{value: 'смотрел', automatic: true}], 'the best meaning fills the form');
 
   await rows[0].children[2].handlers.click();
-  assert.deepEqual(panel.requests[2], {
+  assert.deepEqual(card.win.requests[2], {
     url: '/translation/phrases', body: {language_id: 1, job_id: 'job', indices: [0]},
   });
   assert.equal(rows[0].children[2].textContent, 'Saved');
   assert.equal(rows[0].children[2].disabled, true);
   assert.equal(rows[0].children[0].disabled, true);
-  assert.equal(panel.messages.filter(message => message.event === 'LuteCodexWordCardsSaved').length, 1, 'saving refreshes reading highlights');
-  assert.equal(panel.messages.filter(message => message.event === 'LuteCodexTranslation').length, 1, 'saving a phrase leaves the word form alone');
-  rows[1].children[0].checked = true;
-  rows[1].children[0].handlers.change();
-  assert.equal(panel.getElement('codex-add-phrases').disabled, false);
-  await panel.getElement('codex-add-phrases').onclick();
-  assert.deepEqual(panel.requests[3].body.indices, [1], 'only checked unsaved phrases are saved');
+  assert.equal(card.cardsSaved(), 1, 'saving refreshes reading highlights');
+  assert.equal(card.form.choices.length, 1, 'saving a phrase leaves the word form alone');
 
   const empty = makePanel({phraseCards: []});
   await settle();
-  assert.equal(empty.getElement('codex-phrases').hidden, true);
+  assert.equal(empty.el('codex-phrases').hidden, true);
 
   const wordPanel = makePanel({phraseCards: [], words: [{text: 'cats', translation: 'кошки', is_inflected: true, lemma: 'cat', lemma_translation: 'кошка'}]});
   await settle();
-  const wordRow = wordPanel.getElement('codex-word-cards').children[0];
-  assert.equal(wordRow.children[0].checked, true, 'existing word cards remain selected by default');
+  const wordRow = wordPanel.el('codex-word-cards').children[0];
+  assert.equal(wordRow.children[0].checked, true, 'phrase words start selected');
   assert.equal(wordRow.children[1].children[2].textContent, 'Parent: cat — кошка');
-  await wordPanel.getElement('codex-add-words').onclick();
-  assert.equal(wordPanel.requests[2].url, '/translation/words');
+  await wordPanel.el('codex-add-words').onclick();
+  assert.equal(wordPanel.win.requests[2].url, '/translation/words');
 
   const failed = makePanel({saveResponse: async () => ({ok: false, json: async () => ({error: 'Translation expired. Translate again.'})})});
   await settle();
-  const failedRow = failed.getElement('codex-phrase-cards').children[0];
+  const failedRow = failed.el('codex-phrase-cards').children[0];
   await failedRow.children[2].handlers.click();
-  assert.equal(failed.getElement('codex-phrases-status').textContent, 'Translation expired. Translate again.');
+  assert.equal(failed.el('codex-phrases-status').textContent, 'Translation expired. Translate again.');
   assert.equal(failedRow.children[2].disabled, false, 'failed saves can be retried');
   assert.equal(failedRow.children[2].textContent, 'Add');
-  assert.equal(failed.messages.filter(message => message.event === 'LuteCodexWordCardsSaved').length, 0);
+  assert.equal(failed.cardsSaved(), 0);
 
   let releaseSave;
-  const stale = makePanel({saveResponse: () => new Promise(resolve => {releaseSave = resolve;})});
+  const stale = makePanel({saveResponse: () => new Promise(resolve => { releaseSave = resolve; })});
   await settle();
-  const pendingSave = stale.getElement('codex-phrase-cards').children[0].children[2].handlers.click();
-  await stale.getElement('codex-retry').handlers.click();
-  const newRow = stale.getElement('codex-phrase-cards').children[1];
-  newRow.children[0].checked = true;
-  newRow.children[0].handlers.change();
+  const pendingSave = stale.el('codex-phrase-cards').children[0].children[2].handlers.click();
+  stale.el('codex-refresh').handlers.click();
+  await settle();
+  const newRow = stale.el('codex-phrase-cards').children[0];
   releaseSave({ok: true, json: async () => ({saved: [{index: 0, ...phrases[0]}]})});
   await pendingSave;
-  assert.equal(stale.getElement('codex-add-phrases').disabled, false, 'a late save cannot change a newer lookup');
-  assert.equal(newRow.children[2].textContent, 'Add');
-  assert.equal(stale.messages.filter(message => message.event === 'LuteCodexWordCardsSaved').length, 0);
+  assert.equal(newRow.children[2].textContent, 'Add', 'a late save cannot change a newer lookup');
+  assert.equal(stale.cardsSaved(), 0);
 
   const quick = makePanel();
   await settle();
-  assert.deepEqual(['codex-context-before', 'codex-context-word', 'codex-context-after'].map(id => quick.getElement(id).textContent),
+  assert.deepEqual(['codex-context-before', 'codex-context-word', 'codex-context-after'].map(id => quick.el(id).textContent),
     ['He ', 'looked', ' after the cats.'], 'the selected word is marked in its sentence');
-  const saves = () => quick.messages.filter(message => message.event === 'LuteCodexSave' && message.request_id === 'current').length;
-  const translations = () => quick.messages.filter(message => message.event === 'LuteCodexTranslation');
   const press = (key, target = {closest: () => null}) => {
     let prevented = false;
-    quick.handlers.get('keydown').forEach(fn => fn({key, target, preventDefault() {prevented = true;}}));
+    quick.win.dispatch('keydown', {key, target, preventDefault() { prevented = true; }});
     return prevented;
   };
-  quick.getElement('codex-save').handlers.click();
-  assert.equal(saves(), 1, 'Save in the panel submits the term form');
   assert.equal(press('1'), true);
-  assert.equal(translations().at(-1).automatic, false, 'number keys choose a meaning deliberately');
+  assert.deepEqual(quick.form.choices.at(-1), {value: 'смотрел', automatic: false}, 'number keys choose a meaning deliberately');
   assert.equal(press('9'), false, 'missing meanings are ignored');
   press('Enter');
-  assert.equal(saves(), 2, 'Enter saves');
+  assert.equal(quick.form.saves, 1, 'Enter saves the card');
   press('1', {closest: () => ({})});
-  assert.equal(translations().length, 2, 'typing in a field is not a shortcut');
-  quick.getElement('codex-options').children[0].handlers.dblclick();
-  assert.equal(saves(), 3, 'double-click chooses and saves');
-  assert.equal(translations().length, 3);
-  console.log('Codex optional card checks passed');
+  assert.equal(quick.form.choices.length, 2, 'typing in a field is not a shortcut');
+  quick.el('codex-options').children[0].handlers.dblclick();
+  assert.equal(quick.form.saves, 2, 'double-click chooses and saves');
+  assert.equal(quick.form.choices.length, 3);
+  assert.equal(quick.el('codex-options').children[0].classList.contains('selected'), true);
+
+  const edited = makePanel({form: makeForm()});
+  await settle();
+  edited.form.text = () => 'looked after';
+  edited.el('codex-options').children[0].handlers.click();
+  assert.equal(edited.form.choices.length, 1, 'a meaning is not applied after the term text changes');
+  console.log('Codex card checks passed');
 }
-checks().catch(error => {console.error(error); process.exitCode = 1;});
+checks().catch(error => { console.error(error); process.exitCode = 1; });

@@ -2,11 +2,8 @@
 
 let mouse_pos;
 let widthDefault;
-let trHeightDefault;
 const borderWidth = 30; // drag click area is actually dependent on the pseudo element width. this is arbitrary high value
 const wordFrame = document.getElementById("wordframeid");
-const dictFramesCont = document.getElementById("dictframes");
-const dictContainer = document.querySelector(".dictcontainer");
 
 applyInitialPaneSizes();
 
@@ -28,23 +25,6 @@ function resizeCol(e){
   readPaneRight.style.width = `${rtWidthPct}%`;
 
   localStorage.setItem("textWidth", lfWidthPct);
-}
-
-function resizeRow(e){
-  const dx = mouse_pos - e.y;
-  mouse_pos = e.y;
-  const currentHeightWordFrame = parseFloat(window.getComputedStyle(readPaneRight).gridTemplateRows.split(" ")[0]);
-  const readPaneRightHeight = parseFloat(window.getComputedStyle(readPaneRight).getPropertyValue("height"));
-  // console.log(currentHeightWordFrame);
-  let wordFrameHeight = (currentHeightWordFrame / readPaneRightHeight * 100) - (dx / readPaneRightHeight * 100);
-  wordFrameHeight = clamp(wordFrameHeight, 5, 95);
-  // const currentWidthRight = window.getComputedStyle(readPaneRight).width;
-  // console.log(currentHeightWord);
-
-  readPaneRight.style.gridTemplateRows = `${wordFrameHeight}% 1fr`;
-  // console.log(`${parseInt(currentWidthRight) - dx}px`);
-  // readPaneRight.style.width = `${parseInt(currentWidthRight) + dx}px`;
-  localStorage.setItem("trHeight", wordFrameHeight);
 }
 
 readPaneRight.addEventListener("mousedown", function(e){
@@ -73,43 +53,14 @@ readPaneRight.addEventListener("dblclick", function(e){
     }
 });
 
-dictContainer.addEventListener("pointerdown", function(e){
-  //if not stopPropagation resizing dictcontainer triggers parent event which resizes
-  //readPaneRight at the same time (for @media 900)
-  e.stopPropagation();
-  // resize only if the border is selected. fixes: clicking on tab buttons area also able to resize pane
-  if (e.target != e.currentTarget) return; 
-
-  setIFrameStatus("none");
-  if (e.offsetY < borderWidth) {
-    mouse_pos = e.y;
-    document.addEventListener("pointermove", resizeRow);
-    e.preventDefault();
-  }
-});
-
-dictContainer.addEventListener("dblclick", function(e){
-  if (e.target != e.currentTarget) return; 
-  
-  if (e.offsetY < borderWidth) {
-    if (readPaneRight.style.gridTemplateRows.split(" ")[0] == "5%") {
-      readPaneRight.style.gridTemplateRows = `${getFromLocalStorage("trHeight", trHeightDefault)}% 1fr`;
-    } else {
-      readPaneRight.style.gridTemplateRows = `${5}% 1fr`;
-    }
-  }
-});
-
 document.addEventListener("pointerup", function(){
   document.removeEventListener("mousemove", resizeCol);
-  document.removeEventListener("pointermove", resizeRow);
   setIFrameStatus("unset");
 });
 
 // if the iframes are clickable mousemove doesn't work correctly
 function setIFrameStatus(status) {
   wordFrame.style.pointerEvents = status;
-  dictFramesCont.style.pointerEvents = status;
 }
 
 // because right side is fixed. it's width value is different. need to find ratio
@@ -130,25 +81,15 @@ function getTextWidthPercentage() {
   // return parseFloat(elementComputedStyle.width);
 }
 
-function getWordFrameHeightPercentage() {
-  // returns percentage value
-  // const elementComputedStyle = window.getComputedStyle(dictContainer);
-  return (parseFloat(window.getComputedStyle(readPaneRight).gridTemplateRows.split(" ")[0]) / parseFloat(window.getComputedStyle(readPaneRight).getPropertyValue("height"))) * 100;
-  // return parseFloat(elementComputedStyle.width);
-}
-
 function applyInitialPaneSizes() {
   widthDefault = getTextWidthPercentage();
-  trHeightDefault = getWordFrameHeightPercentage();
 
   const width = getFromLocalStorage("textWidth", widthDefault);
-  const height = getFromLocalStorage("trHeight", trHeightDefault);
   const ratio = getReadPaneWidthRatio();
   const pane_right_width = (100 - width) * ratio;
 
   readPaneLeft.style.width = `${width}%`;
   readPaneRight.style.width = `${pane_right_width}%`;
-  readPaneRight.style.gridTemplateRows = `${height}% 1fr`;
 }
 
 function getFromLocalStorage(item, defaultVal) {
