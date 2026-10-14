@@ -166,6 +166,9 @@ def translate(
         raise TranslationError(
             "Codex CLI was not found. Install it on the Lute server and run codex login."
         )
+    words_to_translate = (
+        list(word_texts) if kind == "term" and len(word_texts) > 1 else []
+    )
     payload = json.dumps(
         {
             "source_language": source,
@@ -173,9 +176,7 @@ def translate(
             "text": text,
             "sentence_context": context,
             "kind": kind,
-            "words_to_translate": (
-                list(word_texts) if kind == "term" and len(word_texts) > 1 else []
-            ),
+            "words_to_translate": words_to_translate,
             "phrase_candidates": list(phrase_texts) if kind == "term" else [],
         },
         ensure_ascii=False,
@@ -303,10 +304,7 @@ def translate(
             words = data["words"]
             if not isinstance(words, list) or len(words) > 40:
                 raise ValueError("Invalid word cards")
-            expected = (
-                list(word_texts) if kind == "term" and len(word_texts) > 1 else []
-            )
-            if [w["text"] for w in words] != expected:
+            if [w["text"] for w in words] != words_to_translate:
                 raise ValueError("Word cards do not match the selected phrase")
             for word in words:
                 if (
