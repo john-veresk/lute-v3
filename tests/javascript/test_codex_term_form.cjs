@@ -16,6 +16,7 @@ function makeContainer() {
     '#suggested_parent_translation_selected': {value: ''},
     '#btnsubmit': {clicks: 0, click() { this.clicks++; }},
     '#codex_phrases': {value: ''},
+    '#codex_words': {value: ''},
   };
   return {fields, dataset: {}, querySelector: selector => fields[selector]};
 }
@@ -65,6 +66,10 @@ assert.equal(fields['#suggested_parent_text'].value, '', 'no suggestion is stage
 form.usePhrases([{text: 'cats sleep', translation: 'кошки спят'}]);
 assert.deepEqual(JSON.parse(fields['#codex_phrases'].value), [{text: 'cats sleep', translation: 'кошки спят'}],
   'checked phrases are posted with the term');
+form.useWords([{text: 'cats', translation: 'кошки', lemma: 'cat', is_inflected: true, lemma_translation: 'кошка'}]);
+assert.deepEqual(JSON.parse(fields['#codex_words'].value),
+  [{text: 'cats', translation: 'кошки', lemma: 'cat', is_inflected: true, lemma_translation: 'кошка'}],
+  'checked words are posted with the term');
 
 form.save();
 assert.equal(fields['#btnsubmit'].clicks, 1, 'Codex saves through the form button');

@@ -20,6 +20,36 @@ from lute.models.term import Term
 from lute.models.repositories import LanguageRepository, TermRepository
 
 
+def _is_text(value, limit):
+    return isinstance(value, str) and len(value) <= limit
+
+
+def _is_phrase(card):
+    return (
+        isinstance(card, dict)
+        and isinstance(card.get("text"), str)
+        and 0 < len(card["text"].strip()) <= 250
+        and _is_text(card.get("translation"), 500)
+    )
+
+
+def _is_word(card):
+    inflected = card.get("is_inflected") if isinstance(card, dict) else None
+    return (
+        isinstance(card, dict)
+        and isinstance(card.get("text"), str)
+        and 0 < len(card["text"].strip()) <= 250
+        and _is_text(card.get("translation"), 500)
+        and _is_text(card.get("lemma"), 500)
+        and isinstance(inflected, bool)
+        and _is_text(card.get("lemma_translation"), 500)
+        and (
+            not inflected
+            or (card["lemma"].strip() and card["lemma_translation"].strip())
+        )
+    )
+
+
 class TermForm(FlaskForm):
     """
     Term.
@@ -39,6 +69,8 @@ class TermForm(FlaskForm):
     suggested_parent_translation_selected = HiddenField()
     # Codex phrase cards checked in the term card: [{"text", "translation"}].
     codex_phrases = HiddenField()
+    # Codex word cards checked in the term card.
+    codex_words = HiddenField()
 
     translation = TextAreaField(
         "Translation", render_kw={"placeholder": "Translation", "autofocus": True}
@@ -108,26 +140,28 @@ class TermForm(FlaskForm):
         "Phrase cards to save with the term."
         return json.loads(self.codex_phrases.data or "[]")
 
+    def selected_words(self):
+        "Word cards to save with the term."
+        return json.loads(self.codex_words.data or "[]")
+
     def validate_codex_phrases(self, field):  # pylint: disable=unused-argument
         "At most three suggested phrases, each with a translation."
+        self._validate_cards(self.selected_phrases, _is_phrase, 3, "phrase")
 
-        def _is_phrase(card):
-            return (
-                isinstance(card, dict)
-                and isinstance(card.get("text"), str)
-                and 0 < len(card["text"].strip()) <= 250
-                and isinstance(card.get("translation"), str)
-                and len(card["translation"]) <= 500
-            )
+    def validate_codex_words(self, field):  # pylint: disable=unused-argument
+        "At most forty suggested words, each with a translation and base form."
+        self._validate_cards(self.selected_words, _is_word, 40, "word")
 
+    def _validate_cards(self, selected, is_card, limit, label):
+        "Reject a selection that is not a short list of complete cards."
         try:
-            phrases = self.selected_phrases()
+            cards = selected()
         except ValueError as exc:
-            raise ValidationError("Invalid phrase selection") from exc
-        if not isinstance(phrases, list) or len(phrases) > 3:
-            raise ValidationError("Invalid phrase selection")
-        if not all(_is_phrase(card) for card in phrases):
-            raise ValidationError("Invalid phrase selection")
+            raise ValidationError(f"Invalid {label} selection") from exc
+        if not isinstance(cards, list) or len(cards) > limit:
+            raise ValidationError(f"Invalid {label} selection")
+        if not all(is_card(card) for card in cards):
+            raise ValidationError(f"Invalid {label} selection")
 
     def validate_language_id(self, field):  # pylint: disable=unused-argument
         "Language must be set."

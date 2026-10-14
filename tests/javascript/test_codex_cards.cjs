@@ -11,8 +11,9 @@ const phrases = [
 
 function makeForm(text = 'looked') {
   return {
-    saves: 0, translation: '', choices: [], phrases: null,
+    saves: 0, translation: '', choices: [], phrases: null, words: null,
     usePhrases(phrases) { this.phrases = JSON.parse(JSON.stringify(phrases)); },
+    useWords(words) { this.words = JSON.parse(JSON.stringify(words)); },
     text: () => text,
     languageId: () => 1,
     useTranslation(value, automatic) {
@@ -76,6 +77,7 @@ async function checks() {
   assert.deepEqual(card.form.phrases, [phrases[1]], 'a phrase saved with Add is not saved again');
   card.el('codex-refresh').handlers.click();
   assert.deepEqual(card.form.phrases, [], 'a new lookup clears the checked phrases');
+  assert.deepEqual(card.form.words, [], 'a new lookup clears the checked words');
   await settle();
 
   const empty = makePanel({phraseCards: []});
@@ -85,10 +87,16 @@ async function checks() {
   const wordPanel = makePanel({phraseCards: [], words: [{text: 'cats', translation: 'кошки', is_inflected: true, lemma: 'cat', lemma_translation: 'кошка'}]});
   await settle();
   const wordRow = wordPanel.el('codex-word-cards').children[0];
-  assert.equal(wordRow.children[0].checked, true, 'phrase words start selected');
+  const word = {text: 'cats', translation: 'кошки', lemma: 'cat', is_inflected: true, lemma_translation: 'кошка'};
+  assert.equal(wordRow.children[0].checked, false, 'words start unchecked');
+  assert.deepEqual(wordPanel.form.words, [], 'no word is saved with the card until checked');
   assert.equal(wordRow.children[1].children[2].textContent, 'Parent: cat — кошка');
+  wordRow.children[0].checked = true;
+  wordRow.children[0].handlers.change();
+  assert.deepEqual(wordPanel.form.words, [word], 'a checked word is saved with the card');
   await wordPanel.el('codex-add-words').onclick();
   assert.equal(wordPanel.win.requests[2].url, '/translation/words');
+  assert.deepEqual(wordPanel.form.words, [], 'a word saved with Add is not saved again');
 
   const failed = makePanel({saveResponse: async () => ({ok: false, json: async () => ({error: 'Translation expired. Translate again.'})})});
   await settle();

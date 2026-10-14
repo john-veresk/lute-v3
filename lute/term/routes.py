@@ -332,6 +332,8 @@ def handle_term_form(
         language = LanguageRepository(session).find(term.language_id)
         for phrase in form.selected_phrases():
             save_card(repo, language, phrase, "phrases")
+        for word in form.selected_words():
+            save_card(repo, language, word, "words")
         repo.commit()
         return return_on_success
 

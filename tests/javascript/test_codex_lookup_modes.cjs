@@ -13,6 +13,7 @@ function openCard(translation, job = {job_id: null}) {
     '#text': {value: 'kissat'},
     '#language_id': {value: '1'},
     '#codex_phrases': {value: ''},
+    '#codex_words': {value: ''},
   };
   win.document.getElementById('term-form-container').querySelector = selector => fields[selector];
   startTermCodex(win, 'Kissat nukkuvat.');

@@ -114,6 +114,7 @@ class CodexPanel {
     this.cardRows = {words: [], phrases: []};
     if (!this.form) return;
     this.form.usePhrases([]);
+    this.form.useWords([]);
     this.element('codex-parent-options').replaceChildren();
     this.element('codex-parent').hidden = true;
     this.element('codex-parent').open = false;
@@ -306,8 +307,10 @@ class CodexPanel {
 
     const updateButtons = () => {
       if (current !== this.generation) return;
-      if (cardType === 'words') add.disabled = saving || !rows.some(row => row.checkbox.checked && !row.saved);
-      else this.form.usePhrases(this.selectedPhrases());
+      if (cardType === 'words') {
+        add.disabled = saving || !rows.some(row => row.checkbox.checked && !row.saved);
+        this.form.useWords(this.selectedWords());
+      } else this.form.usePhrases(this.selectedPhrases());
       rows.forEach(row => { row.button.disabled = saving || row.saved; });
     };
 
@@ -342,7 +345,7 @@ class CodexPanel {
     };
 
     cards.forEach((card, index) => {
-      const row = this.cardRow(card, `codex-${cardType}-select-${current}-${index}`, cardType === 'words', label);
+      const row = this.cardRow(card, `codex-${cardType}-select-${current}-${index}`, false, label);
       row.checkbox.addEventListener('change', updateButtons);
       row.button.addEventListener('click', () => save([index]));
       rows.push(row);
@@ -358,6 +361,18 @@ class CodexPanel {
     return this.cardRows.phrases
       .filter(row => row.checkbox.checked && !row.saved)
       .map(row => ({text: row.card.text, translation: row.card.translation}));
+  }
+
+  selectedWords() {
+    return this.cardRows.words
+      .filter(row => row.checkbox.checked && !row.saved)
+      .map(row => ({
+        text: row.card.text,
+        translation: row.card.translation,
+        lemma: row.card.lemma,
+        is_inflected: row.card.is_inflected,
+        lemma_translation: row.card.lemma_translation,
+      }));
   }
 
   cardRow(card, id, checked, label) {

@@ -44,6 +44,9 @@ class CodexTermForm {
   /** Checked phrase cards are created when the term is saved. */
   usePhrases(phrases) { this.field('#codex_phrases').value = JSON.stringify(phrases); }
 
+  /** Checked word cards are created when the term is saved. */
+  useWords(words) { this.field('#codex_words').value = JSON.stringify(words); }
+
   save() { this.field('#btnsubmit').click(); }
 }
 
