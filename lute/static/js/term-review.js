@@ -152,6 +152,9 @@ class LuteTermReview {
     } else if (/^[1-5]$/.test(event.key)) {
       event.preventDefault();
       this.rate(Number(event.key));
+    } else if (event.code === 'KeyW' || event.key?.toLowerCase() === 'w') {
+      event.preventDefault();
+      this.rate(99);
     }
   }
 
