@@ -2,7 +2,7 @@
 class LuteTermReview {
   constructor(root, configuration) {
     this.root = root;
-    this.ids = [...configuration.term_ids];
+    this.ids = [...new Set(configuration.term_ids)];
     for (let i = this.ids.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [this.ids[i], this.ids[j]] = [this.ids[j], this.ids[i]];

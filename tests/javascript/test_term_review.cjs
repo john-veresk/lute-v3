@@ -100,6 +100,21 @@ function fixture(ids, options = {}) {
   assert.equal(f.elements.card.hidden, true);
   assert.equal(f.elements['complete-title'].textContent, 'Practice complete');
 
+  const repeated = fixture([1, 1, 2, 1, 2]);
+  await tick();
+  assert.equal(repeated.elements.progress.textContent, 'Card 1 of 2');
+  repeated.review.showAnswer();
+  await repeated.review.rate(3);
+  assert.equal(repeated.elements.word.textContent, 'word2');
+  assert.equal(repeated.elements.progress.textContent, 'Card 2 of 2');
+  repeated.review.skip();
+  await tick();
+  assert.deepEqual(repeated.loaded, [1, 2], 'each term is shown only once');
+  assert.equal(repeated.posts.length, 1);
+  assert.equal(repeated.elements.complete.hidden, false);
+  assert.equal(repeated.elements.progress.textContent, '2 of 2 cards completed');
+  assert.equal(repeated.elements.summary.textContent, '1 reviewed · 1 skipped · 0 unavailable.');
+
   let release;
   const failing = fixture([1], {save: posts => posts.length === 1
     ? new Promise(resolve => { release = resolve; })
