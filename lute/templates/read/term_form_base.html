@@ -3,6 +3,21 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <title>Form</title>
+    <script>
+      // The phone "Text" bar lives in the parent page. Mark this frame so its
+      // actions can sit on that same row.
+      (function () {
+        if (window.parent === window) return;
+        try {
+          var query = window.parent.matchMedia("screen and (max-width: 980px)");
+          var sync = function () {
+            document.documentElement.classList.toggle("term-pane-compact", query.matches);
+          };
+          sync();
+          query.addEventListener("change", sync);
+        } catch (error) {}
+      })();
+    </script>
     
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='vendor/jquery/jquery-ui.css') }}" />
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='vendor/tagify/tagify.css') }}" />

@@ -23,6 +23,7 @@ body {
     --surface: color-mix(in oklab, var(--font-color) 3.5%, var(--background-color));
     --surface-2: color-mix(in oklab, var(--font-color) 7%, var(--background-color));
     --danger: #b3261e;
+    --term-bar-height: 56px;
 
     --radius-s: 6px;
     --radius-m: 10px;
@@ -921,6 +922,33 @@ form select:focus,
 
 .term-pane-bar { display: none; }
 
+/* The phone "Text" control is a transparent bar over this frame. The frame
+   paints that row and parks the term status and icon buttons on it. */
+html.term-pane-compact body { padding-top: var(--term-bar-height); }
+
+html.term-pane-compact body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: 4;
+    height: var(--term-bar-height);
+    background: var(--background-color);
+}
+
+html.term-pane-compact #term .term-head-actions {
+    position: fixed;
+    top: 0;
+    right: .6rem;
+    z-index: 5;
+    height: var(--term-bar-height);
+}
+
+html.term-pane-compact .codex-panel {
+    min-height: calc(100vh - var(--term-bar-height));
+}
+
 /* Phones and tablets: the term pane slides in from the right over the text. */
 @media screen and (max-width: 980px) {
     body { --pane-ease: cubic-bezier(.32, .72, 0, 1); --pane-time: .38s; }
@@ -937,7 +965,6 @@ form select:focus,
         left: 0;
         width: 100% !important;
         height: 100dvh !important;
-        padding-top: 56px;
         box-sizing: border-box;
         border: 0;
         opacity: 1;
@@ -978,14 +1005,16 @@ form select:focus,
         z-index: 2;
         display: flex;
         align-items: center;
-        height: 56px;
+        height: var(--term-bar-height);
         padding: 0 .6rem;
         box-sizing: border-box;
         border-bottom: 1px solid var(--line);
-        background: var(--background-color);
+        background: transparent;
+        pointer-events: none;
     }
 
     .term-pane-back {
+        pointer-events: auto;
         display: inline-flex;
         align-items: center;
         gap: .1rem;
