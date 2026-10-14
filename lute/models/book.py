@@ -3,8 +3,23 @@ Book entity.
 """
 
 import sqlite3
-from contextlib import closing
+import threading
+
 from lute.db import db
+
+_sqlite_lower_local = threading.local()
+
+
+def _sqlite_lower(input_string):
+    "SQLite LOWER(), reusing one in-memory connection per thread."
+    if input_string is None:
+        return None
+    connection = getattr(_sqlite_lower_local, "connection", None)
+    if connection is None:
+        connection = sqlite3.connect(":memory:")
+        _sqlite_lower_local.connection = connection
+    return connection.execute("SELECT LOWER(?)", (input_string,)).fetchone()[0]
+
 
 booktags = db.Table(
     "booktags",
@@ -16,6 +31,7 @@ booktags = db.Table(
 
 class BookTag(db.Model):
     "Term tags."
+
     __tablename__ = "tags2"
 
     id = db.Column("T2ID", db.Integer, primary_key=True)
@@ -315,17 +331,8 @@ class Sentence(db.Model):
         This method is public for use in the data_cleanup module.
         """
 
-        def _get_sql_lower(input_string):
-            "Returns result of sqlite LOWER call of input_string."
-            if input_string is None:
-                return None
-            with sqlite3.connect(":memory:") as conn, closing(conn.cursor()) as cur:
-                cur.execute("SELECT LOWER(?)", (input_string,))
-                result = cur.fetchone()
-                return result[0]
-
         lcased = parser.get_lowercase(self.text_content)
-        if lcased == _get_sql_lower(self.text_content):
+        if lcased == _sqlite_lower(self.text_content):
             lcased = "*"
         self.textlc_content = lcased
 
@@ -374,6 +381,7 @@ class TextBookmark(db.Model):
 
 class BookStats(db.Model):
     "The stats table."
+
     __tablename__ = "bookstats"
 
     BkID = db.Column(db.Integer, primary_key=True)
