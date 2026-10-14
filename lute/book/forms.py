@@ -2,13 +2,14 @@
 Book create/edit forms.
 """
 
-import json
 from flask import request
 from wtforms import StringField, SelectField, TextAreaField, IntegerField, HiddenField
 from wtforms import ValidationError
 from wtforms.validators import DataRequired, Length, NumberRange
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
+
+from lute.utils.formutils import tagify_field_data, tagify_field_values
 
 # Global configuration for allowed audio files
 ALLOWED_AUDIO_EXTENSIONS = [
@@ -25,14 +26,6 @@ ALLOWED_AUDIO_EXTENSIONS = [
 AUDIO_VALIDATION_MSG = (
     f"Please upload a valid audio file ({', '.join(ALLOWED_AUDIO_EXTENSIONS)})"
 )
-
-
-def _tag_values(field_data):
-    "Convert field data to array."
-    ret = []
-    if field_data:
-        ret = [h["value"] for h in json.loads(field_data)]
-    return ret
 
 
 class NewBookForm(FlaskForm):
@@ -83,18 +76,14 @@ class NewBookForm(FlaskForm):
         super().__init__(*args, **kwargs)
         book = kwargs.get("obj")
 
-        def _data(arr):
-            "Get data in proper format for tagify."
-            return json.dumps([{"value": p} for p in arr])
-
-        self.book_tags.data = _data(book.book_tags)
+        self.book_tags.data = tagify_field_data(book.book_tags)
         if request.method == "POST":
             self.book_tags.data = request.form.get("book_tags", "")
 
     def populate_obj(self, obj):
         "Call the populate_obj method from the parent class, then mine."
         super().populate_obj(obj)
-        obj.book_tags = _tag_values(self.book_tags.data)
+        obj.book_tags = tagify_field_values(self.book_tags.data)
         tfd = self.textfile.data
         if tfd:
             obj.text_stream = tfd.stream
@@ -147,18 +136,14 @@ class EditBookForm(FlaskForm):
         super().__init__(*args, **kwargs)
         book = kwargs.get("obj")
 
-        def _data(arr):
-            "Get data in proper format for tagify."
-            return json.dumps([{"value": p} for p in arr])
-
-        self.book_tags.data = _data(book.book_tags)
+        self.book_tags.data = tagify_field_data(book.book_tags)
         if request.method == "POST":
             self.book_tags.data = request.form.get("book_tags", "")
 
     def populate_obj(self, obj):
         "Call the populate_obj method from the parent class, then mine."
         super().populate_obj(obj)
-        obj.book_tags = _tag_values(self.book_tags.data)
+        obj.book_tags = tagify_field_values(self.book_tags.data)
 
         afd = self.audiofile.data
         if afd:

@@ -2,8 +2,22 @@
 Common form methods.
 """
 
+import json
+
 from lute.models.language import Language
 from lute.models.repositories import UserSettingRepository
+
+
+def tagify_field_data(values):
+    "Tagify JSON for a list of tag texts."
+    return json.dumps([{"value": value} for value in values])
+
+
+def tagify_field_values(field_data):
+    "Tag texts from a Tagify field."
+    if not field_data:
+        return []
+    return [item["value"] for item in json.loads(field_data)]
 
 
 def language_choices(session, dummy_entry_placeholder="-"):

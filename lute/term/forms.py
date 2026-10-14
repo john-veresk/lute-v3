@@ -18,13 +18,14 @@ from wtforms.validators import DataRequired, Length
 
 from lute.models.term import Term
 from lute.models.repositories import LanguageRepository, TermRepository
+from lute.utils.formutils import tagify_field_data, tagify_field_values
 
 
 def _is_text(value, limit):
     return isinstance(value, str) and len(value) <= limit
 
 
-def _is_phrase(card):
+def _has_card_text(card):
     return (
         isinstance(card, dict)
         and isinstance(card.get("text"), str)
@@ -33,13 +34,14 @@ def _is_phrase(card):
     )
 
 
+def _is_phrase(card):
+    return _has_card_text(card)
+
+
 def _is_word(card):
     inflected = card.get("is_inflected") if isinstance(card, dict) else None
     return (
-        isinstance(card, dict)
-        and isinstance(card.get("text"), str)
-        and 0 < len(card["text"].strip()) <= 250
-        and _is_text(card.get("translation"), 500)
+        _has_card_text(card)
         and _is_text(card.get("lemma"), 500)
         and isinstance(inflected, bool)
         and _is_text(card.get("lemma_translation"), 500)
@@ -107,12 +109,8 @@ class TermForm(FlaskForm):
         term = kwargs["obj"]
         self.session = kwargs["session"]
 
-        def _data(arr):
-            "Get data in proper format for tagify."
-            return json.dumps([{"value": p} for p in arr])
-
-        self.parentslist.data = _data(term.parents)
-        self.termtagslist.data = _data(term.term_tags)
+        self.parentslist.data = tagify_field_data(term.parents)
+        self.termtagslist.data = tagify_field_data(term.term_tags)
         self.duplicated_term = None
 
         if request.method == "POST":
@@ -126,15 +124,8 @@ class TermForm(FlaskForm):
             self.suggested_parent_translation_selected.data == "y"
         )
 
-        def _values(field_data):
-            "Convert field data to array."
-            ret = []
-            if field_data:
-                ret = [h["value"] for h in json.loads(field_data)]
-            return ret
-
-        obj.parents = _values(self.parentslist.data)
-        obj.term_tags = _values(self.termtagslist.data)
+        obj.parents = tagify_field_values(self.parentslist.data)
+        obj.term_tags = tagify_field_values(self.termtagslist.data)
 
     def selected_phrases(self):
         "Phrase cards to save with the term."
