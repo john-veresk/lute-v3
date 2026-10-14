@@ -6,6 +6,18 @@ from abc import ABC, abstractmethod
 from typing import List
 
 
+def apply_character_substitutions(text, substitutions):
+    "Apply from=to rules, then normalize newlines and braces."
+    for replacement in substitutions.split("|"):
+        parts = replacement.strip().split("=")
+        if len(parts) >= 2:
+            text = text.replace(parts[0].strip(), parts[1].strip())
+    text = text.replace("\r\n", "\n")
+    text = text.replace("{", "[")
+    text = text.replace("}", "]")
+    return text
+
+
 class ParsedToken:
     """
     A single parsed token from an input text.

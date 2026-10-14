@@ -12,13 +12,12 @@ Includes classes:
 
 import re
 from typing import List
-from lute.parse.base import ParsedToken, AbstractParser
+from lute.parse.base import ParsedToken, AbstractParser, apply_character_substitutions
 
 
 class ClassicalChineseParser(AbstractParser):
     """
-    A general parser for space-delimited languages,
-    such as English, French, Spanish ... etc.
+    One character at a time, for Classical Chinese.
     """
 
     @classmethod
@@ -30,18 +29,7 @@ class ClassicalChineseParser(AbstractParser):
         Returns ParsedToken array for given language.
         """
         text = re.sub(r"[ \t]+", "", text)
-
-        replacements = language.character_substitutions.split("|")
-        for replacement in replacements:
-            fromto = replacement.strip().split("=")
-            if len(fromto) >= 2:
-                rfrom = fromto[0].strip()
-                rto = fromto[1].strip()
-                text = text.replace(rfrom, rto)
-
-        text = text.replace("\r\n", "\n")
-        text = text.replace("{", "[")
-        text = text.replace("}", "]")
+        text = apply_character_substitutions(text, language.character_substitutions)
         text = text.replace("\n", "¶")
         text = text.strip()
 
