@@ -189,8 +189,14 @@ let tooltip_textitem_hover_content = function (el, setContent) {
 /* ========================================= */
 /** Showing the edit form. */
 
+/* Replacing keeps frame loads out of the history, so Back leaves the term pane. */
+function _replace_wordframe_url(url) {
+  top.frames.wordframe.location.replace(url);
+}
+
 function _show_wordframe_url(url) {
-  top.frames.wordframe.location.href = url;
+  window.LUTE_TERM_PANE?.request();
+  _replace_wordframe_url(url);
   applyInitialPaneSizes();  // in resize.js
 }
 
@@ -221,8 +227,9 @@ function show_bulk_term_edit_form(count_of_terms) {
     }
   }
 
+  window.LUTE_TERM_PANE?.request();
   if (!wordFrame.location.href.endsWith(url))
-    wordFrame.location.href = url;
+    _replace_wordframe_url(url);
   else
     updateSpanContent();
 }
@@ -233,7 +240,7 @@ function _hide_dictionaries() {
 
 /* Hide word editing form. */
 function _hide_term_edit_form() {
-  $('#wordframeid').attr('src', '/read/empty');
+  if (top.frames.wordframe) _replace_wordframe_url('/read/empty');
   // NOTE: checking for specific URLs or fragments in the location.href
   // causes security errors in some cases.
   /*
@@ -843,9 +850,10 @@ let show_translation_for_text = function(text) {
     const request_id = newCodexLookupId();
     window.LUTE_CODEX_SENTENCE_LOOKUP = {request_id, payload: {language_id: Number(LookupButton.LANG_ID), text, context: '', kind: 'sentence'}};
     const params = new URLSearchParams({language_id: LookupButton.LANG_ID, request_id, kind: 'sentence'});
-    top.frames.wordframe.location.href = `/translation/panel?${params}`;
+    _replace_wordframe_url(`/translation/panel?${params}`);
     $('.dictcontainer').hide();
     $('#read_pane_right').css('grid-template-rows', '1fr 0');
+    window.LUTE_TERM_PANE?.open();
     return;
   }
 
@@ -859,8 +867,9 @@ let show_translation_for_text = function(text) {
     LutePopups.open_popup(url, settings);
   }
   else {
-    top.frames.wordframe.location.href = url;
+    _replace_wordframe_url(url);
     $('#read_pane_right').css('grid-template-rows', '1fr 0');
+    window.LUTE_TERM_PANE?.open();
   }
 
 };

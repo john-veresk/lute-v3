@@ -47,45 +47,6 @@ function resizeRow(e){
   localStorage.setItem("trHeight", wordFrameHeight);
 }
 
-function resizePaneRight(e) {
-  const dy = mouse_pos - e.y;
-  mouse_pos = e.y;
-
-  // Hack!!!  Currently, when you open a page and long-click two terms
-  // to create a multiword term, the term edit handles appear right at
-  // the bottom of the screen, and dragging throws an error ("Cannot
-  // read properties of undefined (reading 'split')") ... I can't
-  // figure out why.  Setting the currentTy to 80 at least lets the
-  // thing be draggable.
-  let currentTy = 80;
-  try {
-    currentTy = parseFloat(readPaneRight.style.transform.split("(")[1].split(")")[0]);
-  }
-  catch (error) {
-    console.log("Error on settingTy: " + error.message);
-  }
-  // console.log(`current ty = ${currentTy}`);
-
-  let resultTy = currentTy - (dy / document.documentElement.clientHeight * 100);
-  resultTy = clamp(resultTy, 5, 95);
-  readPaneRight.style.transform = `translateY(${resultTy}%)`;
-  e.preventDefault();
-}
-
-if (mediaTablet.matches) {
-  readPaneRight.addEventListener("pointerdown", function(e){
-    if (e.offsetY < borderWidth) {
-      // if there's transition animation dragging is not smooth.
-      // gets reverted back on document.mouseup below
-      readPaneRight.style.transition = "unset";
-      setIFrameStatus("none");
-      mouse_pos = e.y;
-      document.addEventListener("pointermove", resizePaneRight);
-      e.preventDefault();
-    }
-  });
-}
-
 readPaneRight.addEventListener("mousedown", function(e){
   if (e.offsetX < borderWidth) {
     setIFrameStatus("none");
@@ -143,11 +104,6 @@ document.addEventListener("pointerup", function(){
   document.removeEventListener("mousemove", resizeCol);
   document.removeEventListener("pointermove", resizeRow);
   setIFrameStatus("unset");
-
-  if (mediaTablet.matches) {
-    document.removeEventListener("pointermove", resizePaneRight);
-    readPaneRight.style.removeProperty("transition");
-  }
 });
 
 // if the iframes are clickable mousemove doesn't work correctly

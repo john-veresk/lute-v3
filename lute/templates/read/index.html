@@ -8,6 +8,7 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/resize.js') }}" charset="utf-8" defer></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/text-options.js') }}" charset="utf-8" defer></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/dict-tabs.js') }}" charset="utf-8"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/term-pane.js') }}" charset="utf-8"></script>
 
 <div id="rendering_controls" style="display: none">
   <pre>
@@ -145,7 +146,12 @@
 </div>
 
 <div id="read_pane_right">
-  <button class="close-btn read-pane-right-close-btn" onclick="closeRightPane()"></button>
+  <div class="term-pane-bar">
+    <button type="button" class="term-pane-back" onclick="closeRightPane()" aria-label="Back to text">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      <span>Text</span>
+    </button>
+  </div>
   <div class="wordframecontainer">
   <iframe
     name="wordframe"
@@ -174,32 +180,33 @@
   LookupButton.LANG_ID = {{ lang_id | safe }};
   LookupButton.TERM_DICTS = {{ term_dicts | safe }};
 
-  let mouseY = 0;
   let scrollY = 0;
   let scrollYBeforeReload = 0;
   const mediaTablet = window.matchMedia("(max-width: 980px)");
   const readPaneRight = document.getElementById("read_pane_right");
-  const btmMarginCont = document.querySelector(".btm-margin-container");
   const theText = document.getElementById("thetext");
   const focusChk = document.getElementById("focus");
   const tap_sets_statusChk = document.getElementById("tap_sets_status");
 
-  // Fixes a dev-only "bug" where the right pane doesn't translate up
-  // to zero, due to the inline transform property, if it's first
-  // opened in mobile view, and the screen is then resized to desktop
-  // size.  This handler is only useful during dev: during actual use,
-  // the mobile size won't be resized to desktop size.
-  mediaTablet.addEventListener("change", function() {
-    if (!mediaTablet.matches) {
-      readPaneRight.style.removeProperty("transform");
+  window.LUTE_TERM_PANE = new TermPane({
+    pane: readPaneRight,
+    root: document.body,
+    history: window.history,
+    isCompact: () => mediaTablet.matches,
+  });
+  window.addEventListener("popstate", () => LUTE_TERM_PANE.onPopState());
+  document.getElementById("wordframeid").addEventListener("load", function() {
+    try {
+      const nav = this.contentWindow.performance.getEntriesByType("navigation")[0];
+      if (nav?.type === "back_forward") LUTE_TERM_PANE.onFrameTraversed();
     }
-  })
+    catch (error) {}  // A cross-origin dictionary page.
+  });
 
-  // Display the term form when a multi-word term is created on
-  // mobile. This must be "pointerup", and not "click", because the
+  // Remember the scroll position of the tap that opens the term form.
+  // This must be "pointerup", and not "click", because the
   // "touchend" event cancels the click event.
   document.addEventListener("pointerup", (event) => {
-      mouseY = event.clientY;
       scrollY = window.scrollY;
   });
 
@@ -233,24 +240,15 @@
       loadDictionaries();
     }
 
-    if (event.data.event === "LuteTermFormOpened" && mediaTablet.matches) {
-      readPaneRight.classList.add("open-dict");
-      btmMarginCont.classList.add("open-dict");
-
-      const viewportHeight = document.documentElement.clientHeight;
-      const mousePosPercent = mouseY / viewportHeight * 100;
-      const dict_transform = `translateY(${Math.round(mousePosPercent) + 10}%)`;
-      document.querySelector("#read_pane_right.open-dict").style.transform = dict_transform;
-      readPaneRight.style.opacity = "1";
-
-      // Add margin to the bottom of readLeft so it's fully scrollable
-      // to the bottom when the dict is over text
-      const mt = `calc(${viewportHeight - mouseY + 70}px - var(--player-height))`;
-      document.querySelector(".open-dict.btm-margin-container").style.marginTop = mt;
-
+    if (event.data.event === "LuteTermFormOpened" && LUTE_TERM_PANE.openIfRequested()) {
       // Sometimes there's an unnecessary text scroll when clicking on
       // a word. Return to the previous scroll position
       window.scrollTo(0, scrollY);
+    }
+
+    // A saved word returns the phone reader to the text.
+    if (event.data.event === "LuteTermFormPosted" && !event.data.keepOpen) {
+      LUTE_TERM_PANE.close();
     }
 
     // When term form posts data (either updating or deleting terms),
@@ -504,11 +502,7 @@
   }
 
   function closeRightPane() {
-      readPaneRight.classList.remove("open-dict");
-      btmMarginCont.classList.remove("open-dict");
-      btmMarginCont.style.removeProperty("margin-top");
-      readPaneRight.style.removeProperty("transform");
-      readPaneRight.style.removeProperty("opacity");
+    LUTE_TERM_PANE.close();
   }
 
   function edit_current_page() {

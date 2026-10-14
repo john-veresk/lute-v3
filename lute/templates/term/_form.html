@@ -221,8 +221,11 @@
       const frm = $('#term-form');
       const formData = frm.serialize();
       $.post(frm.attr('action'), formData, function(response) {
-        window.parent.postMessage({ event: "LuteTermFormPosted" }, "*");
-        window.location.href = url;
+        window.parent.postMessage({ event: "LuteTermFormPosted", keepOpen: true }, "*");
+        if (in_reading_frame)
+          window.location.replace(url);
+        else
+          window.location.href = url;
       });
     });
 
@@ -328,7 +331,7 @@
     $.post("/term/delete/{{ term.id }}", function( data ) {
       if ("{{ embedded_in_reading_frame }}" == "True") {
         window.parent.postMessage({ event: "LuteTermFormPosted" }, "*");
-        window.parent.document.getElementById('wordframeid').src = 'about:blank';
+        window.location.replace('about:blank');
       }
       else {
         // If on term page, go to term listing

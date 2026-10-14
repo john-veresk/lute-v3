@@ -1,5 +1,11 @@
 "use strict";
 
+/** Load a lookup frame without adding a Back step to the reading page. */
+function navigateFrame(frame, url) {
+  const location = frame.contentWindow?.location;
+  if (location) location.replace(url);
+  else frame.src = url;
+}
 
 /**
  * A general lookup button, for images, sentences, etc.
@@ -103,7 +109,7 @@ class SentenceLookupButton extends GeneralLookupButton {
       // multi-word terms are actually created and saved.  e.g., I can
       // highlight the text "a big thing" and see if that phrase has
       // been used in anything I've read already.
-      iframe.setAttribute("src", `/term/sentences/${LookupButton.LANG_ID}/${t}`);
+      navigateFrame(iframe, `/term/sentences/${LookupButton.LANG_ID}/${t}`);
     };
 
     super("sentences-btn", "Sentences", "See term usage", "dict-sentences-btn", handler);
@@ -140,7 +146,7 @@ class ImageLookupButton extends GeneralLookupButton {
       const binghash = raw_bing_url.replace('https://www.bing.com/images/search?', '');
       const url = `/bing/search_page/${LookupButton.LANG_ID}/${encodeURIComponent(use_text)}/${encodeURIComponent(binghash)}`;
 
-      iframe.setAttribute("src", url);
+      navigateFrame(iframe, url);
     };  // end handler
 
     super("dict-image-btn", null, "Lookup images", "dict-image-btn", handler);
@@ -260,7 +266,7 @@ class DictButton extends LookupButton {
       url = `/bing/search/${LookupButton.LANG_ID}/${encodeURIComponent(use_text)}/${encodeURIComponent(binghash)}`;
     }
 
-    this.frame.setAttribute("src", url);
+    navigateFrame(this.frame, url);
     this.contentLoaded = true;
   }
 
@@ -291,7 +297,7 @@ class CodexButton extends LookupButton {
       request_id: this.lookupId,
       kind: 'term',
     });
-    this.frame.src = `/translation/panel?${params}`;
+    navigateFrame(this.frame, `/translation/panel?${params}`);
     this.contentLoaded = true;
   }
 }

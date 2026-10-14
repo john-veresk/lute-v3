@@ -903,18 +903,142 @@ form select:focus,
 
 ::placeholder { color: var(--ink-3); font-size: .9rem; opacity: 1; }
 
+/* A narrow frame means a phone: keep the whole form visible above the lookups. */
+@media screen and (max-width: 600px) {
+    #term-form-container { padding: .6rem .9rem .5rem; }
+    #term { gap: .35rem; }
+    #term-form #text { font-size: 1.2rem; }
+    #term-form #translation { min-height: 44px; padding: .4rem .6rem; }
+    #status label { width: 30px; height: 28px; }
+    #term-button-container { margin-top: .2rem; }
+    #term-button-container .btn { min-height: 32px; }
+}
+
+.term-pane-bar { display: none; }
+
+/* Phones and tablets: the term pane slides in from the right over the text. */
 @media screen and (max-width: 980px) {
+    body { --pane-ease: cubic-bezier(.32, .72, 0, 1); --pane-time: .38s; }
+
     #reading-header { position: fixed; }
     .reading_header_container { padding: .5rem .75rem; }
     .reader-review-btn { font-size: 0; gap: 0; padding: 0 .5rem; }
-    div#read_pane_right { border-left: 0; border-top: 1px solid var(--line); }
-    #read_pane_right::after,
-    .dictcontainer::after { background-color: var(--line-strong); }
-    #read_pane_right::before,
-    .dictcontainer::before,
-    .read-pane-right-close-btn,
-    .read-pane-right-close-btn:hover { background-color: var(--accent); }
     #reading_menu { width: min(320px, 88%); }
+
+    div#read_pane_right {
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100% !important;
+        height: 100dvh !important;
+        padding-top: 56px;
+        box-sizing: border-box;
+        border: 0;
+        opacity: 1;
+        visibility: hidden;
+        transform: translateX(100%);
+        transition: transform var(--pane-time) var(--pane-ease), visibility 0s linear var(--pane-time);
+        box-shadow: -28px 0 48px -28px color-mix(in oklab, var(--font-color) 45%, transparent);
+        touch-action: auto;
+    }
+
+    div#read_pane_right.open-dict {
+        visibility: visible;
+        transform: translateX(0);
+        transition: transform var(--pane-time) var(--pane-ease);
+    }
+
+    #read_pane_right::before,
+    #read_pane_right::after { display: none; }
+
+    #thetexttitle,
+    #thetext,
+    #reading-footer {
+        transition: transform var(--pane-time) var(--pane-ease), opacity var(--pane-time) var(--pane-ease);
+    }
+
+    .term-pane-open #thetexttitle,
+    .term-pane-open #thetext,
+    .term-pane-open #reading-footer {
+        opacity: .35;
+        transform: translateX(-24%);
+    }
+
+    .term-pane-bar {
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        height: 56px;
+        padding: 0 .6rem;
+        box-sizing: border-box;
+        border-bottom: 1px solid var(--line);
+        background: var(--background-color);
+    }
+
+    .term-pane-back {
+        display: inline-flex;
+        align-items: center;
+        gap: .1rem;
+        height: 38px;
+        padding: 0 .9rem 0 .45rem;
+        border: 0;
+        border-radius: 99px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font: 600 .95rem/1 var(--ui-font);
+        cursor: pointer;
+        transition: transform .12s, background-color .12s;
+    }
+
+    .term-pane-back:active {
+        transform: scale(.94);
+        background: color-mix(in oklab, var(--accent) 22%, var(--background-color));
+    }
+
+    .term-pane-back svg {
+        width: 22px;
+        height: 22px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2.2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        transition: transform var(--pane-time) var(--pane-ease);
+    }
+
+    .open-dict .term-pane-back svg { animation: term-pane-nudge .5s var(--pane-ease) .25s both; }
+
+    @keyframes term-pane-nudge {
+        from { transform: translateX(6px); opacity: 0; }
+        to { transform: none; opacity: 1; }
+    }
+
+    .dictcontainer::after { background-color: var(--line); }
+
+    .dictcontainer::before {
+        top: 6px;
+        width: 40px;
+        height: 4px;
+        border-radius: 99px;
+        background: var(--line-strong);
+        transform: translateX(-50%);
+    }
+
+    #dicttabs { padding-top: .9rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    div#read_pane_right,
+    div#read_pane_right.open-dict,
+    #thetexttitle,
+    #thetext,
+    #reading-footer { transition: none; }
+    .open-dict .term-pane-back svg { animation: none; }
 }
 
 /* Settings ***********************************************/
