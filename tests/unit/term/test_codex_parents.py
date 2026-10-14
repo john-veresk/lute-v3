@@ -156,6 +156,34 @@ def make_phrase_job(client, language, monkeypatch):
     return job_id
 
 
+def test_words_already_in_the_vocabulary_are_marked_saved(
+    client, codex_english, monkeypatch
+):
+    job_id = make_phrase_job(client, codex_english, monkeypatch)
+    client.get(f"/translation/jobs/{job_id}")
+    saved = DBTerm(codex_english, "cats")
+    saved.status = 1
+    saved.translation = "мой перевод"
+    placeholder = DBTerm(codex_english, "home")
+    placeholder.status = 0
+    db.session.add_all([saved, placeholder])
+    db.session.commit()
+    response = client.post(
+        "/translation/jobs",
+        json={"language_id": codex_english.id, "text": "cats went home"},
+    )
+    assert response.json["saved"] is True
+    words = {
+        word["text"]: word
+        for word in client.get(f"/translation/jobs/{response.json['job_id']}").json[
+            "result"
+        ]["words"]
+    }
+    assert words["cats"]["saved"] is True
+    assert "saved" not in words["went"]
+    assert "saved" not in words["home"]
+
+
 def test_phrase_lookup_is_read_only_and_saves_only_selected_cards(
     client, codex_english, monkeypatch
 ):

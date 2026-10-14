@@ -356,7 +356,7 @@ div.codex-option { cursor: auto; padding-inline: 0; }
     background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 12"><path d="M2.5 6.2 5 8.5l4.5-5" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 }
 
-.codex-word input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
+.codex-word input[type="checkbox"]:disabled { cursor: default; }
 
 .codex-word-body {
     display: flex;
@@ -381,17 +381,8 @@ div.codex-option { cursor: auto; padding-inline: 0; }
     opacity: 1;
 }
 
-.codex-cards-foot {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: .75rem;
-    margin-top: .3rem;
-}
-
-.codex-cards-status { margin: 0 .3rem; color: var(--ink-3); font-size: .8rem; }
+.codex-cards-status { margin: .3rem .3rem 0; color: var(--ink-3); font-size: .8rem; }
 .codex-cards-status:empty { display: none; }
-.codex-cards-foot .btn { min-height: 30px; font-size: .82rem; }
 
 /* Save stays reachable at the bottom of the card. */
 

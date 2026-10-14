@@ -94,9 +94,22 @@ async function checks() {
   wordRow.children[0].checked = true;
   wordRow.children[0].handlers.change();
   assert.deepEqual(wordPanel.form.words, [word], 'a checked word is saved with the card');
-  await wordPanel.el('codex-add-words').onclick();
+  await wordRow.children[2].handlers.click();
   assert.equal(wordPanel.win.requests[2].url, '/translation/words');
+  assert.equal(wordRow.children[0].checked, true, 'an added word stays checked');
+  assert.equal(wordRow.children[0].disabled, true, 'an added word cannot be selected again');
+  assert.equal(wordRow.children[2].textContent, 'Saved');
+  assert.equal(wordRow.children[2].disabled, true);
   assert.deepEqual(wordPanel.form.words, [], 'a word saved with Add is not saved again');
+
+  const known = makePanel({phraseCards: [], words: [{...word, saved: true}]});
+  await settle();
+  const knownRow = known.el('codex-word-cards').children[0];
+  assert.equal(knownRow.children[0].checked, true, 'a word already in the vocabulary starts checked');
+  assert.equal(knownRow.children[0].disabled, true, 'a saved word cannot be clicked');
+  assert.equal(knownRow.children[2].textContent, 'Saved');
+  assert.equal(knownRow.children[2].disabled, true);
+  assert.deepEqual(known.form.words, [], 'a saved word is not posted again');
 
   const failed = makePanel({saveResponse: async () => ({ok: false, json: async () => ({error: 'Translation expired. Translate again.'})})});
   await settle();

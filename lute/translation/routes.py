@@ -3,6 +3,7 @@
 from flask import Blueprint, current_app, jsonify, render_template, request
 from lute.db import db
 from lute.models.language import Language
+from lute.models.term import Term as DBTerm
 from lute.term.model import Repository
 from lute.translation import store
 from lute.translation.cards import save_card
@@ -134,7 +135,7 @@ def submit():
     if kind == "term" and mode != "refresh":
         saved = store.find(db.session, language, clean_text)
     if saved is not None and mode != "prefetch":
-        job_id = _jobs().adopt(key, _fit_to_context(saved, phrase_texts))
+        job_id = _jobs().adopt(key, _fit_to_context(saved, phrase_texts), language.id)
         return jsonify(job_id=job_id, saved=True), 202
     if saved is not None or mode == "stored":
         return jsonify(job_id=None), 200
@@ -159,7 +160,37 @@ def poll(job_id):
         return jsonify(error="Translation expired. Try again."), 404
     if result["status"] == "complete":
         _save_new_result(job_id, result["result"])
+        result = {**result, "result": _mark_saved_words(job_id, result["result"])}
     return jsonify(result)
+
+
+def _mark_saved_words(job_id, result):
+    "Words already in the vocabulary stay checked and are not saved again."
+    words = result.get("words") or []
+    language_id = _jobs().language_id_for(job_id)
+    language = db.session.get(Language, language_id) if language_id else None
+    if language is None or not words:
+        return result
+    lowered = [language.get_lowercase(word["text"]) for word in words]
+    saved = {
+        text
+        for (text,) in db.session.query(DBTerm.text_lc).filter(
+            DBTerm.language_id == language.id,
+            DBTerm.text_lc.in_(lowered),
+            DBTerm.status != 0,
+        )
+    }
+    return {
+        **result,
+        "words": [
+            (
+                {**word, "saved": True}
+                if language.get_lowercase(word["text"]) in saved
+                else word
+            )
+            for word in words
+        ],
+    }
 
 
 def _save_new_result(job_id, result):

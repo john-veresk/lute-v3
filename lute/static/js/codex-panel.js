@@ -296,7 +296,6 @@ class CodexPanel {
     const label = cardType === 'words' ? 'word' : 'phrase';
     const section = this.element(`codex-${cardType}`);
     const list = this.element(cardType === 'words' ? 'codex-word-cards' : 'codex-phrase-cards');
-    const add = this.element('codex-add-words');
     const status = this.element(`codex-${cardType}-status`);
     list.replaceChildren();
     section.hidden = cards.length === 0;
@@ -307,10 +306,8 @@ class CodexPanel {
 
     const updateButtons = () => {
       if (current !== this.generation) return;
-      if (cardType === 'words') {
-        add.disabled = saving || !rows.some(row => row.checkbox.checked && !row.saved);
-        this.form.useWords(this.selectedWords());
-      } else this.form.usePhrases(this.selectedPhrases());
+      if (cardType === 'words') this.form.useWords(this.selectedWords());
+      else this.form.usePhrases(this.selectedPhrases());
       rows.forEach(row => { row.button.disabled = saving || row.saved; });
     };
 
@@ -328,7 +325,7 @@ class CodexPanel {
         data.saved.forEach(item => {
           const row = rows[item.index];
           row.saved = true;
-          row.checkbox.checked = false;
+          row.checkbox.checked = cardType === 'words';
           row.checkbox.disabled = true;
           row.button.textContent = 'Saved';
           row.button.setAttribute('aria-label', `Saved ${label} ${item.text}`);
@@ -345,16 +342,24 @@ class CodexPanel {
     };
 
     cards.forEach((card, index) => {
-      const row = this.cardRow(card, `codex-${cardType}-select-${current}-${index}`, false, label);
+      const alreadySaved = cardType === 'words' && card.saved === true;
+      const row = this.cardRow(card, `codex-${cardType}-select-${current}-${index}`, alreadySaved, label);
+      if (alreadySaved) this.markSaved(row, label);
       row.checkbox.addEventListener('change', updateButtons);
       row.button.addEventListener('click', () => save([index]));
       rows.push(row);
       list.appendChild(row.element);
     });
     updateButtons();
-    if (cardType === 'words') {
-      add.onclick = () => save(rows.map((row, index) => row.checkbox.checked && !row.saved ? index : -1).filter(index => index >= 0));
-    }
+  }
+
+  markSaved(row, label) {
+    row.saved = true;
+    row.checkbox.checked = true;
+    row.checkbox.disabled = true;
+    row.button.disabled = true;
+    row.button.textContent = 'Saved';
+    row.button.setAttribute('aria-label', `Saved ${label} ${row.card.text}`);
   }
 
   selectedPhrases() {

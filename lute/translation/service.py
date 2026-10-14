@@ -408,14 +408,20 @@ class TranslationJobs:
             future = self.pool.submit(translate, *key)
             return self._add(_Job(key, future, now, language_id))
 
-    def adopt(self, key, result):
+    def adopt(self, key, result, language_id=None):
         "Serve a saved result like a completed lookup, without saving it again."
         future = Future()
         future.set_result(result)
         with self.lock:
             now = time.monotonic()
             self._drop_finished(now)
-            return self._add(_Job(key, future, now, saved=True))
+            return self._add(_Job(key, future, now, language_id, saved=True))
+
+    def language_id_for(self, job_id):
+        "Language of a lookup, including one served from the translation store."
+        with self.lock:
+            job = self.jobs.get(job_id)
+            return job.language_id if job else None
 
     def claim_unsaved(self, job_id):
         "Return (key, language_id) once for each new successful result."
