@@ -1235,6 +1235,9 @@ form select:focus,
     .app-bar { gap: .75rem; height: 56px; }
     .app-brand span:not(.app-env) { display: none; }
     .app-nav a { padding: 0 .5rem; }
-    .app-button-primary { padding: 0 .6rem; font-size: 0; gap: 0; }
-    .app-button-primary svg { width: 18px; height: 18px; }
+    #book_new { padding: 0 .6rem; font-size: 0; gap: 0; }
+    #book_new svg { width: 18px; height: 18px; }
+    #booktable td:nth-child(4), #booktable th:nth-child(4),
+    #booktable td:nth-child(7), #booktable th:nth-child(7) { display: none; }
+    .home-actions .app-button { flex: 1; }
 }
