@@ -35,6 +35,7 @@ from lute.term.service import (
 from lute.db import db
 from lute.term.forms import TermForm
 from lute.term.review import Service as ReviewService, card_data, parse_ids
+from lute.translation.cards import save_card
 import lute.utils.formutils
 
 bp = Blueprint("term", __name__, url_prefix="/term")
@@ -328,6 +329,9 @@ def handle_term_form(
     if form.validate_on_submit():
         form.populate_obj(term)
         repo.add(term)
+        language = LanguageRepository(session).find(term.language_id)
+        for phrase in form.selected_phrases():
+            save_card(repo, language, phrase, "phrases")
         repo.commit()
         return return_on_success
 

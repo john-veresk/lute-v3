@@ -113,6 +113,7 @@ class CodexPanel {
     this.parentSuggestion = null;
     this.cardRows = {words: [], phrases: []};
     if (!this.form) return;
+    this.form.usePhrases([]);
     this.element('codex-parent-options').replaceChildren();
     this.element('codex-parent').hidden = true;
     this.element('codex-parent').open = false;
@@ -306,6 +307,7 @@ class CodexPanel {
     const updateButtons = () => {
       if (current !== this.generation) return;
       if (cardType === 'words') add.disabled = saving || !rows.some(row => row.checkbox.checked && !row.saved);
+      else this.form.usePhrases(this.selectedPhrases());
       rows.forEach(row => { row.button.disabled = saving || row.saved; });
     };
 
@@ -350,6 +352,12 @@ class CodexPanel {
     if (cardType === 'words') {
       add.onclick = () => save(rows.map((row, index) => row.checkbox.checked && !row.saved ? index : -1).filter(index => index >= 0));
     }
+  }
+
+  selectedPhrases() {
+    return this.cardRows.phrases
+      .filter(row => row.checkbox.checked && !row.saved)
+      .map(row => ({text: row.card.text, translation: row.card.translation}));
   }
 
   cardRow(card, id, checked, label) {

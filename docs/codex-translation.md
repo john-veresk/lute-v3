@@ -56,8 +56,10 @@ grammar is uncertain, Codex leaves Parents alone.
 When you click a single word with sentence context, **Phrases**
 can suggest up to three useful phrases or collocations from nearby words, with
 translations. Each phrase contains the clicked word and is copied from the
-sentence. Press **Add** to save one at once. Phrase checkboxes start unchecked;
-nothing is saved until you choose it. These cards are saved independently of the clicked word,
+sentence. Check phrases to save them together with the term when you press
+**Save**: one click creates the word card, its parent and the checked phrases.
+Press **Add** to save a phrase at once. Phrase checkboxes start unchecked;
+nothing is saved until you choose it. Phrase cards are separate terms from the clicked word,
 and reading highlights refresh after saving. Existing translations, parents and
 learning statuses are preserved. The section stays hidden when there is no
 useful phrase, no sentence context, or you selected several words.

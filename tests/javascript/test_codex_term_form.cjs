@@ -15,6 +15,7 @@ function makeContainer() {
     '#suggested_parent_translation': {value: '', dispatchEvent() {}},
     '#suggested_parent_translation_selected': {value: ''},
     '#btnsubmit': {clicks: 0, click() { this.clicks++; }},
+    '#codex_phrases': {value: ''},
   };
   return {fields, dataset: {}, querySelector: selector => fields[selector]};
 }
@@ -60,6 +61,10 @@ fields['#suggested_parent_text'].value = '';
 form.useParent(parent);
 assert.equal(tags.value[0].value, 'feline', 'preserves existing parents');
 assert.equal(fields['#suggested_parent_text'].value, '', 'no suggestion is staged for another parent');
+
+form.usePhrases([{text: 'cats sleep', translation: 'кошки спят'}]);
+assert.deepEqual(JSON.parse(fields['#codex_phrases'].value), [{text: 'cats sleep', translation: 'кошки спят'}],
+  'checked phrases are posted with the term');
 
 form.save();
 assert.equal(fields['#btnsubmit'].clicks, 1, 'Codex saves through the form button');

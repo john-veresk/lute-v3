@@ -11,7 +11,8 @@ const phrases = [
 
 function makeForm(text = 'looked') {
   return {
-    saves: 0, translation: '', choices: [],
+    saves: 0, translation: '', choices: [], phrases: null,
+    usePhrases(phrases) { this.phrases = JSON.parse(JSON.stringify(phrases)); },
     text: () => text,
     languageId: () => 1,
     useTranslation(value, automatic) {
@@ -65,6 +66,17 @@ async function checks() {
   assert.equal(rows[0].children[0].disabled, true);
   assert.equal(card.cardsSaved(), 1, 'saving refreshes reading highlights');
   assert.equal(card.form.choices.length, 1, 'saving a phrase leaves the word form alone');
+
+  assert.deepEqual(card.form.phrases, [], 'no phrase is saved with the card until checked');
+  rows[1].children[0].checked = true;
+  rows[1].children[0].handlers.change();
+  assert.deepEqual(card.form.phrases, [phrases[1]], 'a checked phrase is saved with the card');
+  rows[0].children[0].checked = true;
+  rows[0].children[0].handlers.change();
+  assert.deepEqual(card.form.phrases, [phrases[1]], 'a phrase saved with Add is not saved again');
+  card.el('codex-refresh').handlers.click();
+  assert.deepEqual(card.form.phrases, [], 'a new lookup clears the checked phrases');
+  await settle();
 
   const empty = makePanel({phraseCards: []});
   await settle();

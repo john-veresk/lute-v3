@@ -37,6 +37,8 @@ class TermForm(FlaskForm):
     suggested_parent_text = HiddenField(validators=[Length(max=500)])
     suggested_parent_translation = HiddenField(validators=[Length(max=500)])
     suggested_parent_translation_selected = HiddenField()
+    # Codex phrase cards checked in the term card: [{"text", "translation"}].
+    codex_phrases = HiddenField()
 
     translation = TextAreaField(
         "Translation", render_kw={"placeholder": "Translation", "autofocus": True}
@@ -101,6 +103,31 @@ class TermForm(FlaskForm):
 
         obj.parents = _values(self.parentslist.data)
         obj.term_tags = _values(self.termtagslist.data)
+
+    def selected_phrases(self):
+        "Phrase cards to save with the term."
+        return json.loads(self.codex_phrases.data or "[]")
+
+    def validate_codex_phrases(self, field):  # pylint: disable=unused-argument
+        "At most three suggested phrases, each with a translation."
+
+        def _is_phrase(card):
+            return (
+                isinstance(card, dict)
+                and isinstance(card.get("text"), str)
+                and 0 < len(card["text"].strip()) <= 250
+                and isinstance(card.get("translation"), str)
+                and len(card["translation"]) <= 500
+            )
+
+        try:
+            phrases = self.selected_phrases()
+        except ValueError as exc:
+            raise ValidationError("Invalid phrase selection") from exc
+        if not isinstance(phrases, list) or len(phrases) > 3:
+            raise ValidationError("Invalid phrase selection")
+        if not all(_is_phrase(card) for card in phrases):
+            raise ValidationError("Invalid phrase selection")
 
     def validate_language_id(self, field):  # pylint: disable=unused-argument
         "Language must be set."

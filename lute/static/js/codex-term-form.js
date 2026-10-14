@@ -41,6 +41,9 @@ class CodexTermForm {
 
   useParent(parent) { applyCodexParent(this.container, parent); }
 
+  /** Checked phrase cards are created when the term is saved. */
+  usePhrases(phrases) { this.field('#codex_phrases').value = JSON.stringify(phrases); }
+
   save() { this.field('#btnsubmit').click(); }
 }
 
