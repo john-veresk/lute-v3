@@ -442,7 +442,7 @@ def when_change_content(luteclient, content):
     "Change the content."
     assert "Reading" in luteclient.page.title(), "sanity check"
     p = luteclient.page
-    p.locator("div.hamburger-btn").first.click()
+    p.locator(".hamburger-btn").first.click()
     p.locator("#page-operations-title").click()
     p.locator("#editText").click()
     p.locator("#text").fill(content)
@@ -454,7 +454,7 @@ def when_add_page(luteclient, position, content):
     "Add a page."
     assert "Reading" in luteclient.page.title(), "sanity check"
     p = luteclient.page
-    p.click("div.hamburger-btn")
+    p.click(".hamburger-btn")
     p.click("#page-operations-title")
     assert position in ["before", "after"], "sanity check"
     linkid = (
@@ -493,7 +493,7 @@ def given_peek_at_page(luteclient, pagenum):
 def when_delete_current_page(luteclient):
     "Delete the current page."
     assert "Reading" in luteclient.page.title(), "sanity check"
-    luteclient.page.click("div.hamburger-btn")
+    luteclient.page.click(".hamburger-btn")
     luteclient.page.click("#page-operations-title")
     luteclient.page.on("dialog", lambda dialog: dialog.accept())
     luteclient.page.click("#readmenu_delete_page")

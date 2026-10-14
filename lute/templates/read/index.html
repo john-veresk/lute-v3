@@ -42,19 +42,9 @@
 
     <div class="reading_header_container">
         <div class="reading_header_left">
-          <div class="hamburger-btn" onclick="toggleMenu()">
-            <span class="hamburger"></span>
-            <span class="hamburger"></span>
-            <span class="hamburger"></span>
-          </div>
-	  <a href="/">
-		<img
-		  src="{{ url_for('static', filename='img/lute.png') }}"
-		  class="lutelogo_small"
-		  style="cursor: pointer"
-		  title="Home"
-		/>
-	  </a>
+          <a href="/" class="app-icon-button" title="Library" aria-label="Library">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+          </a>
         </div>
         <div class="reading_header_mid">
         <div class="reading_header_mid_top">
@@ -75,13 +65,23 @@
           </div>
           <div class="read-slide-container">
             <div class="read_page_nav read_page_disabled"
-              id="navPrev"
-              onclick="goto_relative_page(-1)">◀</div>
-            <input type="range" id="read-slider" class="read_page_disabled" max="{{ page_count - 1 }}" value="{{ page_num }}" step="1">
+              id="navPrev" role="button" title="Previous page" aria-label="Previous page"
+              onclick="goto_relative_page(-1)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></div>
+            <input type="range" id="read-slider" class="read_page_disabled" max="{{ page_count - 1 }}" value="{{ page_num }}" step="1" aria-label="Page">
             <div class="read_page_nav read_page_disabled"
-              id="navNext"
-              onclick="goto_relative_page(1)">▶</div>
+              id="navNext" role="button" title="Next page" aria-label="Next page"
+              onclick="goto_relative_page(1)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
           </div>
+        </div>
+        <div class="reading_header_right">
+          <a id="trainBookTerms" class="app-button reader-review-btn"
+             href="{{ url_for('term.review', book_id=book.id, page_num=page_num) }}"
+             target="_blank" rel="noopener" title="Review this book's words">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="6" width="12" height="14" rx="2"/><path d="M8 3h10a2 2 0 0 1 2 2v12"/></svg>Review
+          </a>
+          <button type="button" class="app-icon-button hamburger-btn" onclick="toggleMenu()" title="Menu" aria-label="Menu">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>
+          </button>
         </div>
     </div>
 
@@ -96,53 +96,41 @@
     ...
   </div>
 
-  <div id="reading-footer" style="text-align: center">
-    <p>
-      <span
+  <div id="reading-footer">
+    <div class="reading-footer-actions">
+      <button type="button" class="btn btn-primary"
         id="footerMarkRestAsKnownNextPage"
-        style="cursor: pointer; color: #4CBB17;"
         onclick="handle_page_done(true, 1)"
-        title="Mark rest as known, mark page as read, then go to next page">
-        &#x2714;
-      </span>
-
-      <span
+        title="Unknown words on this page become Well Known">
+        All known, next page
+      </button>
+      <button type="button" class="btn"
         id="footerNextPage"
-        style="cursor: pointer; font-size: 1.5em; font-weight: bold;"
         onclick="handle_page_done(false, 1)"
-        title="Mark page as read, then go to next page">
-        &#8250;
-      </span>
-    </p>
+        title="Mark this page as read">
+        Next page
+      </button>
+    </div>
 
     <div id="final_page_controls" class="hide">
-      <p>
-        <span
+      <div class="reading-footer-actions">
+        <button type="button" class="btn btn-primary"
           id="footerMarkRestAsKnown"
-          style="cursor: pointer; color: #4CBB17;"
           onclick="handle_page_done(true, 0)"
-          title="Mark rest as known, mark page as read">
-          &#x2714;
-        </span>
-
-        <span
+          title="Unknown words on this page become Well Known">
+          All known, finish
+        </button>
+        <button type="button" class="btn"
           id="footerDone"
-          style="cursor: pointer;"
           onclick="handle_page_done(false, 0)"
-          title="Mark page as read">
-          &#x2714;
-        </span>
-      </p>
+          title="Mark this page as read">
+          Finish
+        </button>
+      </div>
 
-      <h2>&#127881;</h2>
-      <p>
-        <a
-          href=""
-          tabindex="-1"
-          onclick="$('#actionposter').submit(); return false;"
-          >Archive book</a>
-        |
-        <a href="/" tabindex="-1">Home</a>
+      <p class="reading-finished">End of book.
+        <a href="/">Library</a>
+        <a href="" onclick="$('#actionposter').submit(); return false;">Archive book</a>
       </p>
 
       <form
