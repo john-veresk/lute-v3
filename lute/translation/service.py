@@ -9,7 +9,8 @@ import threading
 import time
 import uuid
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 
 
@@ -350,6 +351,15 @@ def translate(
             ) from exc
 
 
+@dataclass
+class _Job:
+    key: tuple
+    future: Future
+    started: float
+    language_id: int = None
+    saved: bool = False
+
+
 class TranslationJobs:
     """Keep HTTP workers free and share repeated lookups, including in-flight ones."""
 
@@ -360,27 +370,67 @@ class TranslationJobs:
         self.lock = threading.Lock()
         self.jobs = OrderedDict()
 
-    def submit(self, key):
-        """Cache up to 128 results for an hour, with at most 8 pending jobs."""
+    def _drop_finished(self, now):
+        "Failures can be retried at once; results are cached for an hour."
+        for job_id, job in list(self.jobs.items()):
+            if job.future.done() and (
+                now - job.started > 3600 or job.future.exception() is not None
+            ):
+                del self.jobs[job_id]
+
+    def _add(self, job):
+        while len(self.jobs) >= 128:
+            done_id = next(j for j, item in self.jobs.items() if item.future.done())
+            del self.jobs[done_id]
+        job_id = uuid.uuid4().hex
+        self.jobs[job_id] = job
+        return job_id
+
+    def submit(self, key, fresh=False, language_id=None):
+        """Cache up to 128 results, with at most 8 pending jobs.
+
+        A fresh lookup ignores cached results but still joins an in-flight one.
+        """
         with self.lock:
             now = time.monotonic()
-            for job_id, (old_key, future, started) in list(self.jobs.items()):
-                if future.done() and (
-                    now - started > 3600 or future.exception() is not None
-                ):
+            self._drop_finished(now)
+            for job_id, job in list(self.jobs.items()):
+                if job.key != key:
+                    continue
+                if fresh and job.future.done():
                     del self.jobs[job_id]
-                elif old_key == key:
+                else:
                     return job_id
-            if sum(not item[1].done() for item in self.jobs.values()) >= 8:
+            if sum(not job.future.done() for job in self.jobs.values()) >= 8:
                 raise TranslationError(
                     "Codex is busy translating other words. Try again shortly."
                 )
-            while len(self.jobs) >= 128:
-                done_id = next(j for j, item in self.jobs.items() if item[1].done())
-                del self.jobs[done_id]
-            job_id = uuid.uuid4().hex
-            self.jobs[job_id] = (key, self.pool.submit(translate, *key), now)
-            return job_id
+            future = self.pool.submit(translate, *key)
+            return self._add(_Job(key, future, now, language_id))
+
+    def adopt(self, key, result):
+        "Serve a saved result like a completed lookup, without saving it again."
+        future = Future()
+        future.set_result(result)
+        with self.lock:
+            now = time.monotonic()
+            self._drop_finished(now)
+            return self._add(_Job(key, future, now, saved=True))
+
+    def claim_unsaved(self, job_id):
+        "Return (key, language_id) once for each new successful result."
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if (
+                job is None
+                or job.saved
+                or job.language_id is None
+                or not job.future.done()
+                or job.future.exception() is not None
+            ):
+                return None
+            job.saved = True
+            return job.key, job.language_id
 
     def get(self, job_id):
         """Return pending, complete, error, or None for an unknown lookup."""
@@ -388,7 +438,7 @@ class TranslationJobs:
             item = self.jobs.get(job_id)
         if item is None:
             return None
-        future = item[1]
+        future = item.future
         if not future.done():
             return {"status": "pending"}
         try:
@@ -402,4 +452,4 @@ class TranslationJobs:
         """Identify the source language and phrase of a reviewed result."""
         with self.lock:
             item = self.jobs.get(job_id)
-            return item[0] if item else None
+            return item.key if item else None

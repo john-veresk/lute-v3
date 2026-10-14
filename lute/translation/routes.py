@@ -4,9 +4,14 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from lute.db import db
 from lute.models.language import Language
 from lute.term.model import Repository
+from lute.translation import store
 from lute.translation.service import TranslationError, TranslationJobs
 
 bp = Blueprint("translation", __name__, url_prefix="/translation")
+
+# auto: a saved result, otherwise translate.  stored: only a saved result.
+# prefetch: translate only terms without a saved result.  refresh: always translate.
+LOOKUP_MODES = ("auto", "stored", "prefetch", "refresh")
 
 
 def _jobs():
@@ -63,7 +68,7 @@ def panel():
 
 @bp.route("/jobs", methods=["POST"])
 def submit():
-    """Queue a Codex translation of a term or sentence."""
+    """Queue a Codex translation of a term or sentence, or reuse a saved one."""
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify(error="Expected a JSON object"), 400
@@ -76,6 +81,9 @@ def submit():
     text = data.get("text", "")
     context = data.get("context", "")
     kind = data.get("kind", "term")
+    mode = data.get("mode", "auto")
+    if mode not in LOOKUP_MODES:
+        return jsonify(error="Invalid lookup mode"), 400
     if (
         not isinstance(text, str)
         or not text.strip()
@@ -121,11 +129,25 @@ def submit():
         language.codex_fast_mode,
         phrase_texts,
     )
+    saved = None
+    if kind == "term" and mode != "refresh":
+        saved = store.find(db.session, language, clean_text)
+    if saved is not None and mode != "prefetch":
+        job_id = _jobs().adopt(key, _fit_to_context(saved, phrase_texts))
+        return jsonify(job_id=job_id, saved=True), 202
+    if saved is not None or mode == "stored":
+        return jsonify(job_id=None), 200
     try:
-        job_id = _jobs().submit(key)
+        job_id = _jobs().submit(key, fresh=mode == "refresh", language_id=language.id)
     except TranslationError as exc:
         return jsonify(error=str(exc)), 429
-    return jsonify(job_id=job_id), 202
+    return jsonify(job_id=job_id, saved=False), 202
+
+
+def _fit_to_context(result, phrase_texts):
+    "A result saved from another sentence only offers phrases found in this one."
+    phrases = [p for p in result.get("phrases", []) if p["text"] in phrase_texts]
+    return {**result, "phrases": phrases}
 
 
 @bp.route("/jobs/<job_id>")
@@ -134,7 +156,20 @@ def poll(job_id):
     result = _jobs().get(job_id)
     if result is None:
         return jsonify(error="Translation expired. Try again."), 404
+    if result["status"] == "complete":
+        _save_new_result(job_id, result["result"])
     return jsonify(result)
+
+
+def _save_new_result(job_id, result):
+    "Every new term translation goes into the translation store."
+    claim = _jobs().claim_unsaved(job_id)
+    if claim is None:
+        return
+    key, language_id = claim
+    language = db.session.get(Language, language_id)
+    if language is not None and key[5] == "term":
+        store.save(db.session, language, key[3], key[4], result)
 
 
 @bp.route("/parent")
