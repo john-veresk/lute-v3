@@ -100,6 +100,11 @@ function fixture(ids, options = {}) {
   assert.equal(f.elements.card.hidden, true);
   assert.equal(f.elements['complete-title'].textContent, 'Practice complete');
 
+  const tapped = fixture([1]);
+  await tick();
+  tapped.elements.card.listeners.click();
+  assert.equal(tapped.elements.answer.hidden, false, 'tapping the card reveals the answer');
+
   const repeated = fixture([1, 1, 2, 1, 2]);
   await tick();
   assert.equal(repeated.elements.progress.textContent, 'Card 1 of 2');

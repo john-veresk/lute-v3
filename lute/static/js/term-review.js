@@ -17,6 +17,7 @@ class LuteTermReview {
     this.busy = false;
     this.levels = [...root.querySelectorAll('[data-review-status]')];
     this.el('show-answer').addEventListener('click', () => this.showAnswer());
+    this.el('card').addEventListener('click', () => this.showAnswer());
     this.el('skip').addEventListener('click', () => this.skip());
     this.el('retry').addEventListener('click', () => this.loadCurrent());
     this.levels.forEach(button => button.addEventListener('click', () => this.rate(Number(button.dataset.reviewStatus))));
@@ -104,7 +105,7 @@ class LuteTermReview {
       meanings.appendChild(translation);
     });
     const current = this.levels.find(button => Number(button.dataset.reviewStatus) === this.card.status);
-    this.el('current-status').textContent = `Current level: ${current?.textContent.trim() ?? this.card.status}`;
+    this.el('current-status').textContent = `Now: ${current?.dataset.label ?? this.card.status}`;
     this.levels.forEach(button => button.setAttribute('aria-pressed', String(button === current)));
     this.el('show-answer').hidden = true;
     this.el('answer').hidden = false;

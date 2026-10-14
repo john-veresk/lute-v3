@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Train terms{% endblock %}
-{% block header %}Train terms{% endblock %}
+{% block title %}Review{% endblock %}
 {% block preloadassets %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/term-review.css') }}">
 {% endblock %}
@@ -9,47 +8,52 @@
 {% block body %}
 <main class="term-review" data-term-review>
   <div class="review-heading">
-    <div>
-      {% if book %}<h2>{{ book.title }}</h2>{% else %}<h2>Term practice</h2>{% endif %}
-      <p>Recall the translation, then show the answer and choose a level.</p>
-    </div>
-    <a href="{{ return_url }}">{% if book %}Back to book{% else %}Back to terms{% endif %}</a>
+    <h1>{% if book %}{{ book.title }}{% else %}Review{% endif %}</h1>
+    <a class="app-icon-button" href="{{ return_url }}" title="{% if book %}Back to book{% else %}Close{% endif %}" aria-label="Close review">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </a>
   </div>
   {% if review_error %}
-  <p role="alert">{{ review_error }}</p>
+  <p role="alert" class="review-alert">{{ review_error }}</p>
   {% else %}
-  <p id="review-progress" role="status" aria-live="polite"></p>
-  <progress id="review-progress-bar" value="0" max="{{ queue.term_ids|length or 1 }}" aria-label="Review progress"></progress>
-  <p id="review-untranslated" {% if not queue.untranslated %}hidden{% endif %}>{{ queue.untranslated }} {{ 'term' if queue.untranslated == 1 else 'terms' }} skipped because no translation is available.</p>
+  <div class="review-meter">
+    <progress id="review-progress-bar" value="0" max="{{ queue.term_ids|length or 1 }}" aria-label="Review progress"></progress>
+    <p id="review-progress" role="status" aria-live="polite"></p>
+  </div>
 
-  <section id="review-card" class="review-card" aria-label="Term card">
+  <section id="review-card" class="review-card" aria-label="Card">
     <p id="review-language" class="review-language"></p>
     <h2 id="review-word" class="review-word"></h2>
-    <p id="review-loading" role="status">Loading card…</p>
-    <button id="review-show-answer" type="button" hidden>Show answer</button>
+    <p id="review-loading" class="review-loading" role="status">Loading…</p>
+    <button id="review-show-answer" class="review-reveal" type="button" hidden>Show answer <kbd>Space</kbd></button>
     <div id="review-answer" class="review-answer" hidden>
       <div id="review-meanings"></div>
-      <p id="review-current-status"></p>
-      <p>Choose a learning level:</p>
       <div class="review-levels" role="group" aria-label="Learning level">
         {% for status in review_statuses %}
-        <button type="button" data-review-status="{{ status.id }}" title="{{ status.text }}" style="--review-status-color: var(--status-{{ status.id }}-color)">
-          {% if status.id == 99 %}Known{% elif status.id == 98 %}Ignored{% else %}{{ status.id }}{% endif %}
+        {% set label = 'Known' if status.id == 99 else ('Ignore' if status.id == 98 else status.id) %}
+        <button type="button" data-review-status="{{ status.id }}" data-label="{{ label }}" title="{{ status.text }}"
+                style="--review-status-color: var(--status-{{ status.id }}-color)">
+          <span>{{ label }}</span>
+          {% if status.id == 99 %}<kbd>W</kbd>{% endif %}
         </button>
         {% endfor %}
       </div>
     </div>
   </section>
 
-  <p id="review-error" role="alert" hidden></p>
   <div id="review-navigation" class="review-navigation">
-    <button id="review-retry" type="button" hidden>Retry loading</button>
-    <button id="review-skip" type="button">Skip</button>
+    <p id="review-current-status" class="review-current"></p>
+    <button id="review-retry" class="btn" type="button" hidden>Retry</button>
+    <button id="review-skip" class="review-skip" type="button" title="Keep the current level">Skip</button>
   </div>
-  <p id="review-help" class="review-help">Space: show answer · 1–5: save level · W: Well Known · Skip leaves the level unchanged.</p>
+  <p id="review-error" class="review-alert" role="alert" hidden></p>
+  <p id="review-untranslated" class="review-note" {% if not queue.untranslated %}hidden{% endif %}>{{ queue.untranslated }} {{ 'word' if queue.untranslated == 1 else 'words' }} without a translation left out.</p>
+  <p id="review-help" hidden></p>
+
   <section id="review-complete" class="review-complete" hidden>
     <h2 id="review-complete-title" tabindex="-1">Practice complete</h2>
     <p id="review-summary"></p>
+    <a class="app-button app-button-primary" href="{{ return_url }}">{% if book %}Back to book{% else %}Done{% endif %}</a>
   </section>
   <script id="review-queue" type="application/json">{{ queue|tojson }}</script>
   <script src="/static/js/never_cache/term-review.js"></script>
