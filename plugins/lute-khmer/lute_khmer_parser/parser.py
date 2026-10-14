@@ -25,16 +25,6 @@ class KhmerParser(AbstractParser):
     def name(cls):
         return "Lute Khmer"
 
-    @classmethod
-    def uses_data_directory(cls):
-        "Uses the data_directory (defined in the AbstractParser)."
-        return False  # or True
-
-    # @classmethod
-    # def init_data_directory(cls):
-    #     "Set up necessary files."
-    #     pass
-
     def _handle_special_token(self, token: str, special_char: str) -> List[str]:
         """
         Handle special token scenarios by replacing all special tokens with newline characters.
@@ -110,9 +100,3 @@ class KhmerParser(AbstractParser):
             t = ParsedToken(word, is_word_char, is_end_of_sentence)
             tokens.append(t)
         return tokens
-
-    def get_reading(self, text: str):
-        """
-        Get reading -- some parsers can return readings.
-        """
-        return None

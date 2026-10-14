@@ -8,7 +8,6 @@ Includes classes:
 """
 
 import re
-import os
 import pythainlp
 
 from typing import List
@@ -27,16 +26,6 @@ class ThaiParser(AbstractParser):
     @classmethod
     def name(cls):
         return "Lute Thai"
-
-    @classmethod
-    def uses_data_directory(cls):
-        "Uses the data_directory (defined in the AbstractParser)."
-        return False
-
-    # @classmethod
-    # def init_data_directory(cls):
-    #     "Set up necessary files."
-    #     pass
 
     def get_parsed_tokens(self, text: str, language) -> List[ParsedToken]:
         """
@@ -63,10 +52,3 @@ class ThaiParser(AbstractParser):
             t = ParsedToken(word, is_word_char, is_end_of_sentence)
             tokens.append(t)
         return tokens
-
-    def get_reading(self, text: str):  # pylint: disable=unused-argument
-        """
-        Get the pronunciation for the given text.  For most
-        languages, this can't be automated.
-        """
-        return None
