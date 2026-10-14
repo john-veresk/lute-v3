@@ -57,6 +57,33 @@ function popTermStack(storage) {
   return previous;
 }
 
+/** Codex writes fields with script-dispatched events. Those are not reader edits. */
+function termEditFromChange(event) {
+  const native = event?.originalEvent;
+  return !(native && native.isTrusted === false);
+}
+
+/**
+ * A touch on Back has to run on pointerup. While the term field is focused,
+ * the phone uses the first click only to dismiss the keyboard.
+ */
+function bindTermBack(button, leave) {
+  let fromTouch = false;
+  button.addEventListener('pointerup', event => {
+    if (event.pointerType === 'mouse') return;
+    event.preventDefault();
+    fromTouch = true;
+    leave();
+  });
+  button.addEventListener('click', () => {
+    if (fromTouch) {
+      fromTouch = false;
+      return;
+    }
+    leave();
+  });
+}
+
 /** The term form fields that Codex reads and fills. */
 class CodexTermForm {
   constructor(container) { this.container = container; }
@@ -76,6 +103,11 @@ class CodexTermForm {
     translation.value = value;
     translation.dispatchEvent(new Event('change', {bubbles: true}));
     return true;
+  }
+
+  /** A meaning the reader picked, as opposed to an automatic fill. */
+  noteUserEdit() {
+    this.container.ownerDocument?.defaultView?.markTermFormEdited?.();
   }
 
   useParent(parent) { applyCodexParent(this.container, parent); }

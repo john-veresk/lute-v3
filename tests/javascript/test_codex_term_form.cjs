@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const {loadCodex} = require('./fake-dom.cjs');
 
-const {CodexTermForm, termStackOnLoad, pushTermStack, popTermStack} = loadCodex();
+const {CodexTermForm, termStackOnLoad, pushTermStack, popTermStack, termEditFromChange, bindTermBack} = loadCodex();
 
 function makeContainer() {
   const fields = {
@@ -93,4 +93,35 @@ assert.equal(shown(termStackOnLoad(stack)), '["/read/edit_term/1","/read/termfor
 assert.equal(popTermStack(stack), '/read/termform/1/data%20here');
 assert.equal(shown(termStackOnLoad(stack)), '["/read/edit_term/1"]', 'back returns one card at a time');
 assert.equal(shown(termStackOnLoad(memoryStorage({'lute-term-stack': 'not-json', 'lute-term-drill': '1'}))), '[]');
+
+assert.equal(termEditFromChange({originalEvent: {isTrusted: false}}), false, 'a Codex fill is not an edit');
+assert.equal(termEditFromChange({originalEvent: {isTrusted: true}}), true);
+assert.equal(termEditFromChange({}), true, 'a reader change without a native event still counts');
+
+let marked = 0;
+const noted = makeContainer();
+noted.ownerDocument = {defaultView: {markTermFormEdited() { marked++; }}};
+new CodexTermForm(noted).noteUserEdit();
+assert.equal(marked, 1, 'picking a meaning counts as an edit');
+
+function button() {
+  const handlers = {};
+  return {
+    addEventListener(type, fn) { (handlers[type] ||= []).push(fn); },
+    fire(type, event) { (handlers[type] || []).forEach(fn => fn(event)); },
+  };
+}
+let leaves = 0;
+const back = button();
+bindTermBack(back, () => { leaves++; });
+back.fire('click', {});
+assert.equal(leaves, 1);
+back.fire('pointerup', {pointerType: 'mouse', preventDefault() {}});
+back.fire('click', {});
+assert.equal(leaves, 2, 'a mouse press uses the click');
+let prevented = false;
+back.fire('pointerup', {pointerType: 'touch', preventDefault() { prevented = true; }});
+back.fire('click', {});
+assert.equal(prevented, true, 'the touch is taken before the keyboard can swallow it');
+assert.equal(leaves, 3, 'the following click does not leave twice');
 console.log('Codex term form checks passed');

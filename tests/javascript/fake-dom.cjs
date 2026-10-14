@@ -69,7 +69,7 @@ function loadCodex() {
     vm.runInContext(fs.readFileSync(`lute/static/js/${file}`, 'utf8'), context);
   }
   return vm.runInContext(
-    '({CodexPanel, CodexTermForm, applyCodexParent, startTermCodex, termStackOnLoad, pushTermStack, popTermStack})',
+    '({CodexPanel, CodexTermForm, applyCodexParent, startTermCodex, termStackOnLoad, pushTermStack, popTermStack, termEditFromChange, bindTermBack})',
     context
   );
 }

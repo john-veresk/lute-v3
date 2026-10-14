@@ -279,6 +279,7 @@ class CodexPanel {
     if (this.form.text() !== this.text || this.form.languageId() !== this.languageId) return;
     this.form.useParent(this.parentSuggestion ? {...this.parentSuggestion} : null);
     if (!this.form.useTranslation(this.options[index].translation, automatic)) return;
+    if (!automatic) this.form.noteUserEdit?.();
     this.selectedIndex = index;
     this.element('codex-options').querySelectorAll('button').forEach((button, i) => {
       button.classList.toggle('selected', i === index);

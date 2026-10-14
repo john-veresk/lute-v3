@@ -11,7 +11,7 @@ const phrases = [
 
 function makeForm(text = 'looked') {
   return {
-    saves: 0, translation: '', choices: [], phrases: null, words: null,
+    saves: 0, translation: '', choices: [], phrases: null, words: null, edits: 0,
     usePhrases(phrases) { this.phrases = JSON.parse(JSON.stringify(phrases)); },
     useWords(words) { this.words = JSON.parse(JSON.stringify(words)); },
     text: () => text,
@@ -23,6 +23,7 @@ function makeForm(text = 'looked') {
       return true;
     },
     useParent() {},
+    noteUserEdit() { this.edits++; },
     save() { this.saves++; },
   };
 }
@@ -57,6 +58,7 @@ async function checks() {
   assert.equal(rows[0].children[0].checked, false, 'context phrases start unchecked');
   assert.equal(card.win.requests.length, 2, 'rendering suggestions does not save cards');
   assert.deepEqual(card.form.choices, [{value: 'смотрел', automatic: true}], 'the best meaning fills the form');
+  assert.equal(card.form.edits, 0, 'an automatic meaning does not count as an edit');
 
   await rows[0].children[2].handlers.click();
   assert.deepEqual(card.win.requests[2], {
@@ -177,6 +179,7 @@ async function checks() {
   };
   assert.equal(press('1'), true);
   assert.deepEqual(quick.form.choices.at(-1), {value: 'смотрел', automatic: false}, 'number keys choose a meaning deliberately');
+  assert.equal(quick.form.edits, 1, 'a chosen meaning is an edit the reader can save');
   assert.equal(press('9'), false, 'missing meanings are ignored');
   press('Enter');
   assert.equal(quick.form.saves, 1, 'Enter saves the card');
