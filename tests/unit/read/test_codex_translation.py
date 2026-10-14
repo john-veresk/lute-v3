@@ -5,6 +5,7 @@ import subprocess
 import threading
 from pathlib import Path
 from types import SimpleNamespace
+from bs4 import BeautifulSoup
 import pytest
 from lute.db import db
 from lute.models.term import Term as DBTerm
@@ -23,9 +24,12 @@ RESULT = {
 }
 
 
-@pytest.mark.parametrize("status,translation", [(0, ""), (1, ""), (1, "мой перевод")])
+@pytest.mark.parametrize(
+    "status,translation",
+    [(0, ""), (1, ""), (99, ""), (1, "мой перевод"), (99, "мой перевод"), (1, " \n ")],
+)
 @pytest.mark.parametrize("route", ["read_id", "read_text", "term_id", "term_text"])
-def test_term_form_distinguishes_saved_cards_from_unknown_rows(
+def test_term_form_preserves_translation_for_codex_autostart(
     client, spanish, status, translation, route
 ):
     term = DBTerm(spanish, "gato")
@@ -41,8 +45,8 @@ def test_term_form_distinguishes_saved_cards_from_unknown_rows(
     }[route]
     response = client.get(url)
     assert response.status_code == 200
-    saved = "false" if status == 0 else "true"
-    assert f'data-term-saved="{saved}"'.encode() in response.data
+    page = BeautifulSoup(response.data, "html.parser")
+    assert page.select_one("#translation").get_text().strip() == translation.strip()
     assert db.session.get(DBTerm, term.id).status == status
 
 
@@ -50,7 +54,8 @@ def test_term_form_distinguishes_saved_cards_from_unknown_rows(
 def test_new_term_form_keeps_automatic_translation(client, spanish, route):
     response = client.get(f"/{route}/{spanish.id}/gato")
     assert response.status_code == 200
-    assert b'data-term-saved="false"' in response.data
+    page = BeautifulSoup(response.data, "html.parser")
+    assert page.select_one("#translation").get_text().strip() == ""
 
 
 def test_cli_uses_selected_model_and_structured_output(monkeypatch):
@@ -273,7 +278,6 @@ def test_cli_rejects_invented_phrase_words(monkeypatch):
         [None],
         [{"translation": "", "explanation": ""}],
         [{"translation": "x" * 501, "explanation": ""}],
-        [{"translation": "идти", "explanation": ""}] * 5,
         [{"translation": "идти", "explanation": []}],
     ],
 )
@@ -324,3 +328,60 @@ def test_cli_returns_dictionary_form_options(monkeypatch):
 
     monkeypatch.setattr(service.subprocess, "run", run)
     assert service.translate("English", "Russian", "", "went", "") == result
+
+
+@pytest.mark.parametrize("count", [1, 6])
+@pytest.mark.parametrize("is_inflected", [False, True])
+def test_cli_preserves_one_or_many_meanings(monkeypatch, count, is_inflected):
+    monkeypatch.setattr(service.shutil, "which", lambda value: "/usr/bin/codex")
+    meanings = [
+        ("бежал", "бежать", "Двигаться бегом"),
+        ("управлял", "управлять", "Руководить организацией"),
+        ("работал", "работать", "Функционировать, о механизме"),
+        ("проводил", "проводить", "Организовывать мероприятие"),
+        ("баллотировался", "баллотироваться", "Участвовать в выборах"),
+        ("протекал", "протекать", "Течь, о жидкости"),
+    ][:count]
+    result = {
+        **RESULT,
+        "lemma": "run",
+        "is_inflected": is_inflected,
+        "lemma_translation": meanings[0][1],
+        "options": [
+            {"translation": past if is_inflected else base, "explanation": explanation}
+            for past, base, explanation in meanings
+        ],
+        "lemma_options": (
+            [
+                {"translation": base, "explanation": explanation}
+                for _, base, explanation in meanings
+            ]
+            if is_inflected
+            else []
+        ),
+    }
+
+    def run(command, **kwargs):
+        Path(command[command.index("--output-last-message") + 1]).write_text(
+            json.dumps(result), encoding="utf-8"
+        )
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(service.subprocess, "run", run)
+    text = "ran" if is_inflected else "run"
+    assert service.translate("English", "Russian", "", text, "") == result
+
+
+@pytest.mark.parametrize("options", [[], "invalid"])
+def test_cli_requires_nonempty_translation_options(monkeypatch, options):
+    monkeypatch.setattr(service.shutil, "which", lambda value: "/usr/bin/codex")
+
+    def run(command, **kwargs):
+        Path(command[command.index("--output-last-message") + 1]).write_text(
+            json.dumps({**RESULT, "options": options}), encoding="utf-8"
+        )
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(service.subprocess, "run", run)
+    with pytest.raises(service.TranslationError):
+        service.translate("Finnish", "Russian", "", "kissa", "")

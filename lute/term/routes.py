@@ -311,8 +311,6 @@ def handle_term_form(
     lives in an iframe in the reading frames and returns a different
     template on success.
     """
-    # Reading creates status-0 rows before the reader saves a vocabulary card.
-    term_is_saved = term.id is not None and term.status != 0
     if term.status == 0:
         term.status = 1
     form = TermForm(obj=term, session=session)
@@ -356,7 +354,6 @@ def handle_term_form(
         form_template_name,
         form=form,
         term=term,
-        term_is_saved=term_is_saved,
         duplicated_term=form.duplicated_term,
         language_dicts=language_repo.all_dictionaries(),
         hide_pronunciation=hide_pronunciation,

@@ -17,23 +17,27 @@ No website dictionaries are required in this mode. Existing website settings
 are retained for switching back.
 
 Clicking a word or selecting a phrase opens a **Codex** tab in the dictionary
-panel. It translates the term using the sentence from the book and shows up to
-four meanings with brief explanations and the dictionary form. The best meaning
-fills an empty Translation field automatically. Click another meaning to select
+panel. It translates the term using the sentence from the book and shows its main
+common meanings with brief explanations and the dictionary form. There is no fixed
+number of options: words with one main meaning show one, while words with several
+also show common meanings outside the sentence's context. Synonyms are grouped
+within a meaning, and rare senses are not added just to lengthen the list. The best
+meaning fills an empty Translation field automatically. Click another meaning to select
 it, then use the existing **Save** button to store it in your vocabulary.
 Saved translations and text typed while a request is running are preserved.
-For a word or phrase with an existing vocabulary card, opening the term or the
-Codex tab does not start a translation. Press **Translate with Codex** inside
-the tab to request one, even if the saved card has an empty Translation field.
-New terms still translate automatically, including unknown words that Lute
-has stored with status 0 while opening the book.
+An empty **Translation** field starts Codex automatically, regardless of whether
+the word or phrase already has a database record or is marked as known.
+Whitespace alone counts as empty. If **Translation** is filled, opening the term
+or the Codex tab does not start a translation. Press **Translate with Codex**
+inside the tab to request a new one.
 Sentence and page translation commands also use Codex. Sentences and image
 lookup tabs remain available.
 
 For an unambiguous inflected word, Codex also adds the dictionary headword to
 **Parents** automatically: an infinitive for a verb, nominative singular for a
 noun, or the language's standard base form. Expand the collapsed **Parent**
-section to choose from up to four dictionary meanings, each with a brief
+section to choose from the headword's main common dictionary meanings without a
+fixed number of options, each with a brief
 explanation. For example, `halusi` can have
 `хотела`, while its parent `haluta` has `хотеть`. The parent and its translation
 are saved together with the child when you press **Save**. Looking up a word

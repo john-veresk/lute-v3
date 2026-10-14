@@ -88,19 +88,18 @@ vm.runInContext(`
   LookupButton.LANG_ID = 1;
   button.activate = () => {};
 `, context);
-for (const savedTranslation of ['', 'my saved translation']) {
-  translation.value = savedTranslation;
-  container.dataset.termSaved = 'true';
+for (const currentTranslation of ['', ' \n\t ', 'my saved translation']) {
+  translation.value = currentTranslation;
   vm.runInContext('loadDictionaries()', context);
-  assert.equal(vm.runInContext('button.payload.autostart', context), false,
-    'saved cards require an explicit translation request, even with an empty translation');
+  assert.equal(vm.runInContext('button.payload.autostart', context), !currentTranslation.trim(),
+    'only an empty Translation field starts Codex automatically');
   const lookupId = vm.runInContext('button.lookupId', context);
   vm.runInContext('button.do_lookup()', context);
   assert.equal(vm.runInContext('button.lookupId', context), lookupId,
-    'reopening the Codex tab keeps the same waiting panel');
+    'reopening the Codex tab keeps the same panel without a duplicate request');
 }
-container.dataset.termSaved = 'false';
+translation.value = '';
 vm.runInContext('loadDictionaries()', context);
 assert.equal(vm.runInContext('button.payload.autostart', context), true,
-  'new terms still request an automatic translation');
+  'opening another term with an empty translation starts Codex again');
 console.log('Codex iframe regression checks passed');

@@ -1,4 +1,4 @@
-// A saved card must not submit a job or start the timer until the panel button is clicked.
+// A filled Translation field requires a button click; an empty field autostarts.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
@@ -55,7 +55,7 @@ saved.lookup({...payload, autostart: true}, {origin: 'https://untrusted.example'
 saved.lookup({...payload, autostart: true}, {source: {}});
 assert.equal(saved.requests.length, 0, 'untrusted messages cannot start translation');
 saved.lookup(payload);
-assert.equal(saved.requests.length, 0, 'opening a saved card does not submit a job');
+assert.equal(saved.requests.length, 0, 'opening a term with a translation does not submit a job');
 assert.equal(saved.timers(), 0, 'the timer waits for the explicit request');
 assert.equal(saved.element('codex-start').hidden, false, 'shows the separate translation button');
 assert.equal(saved.element('codex-text').textContent, payload.text);
@@ -73,7 +73,7 @@ assert.equal(saved.timers(), 1, 'starts the timer with the explicit request');
 
 const fresh = makePanel();
 fresh.lookup({...payload, autostart: true});
-assert.equal(fresh.requests.length, 1, 'new terms still translate automatically');
+assert.equal(fresh.requests.length, 1, 'terms with an empty translation start automatically');
 
 const sentence = makePanel('sentence');
 sentence.lookup({text: 'Kissat nukkuvat.', context: ''});

@@ -39,7 +39,7 @@
 {% endif %}
 
 
-<div id="term-form-container" data-term-saved="{{ 'true' if term_is_saved else 'false' }}">
+<div id="term-form-container">
   <form id="term-form" name="term_form" method="POST"
         onsubmit="return convert_pending_parent_tags(event);">
     {{ form.hidden_tag() }}

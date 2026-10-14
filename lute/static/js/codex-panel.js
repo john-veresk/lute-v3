@@ -275,7 +275,7 @@
       contextElement.textContent = context;
       contextElement.hidden = !context;
       if (event.data.payload.autostart === false) {
-        status.textContent = 'This term is already saved. Click Translate with Codex to request a translation.';
+        status.textContent = 'This term already has a translation. Click Translate with Codex to request a new translation.';
         translate.hidden = false;
       } else {
         start();

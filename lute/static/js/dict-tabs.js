@@ -285,7 +285,7 @@ class CodexButton extends LookupButton {
     this.lookupLanguage = Number(LookupButton.LANG_ID);
     if (!this.lookupText.trim()) return;
     this.lookupId = newCodexLookupId();
-    this.payload = {language_id: this.lookupLanguage, text: this.lookupText, context: window.LUTE_LOOKUP_CONTEXT || '', kind: 'term', autostart: container.dataset.termSaved !== 'true'};
+    this.payload = {language_id: this.lookupLanguage, text: this.lookupText, context: window.LUTE_LOOKUP_CONTEXT || '', kind: 'term', autostart: !container.querySelector('#translation').value.trim()};
     const params = new URLSearchParams({
       language_id: this.lookupLanguage,
       request_id: this.lookupId,
@@ -455,7 +455,7 @@ function loadDictionaries() {
   dictContainer.style.flexDirection = "column";
   LookupButton.all.forEach(button => button.contentLoaded = false);
   // Open Codex for each term, even after visiting Sentences or Images.
-  // The panel waits for a separate button click for saved vocabulary cards.
+  // The panel waits for a separate button click when Translation is filled.
   const active_button = LookupButton.all.find(button => button instanceof CodexButton) ||
     LookupButton.all.find(button => button.is_active);
   if (active_button) {
