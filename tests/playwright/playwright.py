@@ -22,9 +22,10 @@ code generation.  https://playwright.dev/python/docs/codegen
 
 Then I added some tweaks:
 
-Menu sub-items are only visible after hovering over the menu, e.g.:
-  page.locator("#menu_books").hover()
-  page.locator("#book_new").click()
+Navigation is visible in the app bar; rarer pages are in the
+settings sidebar, e.g.:
+  page.locator("#menu_settings").click()
+  page.locator("#lang_index").click()
 """
 
 import os
@@ -74,11 +75,9 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
     page.frame_locator('iframe[name="wordframe"]').get_by_role(
         "button", name="Save"
     ).click()
-    page.get_by_title(
-        "Mark rest as known, mark page as read, then go to next page"
-    ).click()
-    page.get_by_title("Mark page as read, then go to next page", exact=True).click()
-    page.get_by_title("Home").click()
+    page.locator("#footerMarkRestAsKnownNextPage").click()
+    page.locator("#footerNextPage").click()
+    page.get_by_title("Library").click()
 
     # Bookmarks
     _print("Bookmarks.")
@@ -86,19 +85,15 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
     page.get_by_role("link", name="Tutorial follow-up", exact=True).click()
     page.locator(".hamburger-btn").click()
     page.once("dialog", lambda dialog: dialog.accept(prompt_text="Page 1"))
-    page.get_by_text("Bookmarks", exact=True).hover()
-    page.get_by_role("link", name="Add bookmark").hover()
     page.get_by_role("link", name="Add bookmark").click()
 
-    page.get_by_text("▶").click()
+    page.locator("#navNext").click()
 
     page.locator(".hamburger-btn").click()
     page.once("dialog", lambda dialog: dialog.accept(prompt_text="Page 2"))
-    page.get_by_text("Bookmarks", exact=True).hover()
-    page.get_by_role("link", name="Add bookmark").hover()
     page.get_by_role("link", name="Add bookmark").click()
 
-    page.get_by_role("link", name="List bookmarks").click()
+    page.get_by_role("link", name="All bookmarks").click()
     page.get_by_text("…").first.hover()
     page.once("dialog", lambda dialog: dialog.accept())
     page.get_by_role("link", name="Delete").click()
@@ -118,7 +113,6 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
 
     # Make a new book
     _print("New book.")
-    page.locator("#menu_books").hover()
     page.locator("#book_new").click()
     page.locator("#language_id").select_option("4")
     page.get_by_label("Title").click()
@@ -143,15 +137,13 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
     # Archive current book "Hello", check archive.
     _print("Archive.")
     page.get_by_role("link", name="Archive book").click()
-    page.locator("#menu_books").hover()
-    page.get_by_role("link", name="Book archive").click()
+    page.locator(".library-links").get_by_role("link", name="Archive").click()
     expect(page.get_by_role("link", name="Hello")).to_be_visible()
 
     # Open term listing.
     _print("Term listing.")
     page.goto("http://localhost:5001/")
-    page.locator("#menu_terms").hover()
-    page.get_by_role("link", name="Terms", exact=True).click()
+    page.locator("#term_index").click()
     page.get_by_role("link", name="Hello").click()
     # TODO testing: restore Sentences smoke test check.
     # page.get_by_role("link", name="Sentences").click()
@@ -168,8 +160,8 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
     # Edit language.
     _print("Edit language.")
     page.goto("http://localhost:5001/")
-    page.locator("#menu_settings").hover()
-    page.get_by_role("link", name="Languages").click()
+    page.locator("#menu_settings").click()
+    page.locator("#lang_index").click()
     page.get_by_role("link", name="English").click()
     page.get_by_role("button", name="Save").click()
 
@@ -206,7 +198,7 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
 
     # Go home, backup is kicked off.
     _print("Disabled: Verify backup started.")
-    page.locator("#reading-footer").get_by_role("link", name="Home").click()
+    page.locator("#reading-footer").get_by_role("link", name="Library").click()
     # TODO disabled_backup_check: backup now runs and redirects to home.
     # Not sure how to check it easily ... wait for it to complete.
     time.sleep(4)
@@ -227,7 +219,6 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
 
     # Import web page.
     _print("Import web page.")
-    page.locator("#menu_books").hover()
     page.get_by_role("link", name="Import web page").click()
     page.get_by_label("Import URL").fill(
         "http://localhost:5001/dev_api/fake_story.html"
@@ -237,18 +228,17 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
     # Page is imported, form shown, so save it.
     page.get_by_role("button", name="Save").click()
     page.get_by_text("Tengo").click()  # Quick hacky check if exists.
-    page.get_by_title("Home").click()
+    page.get_by_title("Library").click()
     expect(page.get_by_role("link", name="Mi perro.")).to_be_visible()
 
     # Check version.
     _print("Version.")
-    page.locator("#menu_about").hover()
-    page.get_by_role("link", name="Version and software info").click()
+    page.locator("#menu_settings").click()
+    page.get_by_role("link", name="Version", exact=True).click()
 
     # Custom style.
     _print("Custom style.")
-    page.locator("#menu_settings").hover()
-    page.get_by_role("link", name="Settings").click()
+    page.locator("#menu_settings").click()
     page.get_by_label("Custom styles").click()
     page.get_by_label("Custom styles").fill(
         "span.status0 { background-color: yellow; }"
@@ -257,7 +247,7 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
 
     # Custom style.
     _print("Keyboard shortcuts.")
-    page.locator("#menu_settings").hover()
+    page.locator("#menu_settings").click()
     page.get_by_role("link", name="Keyboard shortcuts").click()
     page.get_by_role("button", name="Save").click()
 
