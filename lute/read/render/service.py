@@ -5,13 +5,12 @@ Reading rendering helpers.
 import itertools
 import re
 from sqlalchemy import text as sqltext
+from sqlalchemy.orm import joinedload
 
 from lute.models.term import Term
 from lute.parse.base import ParsedToken
 from lute.read.render.calculate_textitems import get_textitems as calc_get_textitems
 from lute.read.render.multiword_indexer import MultiwordTermIndexer
-
-# from lute.utils.debug_helpers import DebugTimer
 
 
 class Service:
@@ -46,45 +45,12 @@ class Service:
     def _find_all_multi_word_term_text_lcs_in_content(self, text_lcs, language):
         "Find multiword terms, return list of text_lcs."
 
-        # There are a few ways of finding multi-word Terms
-        # (with token_count > 1) in the content:
-        #
-        # 1. load each mword term text_lc via sql and check.
-        # 2. using the model
-        # 3. SQL with "LIKE"
-        #
-        # During reasonable test runs with my data, the times in seconds
-        # for each are similar (~0.02, ~0.05, ~0.025).  This method is
-        # only used for small amounts of data, and the user experience hit
-        # is negligible, so I'll use the first method which IMO is the clearest
-        # code.
-
+        # Loading each multiword text_lc and testing containment was as fast
+        # as a model query or a LIKE, and the code is the clearest of the three.
         zws = "\u200b"  # zero-width space
         content = zws + zws.join(text_lcs) + zws
-
-        # Method 1:
         reclist = self._get_multiword_terms(language)
         return [p[1] for p in reclist if f"{zws}{p[1]}{zws}" in content]
-
-        ## # Method 2: use the model.
-        ## contained_term_qry = self.session.query(Term).filter(
-        ##     Term.language == language,
-        ##     Term.token_count > 1,
-        ##     func.instr(content, Term.text_lc) > 0,
-        ## )
-        ## return [r.text_lc for r in contained_term_qry.all()]
-
-        ## # Method 3: Query with LIKE
-        ## sql = sqltext(
-        ##     """
-        ##     SELECT WoTextLC FROM words
-        ##     WHERE WoLgID=:lid and WoTokenCount>1
-        ##     AND :content LIKE '%' || :zws || WoTextLC || :zws || '%'
-        ##     """
-        ## )
-        ## sql = sql.bindparams(lid=language.id, content=content, zws=zws)
-        ## recs = self.session.execute(sql).all()
-        ## return [r[0] for r in recs]
 
     def _find_all_terms_in_tokens(self, tokens, language, kwtree=None):
         """
@@ -107,48 +73,28 @@ class Service:
         in the tokenized strings, they can be found by a simple query.
         """
 
-        # Performance: About half of the time in this routine is spent in
-        # Step 1 (finding multiword terms), the rest in step 2 (the actual
-        # query).
-        # dt = DebugTimer("_find_all_terms_in_tokens", display=True)
-
         parser = language.parser
         text_lcs = [parser.get_lowercase(t.token) for t in tokens]
 
-        # Step 1: get the multiwords in the content.
-        if kwtree is None:
-            mword_terms = self._find_all_multi_word_term_text_lcs_in_content(
-                text_lcs, language
-            )
-        else:
-            results = kwtree.search_all(text_lcs)
-            mword_terms = [r[0] for r in results]
-        # dt.step("filtered mword terms")
+        # A single token cannot contain a term whose text has an internal
+        # zero-width space, so the multiword scan only runs for longer strings.
+        mword_terms = []
+        if len(tokens) >= 2:
+            if kwtree is None:
+                mword_terms = self._find_all_multi_word_term_text_lcs_in_content(
+                    text_lcs, language
+                )
+            else:
+                mword_terms = [r[0] for r in kwtree.search_all(text_lcs)]
 
-        # Step 2: load the Term objects.
-        #
-        # The Term fetch is actually performant -- there is no
-        # real difference between loading the Term objects versus
-        # loading raw data with SQL and getting dicts.
-        #
-        # Code for getting raw data:
-        # param_keys = [f"w{i}" for i, _ in enumerate(text_lcs)]
-        # keys_placeholders = ','.join([f":{k}" for k in param_keys])
-        # param_dict = dict(zip(param_keys, text_lcs))
-        # param_dict["langid"] = language.id
-        # sql = sqltext(f"""SELECT WoID, WoTextLC FROM words
-        #     WHERE WoLgID=:langid and WoTextLC in ({keys_placeholders})""")
-        # sql = sql.bindparams(language.id, *text_lcs)
-        # results = self.session.execute(sql, param_dict).fetchall()
         text_lcs.extend(mword_terms)
         tok_strings = list(set(text_lcs))
-        terms_matching_tokens_qry = self.session.query(Term).filter(
-            Term.text_lc.in_(tok_strings), Term.language == language
+        terms_matching_tokens_qry = (
+            self.session.query(Term)
+            .options(joinedload(Term.language))
+            .filter(Term.text_lc.in_(tok_strings), Term.language == language)
         )
-        all_terms = terms_matching_tokens_qry.all()
-        # dt.step("exec query")
-
-        return all_terms
+        return terms_matching_tokens_qry.all()
 
     def get_textitems(self, s, language, multiword_term_indexer=None):
         """
