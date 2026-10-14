@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const {loadCodex} = require('./fake-dom.cjs');
 
-const {CodexTermForm, termStackOnLoad, pushTermStack, popTermStack, termEditFromChange, bindTermBack} = loadCodex();
+const {CodexTermForm, termStackOnLoad, pushTermStack, popTermStack, termEditFromChange, bindTermBack, embeddedTermFormSaved, postEmbeddedTermForm} = loadCodex();
 
 function makeContainer() {
   const fields = {
@@ -124,4 +124,36 @@ back.fire('pointerup', {pointerType: 'touch', preventDefault() { prevented = tru
 back.fire('click', {});
 assert.equal(prevented, true, 'the touch is taken before the keyboard can swallow it');
 assert.equal(leaves, 3, 'the following click does not leave twice');
-console.log('Codex term form checks passed');
+
+assert.equal(embeddedTermFormSaved('<meta name="lute-term-saved" content="1">'), true);
+assert.equal(embeddedTermFormSaved('<p>event: "LuteTermFormPosted", keepOpen: true</p>'), false,
+  'the form page mentions the event, but it is not a completed save');
+
+(async () => {
+  const saved = [];
+  const replaced = [];
+  const requests = [];
+  const deps = {
+    fetch: async (url, options) => {
+      requests.push({url, method: options.method, body: options.body});
+      const html = requests.length === 1
+        ? '<meta name="lute-term-saved" content="1">'
+        : '<form id="term-form">invalid</form>';
+      return {ok: true, text: async () => html};
+    },
+    formData: () => 'fields',
+    notify: () => saved.push('posted'),
+    replaceDocument: html => replaced.push(html),
+  };
+  const form = {action: '/read/edit_term/261'};
+  assert.equal(await postEmbeddedTermForm(form, deps), 'saved');
+  assert.deepEqual(saved, ['posted'], 'a saved term tells the reading page without navigating');
+  assert.deepEqual(requests, [{url: '/read/edit_term/261', method: 'POST', body: 'fields'}]);
+  assert.equal(await postEmbeddedTermForm(form, deps), 'invalid');
+  assert.equal(replaced.length, 1, 'a validation error stays in the frame');
+  assert.equal(saved.length, 1, 'an invalid form does not close the pane');
+  console.log('Codex term form checks passed');
+})().catch(error => {
+  console.error(error);
+  process.exit(1);
+});

@@ -59,11 +59,16 @@ class TermPane {
   }
 
   /**
-   * Saving the form leaves a frame entry above the pane's entry, so the
-   * first Back only reloads the frame.  Continue until the pane's entry goes.
+   * A frame navigation sits above the pane's entry, so the first Back only
+   * reloads the frame. Step back once more, and clear the flag first: another
+   * load during that Back must not leave the reading page.
    */
   onFrameTraversed() {
-    if (this.unwinding && !this.isOpen) this.stepBack();
-    else this.unwinding = false;
+    if (!this.unwinding || this.isOpen) {
+      this.unwinding = false;
+      return;
+    }
+    this.unwinding = false;
+    if (this.ownsHistoryEntry) this.history.back();
   }
 }

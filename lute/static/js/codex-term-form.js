@@ -121,6 +121,28 @@ class CodexTermForm {
   save() { this.field('#btnsubmit').click(); }
 }
 
+/** The reading-pane success page is the only response with this marker. */
+function embeddedTermFormSaved(html) {
+  return typeof html === 'string' && html.includes('name="lute-term-saved"');
+}
+
+/**
+ * Post the term form without navigating the frame.
+ * A normal submit adds a Back step, and closing the phone pane then
+ * presses Back while that frame is reloading, which freezes mobile Safari.
+ */
+async function postEmbeddedTermForm(form, {fetch, formData, notify, replaceDocument}) {
+  const response = await fetch(form.action, {method: 'POST', body: formData(form)});
+  const html = await response.text();
+  if (!response.ok) throw new Error('Save failed');
+  if (embeddedTermFormSaved(html)) {
+    notify();
+    return 'saved';
+  }
+  replaceDocument(html);
+  return 'invalid';
+}
+
 /**
  * Show Codex in the term card.  A saved translation is shown without a new
  * request; an empty Translation is translated automatically.

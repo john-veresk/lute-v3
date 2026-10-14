@@ -451,21 +451,50 @@
   // in the tag input box, resulting in nothing getting posted.  This
   // is annoying, so convert any pending text into a full tag before
   // submitting.
+  const embeddedTermForm = ("{{ embedded_in_reading_frame }}" == "True");
+
+  // A reading-pane save must not navigate the frame. On a phone that
+  // navigation becomes a Back step, and closing the pane presses Back
+  // again while the frame reloads, which freezes the mobile browser.
+  function submit_term_form() {
+    const form = document.getElementById('term-form');
+    if (!embeddedTermForm) {
+      form.submit();
+      return;
+    }
+    const button = document.getElementById('btnsubmit');
+    button.disabled = true;
+    postEmbeddedTermForm(form, {
+      fetch: (...args) => window.fetch(...args),
+      formData: current => new FormData(current),
+      notify: () => window.parent.postMessage({ event: "LuteTermFormPosted" }, "*"),
+      replaceDocument(html) {
+        document.open();
+        document.write(html);
+        document.close();
+      },
+    }).catch(() => {
+      button.disabled = false;
+      alert('Save failed. Try again.');
+    });
+  }
+
   function convert_pending_parent_tags(event) {
     const pending_tag = $('span.tagify__input').text().trim();
-    if (pending_tag == '')
+    if (pending_tag != '') {
+      // Simply calling "addTags" is not enough, as there appears to be
+      // some kind of async processing and timing in that method.  We
+      // have to listen to the 'add' event, and only submit once that is
+      // called.
+      parents_tagify.on('add', onFinalTagAdded);
+      parents_tagify.addTags([pending_tag], true, false);
+      event.preventDefault();
+      return false;
+    }
+    if (!embeddedTermForm)
       return true;
-    // console.log(`adding: ${pending_tag}`);
-
-    // Simply calling "addTags" is not enough, as there appears to be
-    // some kind of async processing and timing in that method.  We
-    // have to listen to the 'add' event, and only submit once that is
-    // called.
-    parents_tagify.on('add', onFinalTagAdded);
-
-    // Add the pending tag, and suppress the actual submit.
-    parents_tagify.addTags([pending_tag], true, false);
     event.preventDefault();
+    submit_term_form();
     return false;
   }
 
@@ -477,10 +506,7 @@
 
     // We still have to wait for data to be fully processed :-(
     const DELAY = 150;  // ms
-    setTimeout(function() {
-      const form = $('#term-form');
-      form[0].submit();
-    }, DELAY);
+    setTimeout(submit_term_form, DELAY);
 
     parents_tagify.off('add', onFinalTagAdded);  // clean up listener.
   }

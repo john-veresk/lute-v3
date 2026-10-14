@@ -13,10 +13,17 @@ function fixture(compact = true) {
   const entries = [{state: null}];
   // A frame navigation adds an entry that keeps the page state and fires no popstate.
   const history = {
+    backCalls: 0,
+    delayPop: false,
     get state() { return entries.at(-1).state; },
     pushState(state) { entries.push({state}); },
     frameNavigation() { entries.push({state: this.state, frame: true}); },
-    back() { const entry = entries.pop(); if (!entry.frame) this.onpop?.(); },
+    back() {
+      this.backCalls += 1;
+      if (this.delayPop) return;
+      const entry = entries.pop();
+      if (!entry.frame) this.onpop?.();
+    },
   };
   const pane = {classList: classes()};
   const root = {classList: classes()};
@@ -74,6 +81,17 @@ phone.termPane.close();
 phone.termPane.onFrameTraversed();
 phone.termPane.onFrameTraversed();
 assert.equal(phone.entries.length, 1, 'stray frame loads never step back past the reading page');
+
+const race = fixture();
+race.termPane.open();
+race.history.frameNavigation();
+race.termPane.close();
+race.history.backCalls = 0;
+race.history.delayPop = true;
+race.termPane.onFrameTraversed();
+race.termPane.onFrameTraversed();
+assert.equal(race.history.backCalls, 1, 'a second frame load during Back steps back only once');
+assert.equal(race.entries.length, 2, 'that Back has not left the reading page yet');
 
 const desktop = fixture(false);
 desktop.termPane.request();
