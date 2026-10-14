@@ -333,11 +333,7 @@ class CodexPanel {
         if (current !== this.generation) return;
         data.saved.forEach(item => {
           const row = rows[item.index];
-          row.saved = true;
-          row.checkbox.checked = true;
-          row.checkbox.disabled = true;
-          row.button.textContent = 'Saved';
-          row.button.setAttribute('aria-label', `Saved ${label} ${item.text}`);
+          this.markSaved(row, label);
           row.translation.textContent = item.translation;
         });
         status.textContent = `${data.saved.length} saved`;
@@ -405,7 +401,6 @@ class CodexPanel {
     title.textContent = card.text;
     if (openUrl) {
       title.className = 'codex-word-open';
-      title.href = openUrl;
       title.setAttribute('href', openUrl);
       title.setAttribute('aria-label', `Open ${card.text}`);
       title.addEventListener('click', event => {
