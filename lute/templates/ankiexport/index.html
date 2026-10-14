@@ -1,9 +1,9 @@
-{% extends 'base.html' %}
+{% extends 'settings/layout.html' %}
 
 {% block title %}AnkiConnect{% endblock %}
 {% block header %}AnkiConnect{% endblock %}
 
-{% block body %}
+{% block settings_body %}
 
 <button class="btn" onclick="validate_exports();">Validate exports</button>&nbsp;<span id="validation_message"></span>
 <table id="export_specs" class="display" width="100%"></table>

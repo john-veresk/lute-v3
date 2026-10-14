@@ -88,8 +88,7 @@ class LuteTestClient:  # pylint: disable=too-many-public-methods
         """
         Edit a language.
         """
-        self.visit("/")
-        self.page.hover("#menu_settings")
+        self.visit("/settings/index")
         self.page.locator("#lang_index").first.click()
 
         # Partial text match for link
@@ -108,8 +107,7 @@ class LuteTestClient:  # pylint: disable=too-many-public-methods
 
     def get_language_table_content(self):
         "Get language table content."
-        self.visit("/")
-        self.page.hover("#menu_settings")
+        self.visit("/settings/index")
         self.page.locator("#lang_index").first.click()
         rows = self.page.locator("#languagetable tbody tr")
         rowcount = rows.count()

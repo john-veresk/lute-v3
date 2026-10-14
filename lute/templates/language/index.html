@@ -1,10 +1,10 @@
-{% extends 'base.html' %}
+{% extends 'settings/layout.html' %}
 
 {% block title %}Languages{% endblock %}
 
 {% block header %}Languages{% endblock %}
 
-{% block body %}
+{% block settings_body %}
 
 {% if language_data|length == 0 %}
   <p>No languages defined.</p>

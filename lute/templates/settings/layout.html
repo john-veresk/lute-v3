@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block page_title %}{% endblock %}
+
+{% block body %}
+<div class="settings-shell">
+  {% include 'settings/_nav.html' %}
+  <div class="settings-main">
+    <h1 id="luteTitle" class="page-title">{{ self.header() }}</h1>
+    {% block settings_body %}{% endblock %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% set path = request.path %}
+{% macro item(href, label, id=None) -%}
+<a href="{{ href }}" {% if id %}id="{{ id }}"{% endif %} {% if path.startswith(href) %}aria-current="page"{% endif %}>{{ label }}</a>
+{%- endmacro %}
+<nav class="settings-nav" aria-label="Settings">
+  <div class="settings-nav-group">
+    <h2>Preferences</h2>
+    {{ item('/settings/index', 'General') }}
+    {{ item('/language/index', 'Languages', 'lang_index') }}
+    {{ item('/settings/shortcuts', 'Keyboard shortcuts') }}
+  </div>
+  <div class="settings-nav-group">
+    <h2>Words</h2>
+    {{ item('/termimport/index', 'Import words', 'term_import_index') }}
+    {{ item('/termtag/index', 'Tags') }}
+    {{ item('/ankiexport/index', 'Anki exports', 'anki_export_index') }}
+  </div>
+  <div class="settings-nav-group">
+    <h2>Data</h2>
+    {% if backup_enabled and backup_directory != '' %}
+    {{ item('/backup/index', 'Backups', 'backup_index') }}
+    {% endif %}
+    {{ item('/stats/', 'Statistics') }}
+  </div>
+  <div class="settings-nav-group">
+    <h2>About</h2>
+    {{ item('/version', 'Version') }}
+    <a href="https://luteorg.github.io/lute-manual/" target="_blank" rel="noopener">Manual</a>
+    <a href="https://discord.gg/CzFUQP5m8u" target="_blank" rel="noopener">Discord</a>
+  </div>
+  {% if backup_enabled and backup_directory != '' and backup_time_since is not none %}
+  <p class="settings-nav-note">Last backup {{ backup_time_since }}.
+    <a href="/backup/backup?type=manual">Back up now</a></p>
+  {% endif %}
+</nav>

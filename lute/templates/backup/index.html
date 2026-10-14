@@ -1,10 +1,10 @@
-{% extends 'base.html' %}
+{% extends 'settings/layout.html' %}
 
 {% block title %}Backups{% endblock %}
 
 {% block header %}Backups{% endblock %}
 
-{% block body %}
+{% block settings_body %}
 
 {% if backups|length == 0 %}
   <p>No backups have been made yet.</p>

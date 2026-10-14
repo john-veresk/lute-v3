@@ -1,10 +1,10 @@
-{% extends 'base.html' %}
+{% extends 'settings/layout.html' %}
 
 {% block title %}Stats{% endblock %}
 
 {% block header %}Stats{% endblock %}
 
-{% block body %}
+{% block settings_body %}
 
 <script type="text/javascript" src="{{ url_for('static', filename='vendor/chartjs/chart.umd.js') }}" charset="utf-8"></script>
 <script type="text/javascript" src="{{ url_for('static', filename='vendor/chartjs/chartjs-adapter-date-fns.js') }}" charset="utf-8"></script>

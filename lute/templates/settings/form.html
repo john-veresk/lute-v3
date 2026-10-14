@@ -1,9 +1,23 @@
-{% extends 'base.html' %}
+{% extends 'settings/layout.html' %}
 
 {% block title %}Settings{% endblock %}
-{% block header %}Settings{% endblock %}
+{% block header %}General{% endblock %}
 
-{% block body %}
+{% macro field(f, hint=None) -%}
+{% if f.type == 'BooleanField' %}
+<label class="settings-field settings-switch">
+  <span>{{ f.label.text }}{% if hint %}<small>{{ hint }}</small>{% endif %}</span>
+  {{ f() }}
+</label>
+{% else %}
+<div class="settings-field">
+  <label for="{{ f.id }}">{{ f.label.text }}{% if hint %}<small>{{ hint | safe }}</small>{% endif %}</label>
+  {{ f(class="form-control") }}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% block settings_body %}
 
 {% for field_name, field_errors in form.errors.items() %}
 {% for error in field_errors %}
@@ -11,191 +25,69 @@
 {% endfor %}
 {% endfor %}
 
-<form method="POST">
+<form method="POST" class="settings-form">
   {{ form.hidden_tag() }}
   {{ form.csrf_token }}
 
-  <table class="settingstable">
+  <section class="settings-section">
+    <h2>Appearance</h2>
+    {{ field(form.current_theme) }}
+    {{ field(form.show_highlights) }}
+    {{ field(form.custom_styles, 'CSS applied on top of the theme. <a href="https://luteorg.github.io/lute-manual/usage/themes/custom-styles.html" target="_blank" rel="noopener">Examples</a>') }}
+  </section>
 
-    <tr>
-      <td>
-        <h2>Backup</h2>
-      </td>
-    </tr>
+  <section class="settings-section">
+    <h2>Reading</h2>
+    {{ field(form.open_popup_in_new_tab) }}
+    {{ field(form.stop_audio_on_term_form_open) }}
+    {{ field(form.show_streak_on_home) }}
+    {{ field(form.term_popup_promote_parent_translation) }}
+    {{ field(form.term_popup_show_components) }}
+    {{ field(form.stats_calc_sample_size, 'Pages sampled for book statistics.') }}
+  </section>
 
-    {% for f in [
-    form.backup_enabled,
-    form.backup_dir,
-    form.backup_auto,
-    form.backup_warn,
-    form.backup_count
-    ]%}
-    <tr>
-      <td>{{ f.label }}</td>
-      <td>{{ f(class="form-control") }}</td>
-    </tr>
-    {% endfor %}
+  <section class="settings-section">
+    <h2>Backup</h2>
+    {{ field(form.backup_enabled) }}
+    {{ field(form.backup_dir, 'Absolute path to an existing folder.') }}
+    {{ field(form.backup_auto) }}
+    {{ field(form.backup_warn) }}
+    {{ field(form.backup_count, 'Older backups are deleted first.') }}
+  </section>
 
-    <tr>
-      <td>
-        <h2>Appearance</h2>
-      </td>
-    </tr>
+  <section class="settings-section">
+    <h2>Anki</h2>
+    {{ field(form.use_ankiconnect) }}
+    {{ field(form.ankiconnect_url) }}
+    <div class="settings-test">
+      <button id="test_ankiconnect_btn" class="btn" onclick="test_ankiconnect_setup(); return false;">Test connection</button>
+      <div id="ankiconnect_result"></div>
+    </div>
+  </section>
 
-    <tr>
-      <td>
-        {{ form.current_theme.label }}
-      </td>
-      <td>
-        {{ form.current_theme }}
-      </td>
-    </tr>
-    <tr>
-      <td>
-        {{ form.custom_styles.label }}
-        <img
-          id="about_custom_styles" style="margin-right:10px;"
-          src="{{ url_for('static', filename='icn/question-balloon.png') }}"
-          title="Click for details"
-          onclick="$('#custom_styles_help').toggle();"
-          />
-        <blockquote id="custom_styles_help" style="width:60%; display: none;">
-          <p>Use this field to define custom styles to be applied to
-          Lute.</p>
-          <p>See examples
-          in <a href="https://luteorg.github.io/lute-manual/usage/themes/custom-styles.html"
-          target="_blank">the manual</a>.</p>
-        </blockquote>
-      </td>
-      </td>
-      <td>
-        {{ form.custom_styles(class="form-largetextarea") }}
-      </td>
-    </tr>
-    <tr>
-      <td>
-        {{ form.show_highlights.label }}
-      </td>
-      <td>
-        {{ form.show_highlights }}
-      </td>
-    </tr>
+  <section class="settings-section">
+    <h2>Japanese</h2>
+    {{ field(form.mecab_path, 'Leave empty unless MeCab is not found. <a href="https://luteorg.github.io/lute-manual/install/mecab.html" target="_blank" rel="noopener">MeCab setup</a>') }}
+    <div class="settings-test">
+      <button id="test_mecab_btn" class="btn" onclick="test_mecab_setup(); return false;">Test MeCab</button>
+      <div id="parse_result"></div>
+    </div>
+    {{ field(form.japanese_reading) }}
+  </section>
 
-    <tr>
-      <td>
-        <h2>Behaviour</h2>
-      </td>
-    </tr>
-    {% for f in [
-    form.open_popup_in_new_tab,
-    form.stop_audio_on_term_form_open,
-    form.show_streak_on_home,
-    form.stats_calc_sample_size,
-    ]%}
-    <tr>
-      <td>{{ f.label }}</td>
-      <td>{{ f(class="form-control") }}</td>
-    </tr>
-    {% endfor %}
-
-    <tr>
-      <td>
-        <h2>Term Popups</h2>
-      </td>
-    </tr>
-    {% for f in [
-    form.term_popup_promote_parent_translation,
-    form.term_popup_show_components,
-    ]%}
-    <tr>
-      <td>{{ f.label }}</td>
-      <td>{{ f(class="form-control") }}</td>
-    </tr>
-    {% endfor %}
-
-    <tr>
-      <td>
-        <h2>Anki</h2>
-      </td>
-    </tr>
-    {% for f in [
-    form.use_ankiconnect,
-    form.ankiconnect_url,
-    ]%}
-    <tr>
-      <td>{{ f.label }}</td>
-      <td>{{ f(class="form-control") }}</td>
-    </tr>
-    {% endfor %}
-    <tr>
-      <td>
-      </td>
-      <td>
-        <button id="test_ankiconnect_btn" onclick="test_ankiconnect_setup(); return false;">
-          Test AnkiConnect connection
-        </button>
-        <div style="margin-top: 5px" id="ankiconnect_result"></div>
-      </td>
-    </tr>
-
-    <tr>
-      <td>
-        <h2>Japanese</h2>
-      </td>
-    </tr>
-
-    <tr>
-      <td>
-        {{ form.mecab_path.label }}
-        <img
-          id="about_mecab_path" style="margin-right:10px;"
-          src="{{ url_for('static', filename='icn/question-balloon.png') }}"
-          title="Click for details"
-          onclick="$('#mecab_path_help').toggle();"
-          />
-        <blockquote id="mecab_path_help" style="width:60%; display: none;">
-          <p>Lute uses MeCab to parse Japanese, so MeCab needs to be
-            installed on your machine (see notes
-            in <a href="https://luteorg.github.io/lute-manual/install/mecab.html"
-            target="_blank">the manual</a>).</p>
-          <p>Lute includes the Python
-            library <a href="https://github.com/buruzaemon/natto-py">natto-py</a>
-            to interact with MeCab.  natto-py can usually find MeCab
-            automatically, but you <i>may</i> need to set the MECAB_PATH, per
-            <a href="https://luteorg.github.io/lute-manual/install/mecab.html#lute-configuration"
-            target="_blank">the manual</a>.</p>
-          <p>Try different values for MECAB_PATH, including leaving
-            the field blank, until clicking the &quot;test&quot;
-            button returns a &quot;success&quot; message.</p>
-        </blockquote>
-      </td>
-      <td>{{ form.mecab_path(class="form-control") }}</td>
-    </tr>
-    <tr>
-      <td>
-      </td>
-      <td>
-        <button id="test_mecab_btn" onclick="test_mecab_setup(); return false;">
-          Test my MeCab configuration
-        </button>
-        <div style="margin-top: 5px" id="parse_result"></div>
-      </td>
-    </tr>
-    <tr>
-      <td>{{ form.japanese_reading.label }}</td>
-      <td>{{ form.japanese_reading }}</td>
-    </tr>
-
-  </table>
-
-  <div style="margin-top:40px;">
+  <div class="settings-save">
     <button type="submit" class="btn btn-primary">Save</button>
-    <button class="btn" onclick="window.location = '/'; return false;">Cancel</button>
+    <a class="btn" href="/">Cancel</a>
   </div>
 </form>
 
 
 <script>
+  function show_test_result(el, message, ok) {
+    el.html(message);
+    el.attr('class', ok ? 'settings-test-ok' : 'settings-test-failed');
+  }
+
   function test_mecab_setup() {
     let mecab_path = $('#mecab_path').val()
 
@@ -207,17 +99,10 @@
       success: function(data) {
         const r = data['result'];
         let msg = `${r}: ${data['message']}`
-        let color = 'red';
-        if (r == 'success') {
-          color = 'green';
-        }
-        else {
+        if (r != 'success') {
           msg += "<br/><br/>Also, ensure you have MeCab installed and on your PATH.";
         }
-
-        el = $('#parse_result');
-        el.html(msg);
-        el.css('border', `2px solid ${color}`);
+        show_test_result($('#parse_result'), msg, r == 'success');
       },
       error: function() {
         alert('Error occured');
@@ -235,12 +120,10 @@
     }
     LuteAnki.get_anki_specs(ac_url)
       .then(() => {
-        el.text(`Connected successfully to AnkiConnect at ${ac_url}.`);
-        el.css('border', `2px solid green`);
+        show_test_result(el, `Connected to AnkiConnect at ${ac_url}.`, true);
       })
       .catch(error => {
-        el.text(error);
-        el.css('border', `2px solid red`);
+        show_test_result(el, error, false);
         $("#use_ankiconnect").prop("checked", false);
       });
   }

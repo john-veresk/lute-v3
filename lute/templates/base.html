@@ -24,6 +24,7 @@
   <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='vendor/datatables/datatables.min.css') }}" />
   <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}" />
   <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/player-styles.css') }}" />
+  <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/app.css') }}" />
 
   <link rel="stylesheet" type="text/css" href="/theme/current">
   <link rel="stylesheet" type="text/css" href="/theme/custom_styles">
@@ -54,87 +55,39 @@
 <body>
 
 <div class="container">
-  {% if config.ENV == 'dev' %}
-  <p style="background-color: blue; color: white; margin: 2px; padding: 2px;">Dev environment.</p>
-  {% endif %}
-
   {% if not hide_top_menu %}
   {# Menu bar variables are injected with @app.context_processor in the app_factory. #}
-  <div class="menu-bar">
-    <div class="header">
-      <a href="/" class="home-link">
-        <img src="{{ url_for('static', filename='img/lute.png') }}" class="lutelogo" alt="LUTE Logo">
-      </a>
-      <div class="title-container">
-        <h1 id="luteTitle" title="Learning Using Texts">
-          {% if self.header() | trim %}
-          {% block header %}{% endblock %}
-          {% else %}
-          Lute
-          {% endif %}
-        </h1>
-      </div>
-    </div>
-    <div class="menu">
-      {% if not hide_homelink %}
-      <div class="menu-item">
-        <span><a class="home-link" href="/">Home</a></span>
-      </div>
-      {% endif %}
+  {% set path = request.path %}
+  <header class="app-bar">
+    <a href="/" class="app-brand home-link" title="Learning Using Texts">
+      <img src="{{ url_for('static', filename='img/lute.png') }}" class="lutelogo" alt="">
+      <span>Lute</span>
+      {% if config.ENV == 'dev' %}<span class="app-env">dev</span>{% endif %}
+    </a>
+    {% if have_languages %}
+    <nav class="app-nav" aria-label="Main">
+      <span id="menu_books"><a href="/" {% if path == '/' or path.startswith('/book') %}aria-current="page"{% endif %}>Library</a></span>
+      <span id="menu_terms"><a id="term_index" href="/term/index" {% if path.startswith('/term/') and not path.startswith('/term/review') %}aria-current="page"{% endif %}>Words</a></span>
+      <span id="menu_review"><a href="/term/review" {% if path.startswith('/term/review') %}aria-current="page"{% endif %}>Review</a></span>
+    </nav>
+    {% endif %}
+    <div class="app-actions">
       {% if have_languages %}
-      <div class="menu-item">
-        <span id="menu_books">Books</span>
-        <ul class="sub-menu">
-          <li><a id="book_new" href="/book/new">Create new Book</a></li>
-          <li><a href="/book/import_webpage">Import web page</a></li>
-          <li><a href="/book/archived">Book archive</a></li>
-        </ul>
-      </div>
-      <div class="menu-item">
-        <span id="menu_terms">Terms</span>
-        <ul class="sub-menu">
-          <li><a id="term_index" href="/term/index">Terms</a></li>
-          <li><a id="term_import_index" href="/termimport/index">Import Terms</a></li>
-          <li><a href="/termtag/index">Term Tags</a></li>
-        </ul>
-      </div>
+      <a id="book_new" class="app-button app-button-primary" href="/book/new">
+        <svg aria-hidden="true" viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg>New book
+      </a>
       {% endif %}
-      <div class="menu-item">
-        <span id="menu_settings">Settings</span>
-        <ul class="sub-menu">
-          <li><a id="lang_index" href="/language/index">Languages</a></li>
-          <li><a href="/settings/index">Settings</a></li>
-          <li><a href="/settings/shortcuts">Keyboard shortcuts</a></li>
-          <li><a id="anki_export_index" href="/ankiexport/index">Anki exports</a></li>
-        </ul>
-      </div>
-      {% if backup_enabled and backup_directory != '' %}
-      <div class="menu-item">
-        <span>Backup</span>
-        <ul class="sub-menu last-sub-menu">
-          {% if backup_last_display_date is not none %}
-          {% if backup_time_since is not none %}
-          <li>Last backup was {{ backup_time_since }}.</li>
-          {% endif %}
-          <li>{{ backup_last_display_date | format }}</li>
-          <hr>
-          {% endif %}
-          <li><a id="backup_index" href="/backup/index">Backups</a></li>
-          <li><a href="/backup/backup?type=manual">Create backup</a></li>
-        </ul>
-      </div>
-      {% endif %}
-      <div class="menu-item">
-        <span id="menu_about">About</span>
-        <ul class="sub-menu last-sub-menu">
-          <li><a href="/version">Version and software info</a></li>
-          <li><a href="/stats/">Statistics</a></li>
-          <li><a href="https://luteorg.github.io/lute-manual/" target="_blank">Docs</a></li>
-          <li><a href="https://discord.gg/CzFUQP5m8u" target="_blank">Discord</a></li>
-        </ul>
-      </div>
+      <a id="menu_settings" class="app-icon-button" href="/settings/index" title="Settings" aria-label="Settings"
+         {% if path.startswith('/settings') or path.startswith('/language') %}aria-current="page"{% endif %}>
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+      </a>
     </div>
-  </div>
+  </header>
+  {% block page_title %}
+  {% if self.header() | trim %}
+  <h1 id="luteTitle" class="page-title">{% block header %}{% endblock %}</h1>
+  {% endif %}
+  {% endblock %}
   {% endif %}
 
   {% with messages = get_flashed_messages() %}

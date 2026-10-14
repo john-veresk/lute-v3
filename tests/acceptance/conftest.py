@@ -256,8 +256,7 @@ def given_update_language(luteclient, lang, content):
 @when("I open the language index")
 def when_open_language_index(luteclient):
     "Navigate to the language listing page."
-    luteclient.visit("/")
-    luteclient.page.hover("#menu_settings")
+    luteclient.visit("/settings/index")
     luteclient.page.locator("#lang_index").first.click()
     time.sleep(0.2)
 

@@ -35,16 +35,43 @@
 {% endif %}
 
 {% if not have_languages %}
-  <p>To get started using Lute, first <a href="/language/list_predefined">load a predefined language and sample text</a>, or <a href="/language/new">create your language.</a>
-</p>
+<section class="home-empty">
+  <h2>Add a language to start reading</h2>
+  <p>Load a ready-made language with a sample text, or set one up yourself.</p>
+  <div class="home-actions">
+    <a class="app-button app-button-primary" href="/language/list_predefined">Load a language</a>
+    <a class="app-button" href="/language/new">Create a language</a>
+  </div>
+</section>
 {% else %}
-  {% include "book/tablelisting.html" %}
-{% endif %}
+  {% if continue_book %}
+  {% set b = continue_book %}
+  <section class="home-continue" aria-label="Continue reading">
+    <div class="home-continue-text">
+      <p class="home-continue-meta">{{ b.language }}, page {{ b.page_num }} of {{ b.page_count }}
+        {% if reading_streak > 0 and show_streak_on_home %}<span class="home-streak">{{ reading_streak }}-day streak</span>{% endif %}
+      </p>
+      <h2><a href="/read/{{ b.id }}">{{ b.title }}</a></h2>
+      <div class="home-progress" role="progressbar" aria-label="Book progress"
+           aria-valuemin="1" aria-valuemax="{{ b.page_count }}" aria-valuenow="{{ b.page_num }}">
+        <span style="width: {{ (100 * b.page_num / b.page_count) | round(1) }}%"></span>
+      </div>
+    </div>
+    <div class="home-actions">
+      <a id="continue_reading" class="app-button app-button-primary" href="/read/{{ b.id }}">Continue reading</a>
+      <a class="app-button" href="{{ url_for('term.review', book_id=b.id, page_num=b.page_num) }}">Review words</a>
+    </div>
+  </section>
+  {% endif %}
 
-{% if reading_streak > 0 and show_streak_on_home %}
-<div style="text-align: center; margin-top: 20px; font-size: 1.2em;">
-  <strong>Reading Streak: {{ reading_streak }} day{{ reading_streak != 1 and 's' or '' }}</strong>
-</div>
+  <div class="library-head">
+    <h2>Library</h2>
+    <nav class="library-links" aria-label="Library">
+      <a href="/book/import_webpage">Import web page</a>
+      <a href="/book/archived">Archive</a>
+    </nav>
+  </div>
+  {% include "book/tablelisting.html" %}
 {% endif %}
 
 {% endblock %}
