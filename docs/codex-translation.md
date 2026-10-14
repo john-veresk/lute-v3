@@ -13,6 +13,7 @@ phrases, sentences and pages.
 **Show translation timer** displays elapsed request time beside the model in the
 Codex panel, including waiting for the result. It stops when the response is
 ready or fails. Uncheck it to hide the timer for that language.
+**Pre-translate unknown words** is described below.
 
 Clicking a word or selecting a phrase opens its term card. Codex is part of the
 card, without separate tabs or a divider: it translates the term using the sentence
@@ -35,6 +36,13 @@ is filled and nothing is stored, opening the term does not start a translation.
 The ↻ icon at the top right of the card always asks Codex again and replaces the
 stored translation. Phrase suggestions stored from another sentence are shown
 only if they occur in the current one.
+
+**Pre-translate unknown words** (off by default) translates the unknown words of
+the page you are reading in the background, one word at a time with its sentence,
+and saves them in the translation store, so their cards open without waiting.
+Words that are already stored are skipped. Turning a page replaces the words
+still waiting; the word being translated finishes first. Each unknown word is a
+Codex request and counts toward your usage.
 
 Sentence and page translation commands also use Codex. The image icon beside ↻
 opens the Bing image search inside the card.

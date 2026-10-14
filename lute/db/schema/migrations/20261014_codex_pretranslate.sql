@@ -1,0 +1,1 @@
+ALTER TABLE languages ADD COLUMN LgCodexPretranslate BOOLEAN NOT NULL DEFAULT 0;

@@ -8,6 +8,7 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/resize.js') }}" charset="utf-8" defer></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/text-options.js') }}" charset="utf-8" defer></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/term-pane.js') }}" charset="utf-8"></script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/pretranslate.js') }}" charset="utf-8"></script>
 
 <div id="rendering_controls" style="display: none">
   <pre>
@@ -26,6 +27,7 @@
 <script>
   // Used by the Codex sentence translation in lute.js.
   var LUTE_READING_LANGUAGE_ID = {{ lang_id | safe }};
+  var LUTE_CODEX_PRETRANSLATE = {{ pretranslate | tojson }};
 </script>
 
 
@@ -303,6 +305,27 @@
     goto_relative_page(0, true);
   });
 
+  const pretranslator = new Pretranslator({
+    fetch: (...args) => window.fetch(...args),
+    wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
+    languageId: LUTE_READING_LANGUAGE_ID,
+  });
+
+  // The page's unknown words, each with its sentence as the lookup context.
+  function pretranslate_page() {
+    if (!LUTE_CODEX_PRETRANSLATE) return;
+    const sentences = {};
+    $('span.textitem').each(function() {
+      const id = $(this).data('sentence-id');
+      (sentences[id] ||= []).push(this);
+    });
+    const words = $('span.textitem.word.status0').toArray().map(el => ({
+      text: el.textContent,
+      context: _get_textitems_text(sentences[$(el).data('sentence-id')]).slice(0, 4000),
+    }));
+    pretranslator.run(words);
+  }
+
   let have_audio_file = function() {
     return ($('#book_audio_file').val() != '');
   }
@@ -454,6 +477,7 @@
         $('#thetext').html(data);
         add_status_classes();
         start_hover_mode();
+        pretranslate_page();
         $('#page_num').val(actualPage);
         enable_page_nav_links();
         set_page_fraction();

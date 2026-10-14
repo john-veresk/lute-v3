@@ -21,3 +21,13 @@ def test_reading_page_has_no_dictionary_tabs(client, spanish):
     assert b"wordframeid" in page
     assert b"dicttabs" not in page
     assert b"dictcontainer" not in page
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_reading_page_pretranslates_only_when_enabled(client, spanish, enabled):
+    spanish.codex_pretranslate = enabled
+    book = make_book("Gatos", "Hola gato.", spanish)
+    db.session.add(book)
+    db.session.commit()
+    page = client.get(f"/read/{book.id}").data.decode()
+    assert f"var LUTE_CODEX_PRETRANSLATE = {str(enabled).lower()};" in page

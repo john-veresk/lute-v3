@@ -46,6 +46,7 @@ class Language(
     )
     codex_fast_mode = db.Column("LgCodexFastMode", db.Boolean, default=False)
     codex_show_timer = db.Column("LgCodexShowTimer", db.Boolean, default=True)
+    codex_pretranslate = db.Column("LgCodexPretranslate", db.Boolean, default=False)
 
     dictionaries = db.relationship(
         "LanguageDictionary",
@@ -77,6 +78,7 @@ class Language(
         self.codex_reasoning_effort = ""
         self.codex_fast_mode = False
         self.codex_show_timer = True
+        self.codex_pretranslate = False
 
     def __repr__(self):
         return f"<Language {self.id} '{self.name}'>"
@@ -134,6 +136,7 @@ class Language(
         ret["codex_reasoning_effort"] = self.codex_reasoning_effort
         ret["codex_fast_mode"] = self.codex_fast_mode
         ret["codex_show_timer"] = self.codex_show_timer
+        ret["codex_pretranslate"] = self.codex_pretranslate
         ret["dictionaries"] = []
         for d in self.dictionaries:
             dd = {}
@@ -177,6 +180,7 @@ class Language(
             "codex_reasoning_effort": "codex_reasoning_effort",
             "codex_fast_mode": "codex_fast_mode",
             "codex_show_timer": "codex_show_timer",
+            "codex_pretranslate": "codex_pretranslate",
             "show_romanization": "show_romanization",
             "right_to_left": "right_to_left",
             "parser_type": "parser_type",

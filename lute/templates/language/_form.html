@@ -63,9 +63,16 @@
         <p class="small-flash-notice">Show elapsed request time beside the model in the term card.</p>
       </td>
     </tr>
+    <tr>
+      <td>{{ form.codex_pretranslate.label(class="form-control-label") }}</td>
+      <td>
+        {{ form.codex_pretranslate() }}
+        <p class="small-flash-notice">While you read, translate the page's unknown words in the background and save them, so term cards open instantly. Uses your Codex usage for every unknown word.</p>
+      </td>
+    </tr>
 
     {% for field in form %}
-    {% if field.name not in ('name', 'csrf_token', 'translation_target', 'codex_model', 'codex_reasoning_effort', 'codex_fast_mode', 'codex_show_timer') %}
+    {% if field.name not in ('name', 'csrf_token', 'translation_target', 'codex_model', 'codex_reasoning_effort', 'codex_fast_mode', 'codex_show_timer', 'codex_pretranslate') %}
     <tr>
       <td>{{ field.label(class="form-control-label") }}</td>
       <td>{{ field(class="form-control") }}</td>
