@@ -145,8 +145,7 @@ def run(p: Playwright) -> None:  # pylint: disable=too-many-statements
     page.goto("http://localhost:5001/")
     page.locator("#term_index").click()
     page.get_by_role("link", name="Hello").click()
-    # TODO testing: restore Sentences smoke test check.
-    # page.get_by_role("link", name="Sentences").click()
+    page.get_by_role("button", name="See term usage").click()
     page.get_by_role("link", name="Back to list").click()
     # page.pause()
 

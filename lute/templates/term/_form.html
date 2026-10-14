@@ -63,6 +63,9 @@
             <span class="codex-model">{{ (term_language.codex_model if term_language else '') or 'Codex' }}</span>
             {% if not term_language or term_language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off"></span>{% endif %}
           </span>
+          <button id="term-sentences-btn" type="button" class="term-icon-btn" title="See term usage" aria-label="See term usage" aria-expanded="false">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h9"/></svg>
+          </button>
           <button id="term-image-btn" type="button" class="term-icon-btn" title="Find an image" aria-label="Find an image" aria-expanded="false">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m20.5 16-4.8-4.8-8.2 7.8"/></svg>
           </button>
@@ -105,6 +108,7 @@
              onclick="clicked_zoomable_image(this);"
              />
       </div>
+      <iframe id="term-sentences" class="term-image-search" title="Term usage" src="about:blank" hidden></iframe>
       <iframe id="term-image-search" class="term-image-search" title="Image search" src="about:blank" hidden></iframe>
 
       <div id="status-container">
@@ -317,6 +321,7 @@
 
     const in_reading_frame = ("{{ embedded_in_reading_frame }}" == "True");
     startTermCodex(window, in_reading_frame ? (window.parent.LUTE_LOOKUP_CONTEXT || '') : '');
+    $('#term-sentences-btn').click(toggle_sentences);
     $('#term-image-btn').click(toggle_image_search);
     
     // Post message re form opened.
@@ -330,7 +335,32 @@
 
 
   // =============================
-  // Images.
+  // Sentences and images.
+
+  function close_lookup(frameId, buttonId) {
+    document.getElementById(frameId).hidden = true;
+    $('#' + buttonId).attr('aria-expanded', 'false');
+  }
+
+  // Term usage for the word in the card. Zero-width spaces are storage marks.
+  function toggle_sentences() {
+    const frame = document.getElementById('term-sentences');
+    const opening = frame.hidden;
+    const lang_id = parseInt($('#language_id').val());
+    const text = ($('#text').val() || '').replace(/\u200b/g, '');
+    if (opening && (!lang_id || !text)) {
+      alert('Please select a language and enter the term.');
+      return;
+    }
+    if (opening)
+      close_lookup('term-image-search', 'term-image-btn');
+    frame.hidden = !opening;
+    $('#term-sentences-btn').attr('aria-expanded', String(opening));
+    if (!opening)
+      return;
+    const url = `/term/sentences/${lang_id}/${encodeURIComponent(text)}`;
+    frame.contentWindow.location.replace(url);
+  }
 
   // Bing image search opens inside the card; a single parent is the better query.
   function toggle_image_search() {
@@ -343,6 +373,8 @@
       alert('Please select a language and enter the term.');
       return;
     }
+    if (opening)
+      close_lookup('term-sentences', 'term-sentences-btn');
     frame.hidden = !opening;
     $('#term-image-btn').attr('aria-expanded', String(opening));
     if (!opening)

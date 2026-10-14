@@ -8,7 +8,12 @@ from tests.utils import make_book
 @pytest.mark.parametrize("route", ["read/termform", "term/editbytext"])
 def test_term_card_includes_codex_and_image_search(client, spanish, route):
     page = client.get(f"/{route}/{spanish.id}/gato").data
-    for element_id in (b"codex-refresh", b"codex-options", b"term-image-btn"):
+    for element_id in (
+        b"codex-refresh",
+        b"codex-options",
+        b"term-sentences-btn",
+        b"term-image-btn",
+    ):
         assert b'id="' + element_id + b'"' in page
     assert b"dict-tabs.js" not in page
 

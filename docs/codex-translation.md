@@ -44,8 +44,8 @@ Words that are already stored are skipped. Turning a page replaces the words
 still waiting; the word being translated finishes first. Each unknown word is a
 Codex request and counts toward your usage.
 
-Sentence and page translation commands also use Codex. The image icon beside ↻
-opens the Bing image search inside the card.
+Sentence and page translation commands also use Codex. The sentences icon and
+the image icon beside ↻ open term usage and the Bing image search inside the card.
 
 For an unambiguous inflected word, Codex also adds the dictionary headword to
 **Parents** automatically: an infinitive for a verb, nominative singular for a
