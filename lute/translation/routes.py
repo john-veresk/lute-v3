@@ -160,18 +160,27 @@ def poll(job_id):
         return jsonify(error="Translation expired. Try again."), 404
     if result["status"] == "complete":
         _save_new_result(job_id, result["result"])
-        result = {**result, "result": _mark_saved_words(job_id, result["result"])}
+        result = {**result, "result": _mark_saved_cards(job_id, result["result"])}
     return jsonify(result)
 
 
-def _mark_saved_words(job_id, result):
-    "Words already in the vocabulary stay checked and are not saved again."
-    words = result.get("words") or []
+def _mark_saved_cards(job_id, result):
+    "Words and phrases already in the vocabulary stay checked and are not saved again."
     language_id = _jobs().language_id_for(job_id)
     language = db.session.get(Language, language_id) if language_id else None
-    if language is None or not words:
+    if language is None:
         return result
-    lowered = [language.get_lowercase(word["text"]) for word in words]
+    return {
+        **result,
+        "words": _with_saved_flag(language, result.get("words") or []),
+        "phrases": _with_saved_flag(language, result.get("phrases") or []),
+    }
+
+
+def _with_saved_flag(language, cards):
+    if not cards:
+        return cards
+    lowered = [DBTerm(language, card["text"]).text_lc for card in cards]
     saved = {
         text
         for (text,) in db.session.query(DBTerm.text_lc).filter(
@@ -180,17 +189,10 @@ def _mark_saved_words(job_id, result):
             DBTerm.status != 0,
         )
     }
-    return {
-        **result,
-        "words": [
-            (
-                {**word, "saved": True}
-                if language.get_lowercase(word["text"]) in saved
-                else word
-            )
-            for word in words
-        ],
-    }
+    return [
+        {**card, "saved": True} if lowered[index] in saved else card
+        for index, card in enumerate(cards)
+    ]
 
 
 def _save_new_result(job_id, result):

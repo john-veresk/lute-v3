@@ -18,6 +18,45 @@ function applyCodexParent(container, parent) {
   translationField.dispatchEvent(new Event('change', {bubbles: true}));
 }
 
+const TERM_STACK_KEY = 'lute-term-stack';
+const TERM_DRILL_KEY = 'lute-term-drill';
+
+/** Cards opened from the reading text start fresh. A drill-down keeps the return path. */
+function readTermStack(storage) {
+  try {
+    const value = JSON.parse(storage.getItem(TERM_STACK_KEY) || '[]');
+    return Array.isArray(value) ? value.filter(item => typeof item === 'string' && item.startsWith('/')) : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function termStackOnLoad(storage) {
+  const drilling = storage.getItem(TERM_DRILL_KEY) === '1';
+  storage.removeItem(TERM_DRILL_KEY);
+  if (!drilling) {
+    storage.removeItem(TERM_STACK_KEY);
+    return [];
+  }
+  return readTermStack(storage);
+}
+
+function pushTermStack(storage, url) {
+  const stack = readTermStack(storage);
+  stack.push(url);
+  if (stack.length > 20) stack.shift();
+  storage.setItem(TERM_STACK_KEY, JSON.stringify(stack));
+  storage.setItem(TERM_DRILL_KEY, '1');
+}
+
+function popTermStack(storage) {
+  const stack = readTermStack(storage);
+  const previous = stack.pop() || '';
+  storage.setItem(TERM_STACK_KEY, JSON.stringify(stack));
+  if (previous) storage.setItem(TERM_DRILL_KEY, '1');
+  return previous;
+}
+
 /** The term form fields that Codex reads and fills. */
 class CodexTermForm {
   constructor(container) { this.container = container; }

@@ -27,6 +27,7 @@ from lute.models.repositories import (
 from lute.utils.data_tables import DataTablesFlaskParamParser
 from lute.term.datatables import get_data_tables_list
 from lute.term.model import Repository, Term, ReferencesRepository
+from lute.term.overlapping import load_overlapping_phrases
 from lute.term.service import (
     Service as TermService,
     TermServiceException,
@@ -369,6 +370,9 @@ def handle_term_form(
         hide_pronunciation=hide_pronunciation,
         tags=repo.get_term_tags(),
         embedded_in_reading_frame=embedded_in_reading_frame,
+        overlapping_phrases=load_overlapping_phrases(
+            session, term_language, term.text_lc, embedded_in_reading_frame
+        ),
     )
 
 

@@ -64,6 +64,7 @@ async function checks() {
   });
   assert.equal(rows[0].children[2].textContent, 'Saved');
   assert.equal(rows[0].children[2].disabled, true);
+  assert.equal(rows[0].children[0].checked, true, 'an added phrase stays checked');
   assert.equal(rows[0].children[0].disabled, true);
   assert.equal(card.cardsSaved(), 1, 'saving refreshes reading highlights');
   assert.equal(card.form.choices.length, 1, 'saving a phrase leaves the word form alone');
@@ -126,7 +127,23 @@ async function checks() {
   assert.equal(prevented, true);
   assert.equal(opened, '/read/termform/1/aLUTESLASHb', 'the word opens in the reading pane');
   assert.equal(readingRow.children[0].checked, false, 'opening a word does not select it for saving');
-  assert.equal(card.el('codex-phrase-cards').children[0].children[1].children[0].tagName, 'STRONG', 'a phrase name stays plain text');
+
+  const knownPhrase = makePanel({phraseCards: [{...phrases[0], saved: true}]});
+  await settle();
+  const phraseRow = knownPhrase.el('codex-phrase-cards').children[0];
+  assert.equal(phraseRow.children[0].checked, true, 'a phrase already in the vocabulary starts checked');
+  assert.equal(phraseRow.children[0].disabled, true);
+  assert.equal(phraseRow.children[2].textContent, 'Saved');
+  assert.equal(phraseRow.children[1].children[0].getAttribute('href'), '/term/editbytext/1/looked%20after');
+  let phraseOpened = '';
+  const readingPhrase = makePanel({
+    embedded: true, openWord: url => { phraseOpened = url; },
+    phraseCards: [phrases[0]],
+  });
+  await settle();
+  const phraseLink = readingPhrase.el('codex-phrase-cards').children[0].children[1].children[0];
+  phraseLink.handlers.click({preventDefault() {}});
+  assert.equal(phraseOpened, '/read/termform/1/looked%20after', 'a phrase opens in the reading pane');
 
   const failed = makePanel({saveResponse: async () => ({ok: false, json: async () => ({error: 'Translation expired. Translate again.'})})});
   await settle();

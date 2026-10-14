@@ -57,6 +57,9 @@
       {{ form.original_text }}
 
       <div class="term-head">
+        <button id="term-back" type="button" class="term-icon-btn" title="Back" aria-label="Back" hidden>
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M14.5 6.5 9 12l5.5 5.5"/></svg>
+        </button>
         {{ form.text(class="form-control", autoFocus=True, value=(form.original_text.data or '')) }}
         <div class="term-head-actions">
           <span class="codex-meta" title="Codex model{% if term_language %}, translating into {{ term_language.translation_target }}{% endif %}">
@@ -134,6 +137,20 @@
         <div id="codex-word-cards"></div>
         <p id="codex-words-status" class="codex-cards-status" role="status" aria-live="polite"></p>
       </section>
+
+      {% if overlapping_phrases %}
+      <section id="overlapping-phrases" class="codex-cards" aria-label="Overlapping phrases">
+        <h3>Overlapping phrases</h3>
+        <div class="overlapping-phrases">
+          {% for phrase in overlapping_phrases %}
+          <a class="overlapping-phrase" href="{{ phrase.url }}">
+            <strong>{{ phrase.text }}</strong>
+            {% if phrase.translation %}<span>{{ phrase.translation }}</span>{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
 
       <div id="term-button-container">
           {% if term.id %}
@@ -317,24 +334,44 @@
     );
 
     const in_reading_frame = ("{{ embedded_in_reading_frame }}" == "True");
-    const openPhraseWord = url => {
-      const go = () => {
-        if (in_reading_frame) window.location.replace(url);
-        else window.location.href = url;
+    const termBack = document.getElementById('term-back');
+    const openedFrom = termStackOnLoad(sessionStorage);
+    if (openedFrom.length)
+      termBack.hidden = false;
+    const leaveTerm = (url, mode) => {
+      const proceed = () => {
+        let target = url;
+        if (mode === 'drill')
+          pushTermStack(sessionStorage, window.location.pathname + window.location.search);
+        if (mode === 'back') {
+          target = popTermStack(sessionStorage);
+          if (!target)
+            return;
+        }
+        if (in_reading_frame) window.location.replace(target);
+        else window.location.href = target;
       };
       if (!form_changed) {
-        go();
+        proceed();
         return;
       }
-      const msg = 'You have unsaved changes. Click OK to save these changes and open the word, or Cancel to continue editing.';
+      const msg = 'You have unsaved changes. Click OK to save these changes before leaving, or Cancel to continue editing.';
       if (!confirm(msg))
         return;
       const frm = $('#term-form');
       $.post(frm.attr('action'), frm.serialize(), function() {
         window.parent.postMessage({ event: "LuteTermFormPosted", keepOpen: true }, "*");
-        go();
+        proceed();
       });
     };
+    const openPhraseWord = url => leaveTerm(url, 'drill');
+    termBack.addEventListener('click', () => leaveTerm('', 'back'));
+    document.querySelectorAll('a.overlapping-phrase').forEach(link => {
+      link.addEventListener('click', event => {
+        event.preventDefault();
+        openPhraseWord(link.getAttribute('href'));
+      });
+    });
     startTermCodex(
       window,
       in_reading_frame ? (window.parent.LUTE_LOOKUP_CONTEXT || '') : '',

@@ -67,7 +67,8 @@ translations. Each phrase contains the clicked word and is copied from the
 sentence. Check phrases to save them together with the term when you press
 **Save**: one click creates the word card, its parent and the checked phrases.
 Press **Add** to save a phrase at once. Phrase checkboxes start unchecked;
-nothing is saved until you choose it. Phrase cards are separate terms from the clicked word,
+nothing is saved until you choose it. A phrase that already has a card starts
+checked. Click a phrase to open its card. Phrase cards are separate terms from the clicked word,
 and reading highlights refresh after saving. Existing translations, parents and
 learning statuses are preserved. The section stays hidden when there is no
 useful phrase, no sentence context, or you selected several words.
@@ -82,7 +83,13 @@ saving the complete phrase, and refresh reading highlights. Existing word
 translations, parents and learning statuses are preserved; missing translations
 are filled. New inflected cards also get a parent with its dictionary meaning.
 Words are taken from Lute's language parser; the CLI must translate those exact
-words and cannot add invented words to this list.
+words and cannot add invented words to this list. Click a word or a phrase to
+open its card. **Back** returns through the cards you opened; clicking a word
+in the text starts fresh.
+
+**Overlapping phrases**, under Words, lists saved phrases that share words with
+the open phrase: a shorter phrase inside it, or a phrase that continues past
+its start or end. Click one to open that card. The reading text stays as it is.
 
 Install and log into Codex CLI on the computer running the Lute server:
 

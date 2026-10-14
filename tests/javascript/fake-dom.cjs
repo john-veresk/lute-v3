@@ -68,7 +68,10 @@ function loadCodex() {
   for (const file of ['codex-panel.js', 'codex-term-form.js']) {
     vm.runInContext(fs.readFileSync(`lute/static/js/${file}`, 'utf8'), context);
   }
-  return vm.runInContext('({CodexPanel, CodexTermForm, applyCodexParent, startTermCodex})', context);
+  return vm.runInContext(
+    '({CodexPanel, CodexTermForm, applyCodexParent, startTermCodex, termStackOnLoad, pushTermStack, popTermStack})',
+    context
+  );
 }
 
 const settle = () => new Promise(resolve => setImmediate(resolve));

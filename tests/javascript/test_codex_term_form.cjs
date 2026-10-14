@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const {loadCodex} = require('./fake-dom.cjs');
 
-const {CodexTermForm} = loadCodex();
+const {CodexTermForm, termStackOnLoad, pushTermStack, popTermStack} = loadCodex();
 
 function makeContainer() {
   const fields = {
@@ -73,4 +73,24 @@ assert.deepEqual(JSON.parse(fields['#codex_words'].value),
 
 form.save();
 assert.equal(fields['#btnsubmit'].clicks, 1, 'Codex saves through the form button');
+
+function memoryStorage(initial = {}) {
+  const data = {...initial};
+  return {
+    getItem(key) { return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : null; },
+    setItem(key, value) { data[key] = String(value); },
+    removeItem(key) { delete data[key]; },
+  };
+}
+
+const shown = value => JSON.stringify(value);
+const fresh = memoryStorage({'lute-term-stack': '["/read/edit_term/9"]'});
+assert.equal(shown(termStackOnLoad(fresh)), '[]', 'opening a term from the text starts a new stack');
+const stack = memoryStorage();
+pushTermStack(stack, '/read/edit_term/1');
+pushTermStack(stack, '/read/termform/1/data%20here');
+assert.equal(shown(termStackOnLoad(stack)), '["/read/edit_term/1","/read/termform/1/data%20here"]');
+assert.equal(popTermStack(stack), '/read/termform/1/data%20here');
+assert.equal(shown(termStackOnLoad(stack)), '["/read/edit_term/1"]', 'back returns one card at a time');
+assert.equal(shown(termStackOnLoad(memoryStorage({'lute-term-stack': 'not-json', 'lute-term-drill': '1'}))), '[]');
 console.log('Codex term form checks passed');

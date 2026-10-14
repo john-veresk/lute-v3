@@ -147,6 +147,36 @@ def _phrase_job(client, language, monkeypatch, phrases=PHRASES):
     return response.json["job_id"]
 
 
+def test_phrases_already_in_the_vocabulary_are_marked_saved(client, english, monkeypatch):
+    "A phrase that already has a card starts checked; an unknown placeholder does not."
+    job_id = _phrase_job(client, english, monkeypatch)
+    client.get(f"/translation/jobs/{job_id}")
+    saved = DBTerm(english, "looked after")
+    saved.status = 2
+    saved.translation = "мой перевод"
+    unknown = DBTerm(english, "looked after the cats")
+    unknown.status = 0
+    db.session.add_all([saved, unknown])
+    db.session.commit()
+    response = client.post(
+        "/translation/jobs",
+        json={
+            "language_id": english.id,
+            "text": "looked",
+            "context": "He looked after the cats.",
+        },
+    )
+    assert response.json["saved"] is True
+    phrases = {
+        phrase["text"]: phrase
+        for phrase in client.get(f"/translation/jobs/{response.json['job_id']}").json[
+            "result"
+        ]["phrases"]
+    }
+    assert phrases["looked after"]["saved"] is True
+    assert "saved" not in phrases["looked after the cats"]
+
+
 def test_save_phrase_is_explicit_and_independent_of_the_clicked_word(
     client, english, monkeypatch
 ):

@@ -59,8 +59,8 @@ class CodexTimer {
  * Term lookups are connected to the term form through `form`;
  * sentence lookups only show the translation.
  */
-/** The term form for one word of a phrase. Slashes match the reading-pane route. */
-function wordTermUrl(languageId, text, embedded) {
+/** The term form for a word or phrase. Slashes match the reading-pane route. */
+function termCardUrl(languageId, text, embedded) {
   const encoded = encodeURIComponent(withoutZeroWidth(text).trim().replaceAll('/', 'LUTESLASH'));
   const path = embedded ? 'read/termform' : 'term/editbytext';
   return `/${path}/${languageId}/${encoded}`;
@@ -334,7 +334,7 @@ class CodexPanel {
         data.saved.forEach(item => {
           const row = rows[item.index];
           row.saved = true;
-          row.checkbox.checked = cardType === 'words';
+          row.checkbox.checked = true;
           row.checkbox.disabled = true;
           row.button.textContent = 'Saved';
           row.button.setAttribute('aria-label', `Saved ${label} ${item.text}`);
@@ -351,8 +351,8 @@ class CodexPanel {
     };
 
     cards.forEach((card, index) => {
-      const alreadySaved = cardType === 'words' && card.saved === true;
-      const openUrl = cardType === 'words' ? wordTermUrl(this.languageId, card.text, this.embedded) : '';
+      const alreadySaved = card.saved === true;
+      const openUrl = termCardUrl(this.languageId, card.text, this.embedded);
       const row = this.cardRow(card, `codex-${cardType}-select-${current}-${index}`, alreadySaved, label, openUrl);
       if (alreadySaved) this.markSaved(row, label);
       row.checkbox.addEventListener('change', updateButtons);
