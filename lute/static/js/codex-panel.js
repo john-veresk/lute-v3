@@ -95,19 +95,21 @@
       card.className = 'codex-word';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
+      checkbox.id = `codex-${cardType}-select-${current}-${index}`;
       checkbox.checked = cardType === 'words';
       checkbox.setAttribute('aria-label', `Select ${word.text}`);
       checkbox.addEventListener('change', updateButtons);
-      const body = document.createElement('div');
+      const body = document.createElement('label');
       body.className = 'codex-word-body';
+      body.htmlFor = checkbox.id;
       const title = document.createElement('strong');
       title.textContent = word.text;
-      const translation = document.createElement('p');
+      const translation = document.createElement('span');
       translation.className = 'codex-word-translation';
       translation.textContent = word.translation;
       body.append(title, translation);
       if (word.is_inflected && word.lemma !== word.text) {
-        const parent = document.createElement('div');
+        const parent = document.createElement('span');
         parent.className = 'codex-hint';
         parent.textContent = `Parent: ${word.lemma} — ${word.lemma_translation}`;
         body.appendChild(parent);

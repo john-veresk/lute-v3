@@ -18,7 +18,9 @@
   #codex-parent summary { cursor: pointer; font-weight: bold; }
   #codex-phrases { margin-top: 20px; }
   .codex-word { display: flex; align-items: start; gap: 10px; padding: 12px 0; border-bottom: 1px solid currentColor; }
-  .codex-word-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .codex-word-body { flex: 1; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+  .codex-word-body > span { display: block; }
+  .codex-word input:disabled + .codex-word-body { cursor: default; color: inherit; }
   .codex-word-translation { margin: 4px 0; }
   #codex-add-words, #codex-add-phrases { margin-top: 12px; }
 </style>
