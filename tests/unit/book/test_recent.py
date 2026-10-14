@@ -18,9 +18,7 @@ def test_no_opened_book(app_context, spanish):
     assert last_read_book(db.session) is None
 
 
-def test_most_recently_opened_active_book_and_its_current_page(
-    app_context, spanish
-):
+def test_most_recently_opened_active_book_and_its_current_page(app_context, spanish):
     older = make_book("Older", ["Uno.", "Dos."], spanish)
     newer = make_book("Newer", ["Uno.", "Dos.", "Tres."], spanish)
     archived = make_book("Archived", "Uno.", spanish)
