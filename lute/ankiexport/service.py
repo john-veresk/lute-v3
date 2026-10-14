@@ -95,16 +95,12 @@ class Service:
             msgs.append(f"{spec.export_name}: {v}")
         return msgs
 
-    def _all_terms(self, term):
-        "Term and any parents."
-        ret = [term]
-        ret.extend(term.parents)
-        return ret
-
     def _all_tags(self, term):
         "Tags for term and all parents."
-        ret = [tt.text for t in self._all_terms(term) for tt in t.term_tags]
-        return sorted(list(set(ret)))
+        terms = [term]
+        terms.extend(term.parents)
+        tags = [tt.text for t in terms for tt in t.term_tags]
+        return sorted(list(set(tags)))
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     def _build_ankiconnect_post_json(

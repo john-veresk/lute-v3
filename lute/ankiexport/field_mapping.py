@@ -57,12 +57,6 @@ def _all_terms(term):
     return ret
 
 
-def _all_tags(term):
-    "Tags for term and all parents."
-    ret = [tt.text for t in _all_terms(term) for tt in t.term_tags]
-    return sorted(list(set(ret)))
-
-
 def get_values_and_media_mapping(term, sentence_lookup, mapping):
     """
     Get the value replacements to be put in the mapping, and build
@@ -156,7 +150,7 @@ def get_values_and_media_mapping(term, sentence_lookup, mapping):
         cleaned = {}
         for key, value in replacements_dict.items():
             if isinstance(value, str):
-                cleaned[key] = value.replace("\u200B", "")
+                cleaned[key] = value.replace("\u200b", "")
             else:
                 cleaned[key] = value
         return cleaned
