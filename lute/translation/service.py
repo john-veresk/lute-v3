@@ -866,6 +866,14 @@ def _translate_with_cursor(
     words_to_translate,
     phrase_texts,
 ):
+    # Cursor's --output-format=json wraps the answer; it does not constrain its schema.
+    prompt = (
+        "Return exactly one JSON object matching this JSON Schema, including every required field. "
+        "Do not return Markdown, prose, or extra fields. Response JSON Schema:\n"
+        + json.dumps(SCHEMA, ensure_ascii=False)
+        + "\n"
+        + prompt
+    )
     command = _cursor_command(
         executable,
         workdir,
