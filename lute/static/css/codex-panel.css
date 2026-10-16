@@ -1,13 +1,8 @@
 /* Codex in the term card, and the sentence translation panel. */
-.codex-vocabulary { margin: .6rem .3rem; color: var(--ink-3); font-size: .85rem; line-height: 1.5; }
-.codex-vocabulary a { color: inherit; text-decoration: underline dotted; text-underline-offset: .2em; }
 .codex-usage { margin: .9rem 0; padding: .8rem 1rem; border-left: 3px solid var(--accent); border-radius: 0 var(--radius-m) var(--radius-m) 0; background: var(--surface-2); }
 .codex-usage p { margin: .4rem 0; line-height: 1.5; white-space: pre-wrap; }
 .codex-usage summary { color: var(--ink-3); font-size: .8rem; cursor: pointer; }
 .codex-usage blockquote { margin: .5rem 0 0; color: var(--ink-2); font-family: var(--read-font); line-height: 1.5; white-space: pre-wrap; }
-.codex-fallback { max-width: 8rem; min-height: 28px; padding: .2rem .5rem; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink-3); font: inherit; font-size: .78rem; cursor: pointer; }
-.codex-fallback[aria-pressed="true"] { background: var(--surface-2); color: var(--font-color); }
-.codex-fallback:disabled { cursor: default; opacity: .55; }
 
 body:has(> .codex-panel) { margin: 0; }
 

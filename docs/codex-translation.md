@@ -32,66 +32,11 @@ Durations are in seconds; unavailable estimates are `null`. `estimated_finish_at
 is a UTC timestamp only while a job is running or waiting to retry. ETA includes
 any scheduled retry delay; it excludes time spent waiting behind other jobs.
 
-**Output → Personal Finnish** (named after the language you are learning) explains
-words and phrases in simple Finnish instead of translating into **Translate into**.
-**Fallback language** selects a language such as Russian or English. Its button
-in each card shows that card in the chosen language without changing the
-language's main mode. For term lookups, the model prepares both the simple
-explanation and the fallback translation in the same response, including the
-base form, word cards and every suggested phrase. Both variants are kept in the
-translation store, so pressing the language button uses the saved translation
-without another model request. This also applies to background book jobs, which
-snapshot the fallback language when queued. Press **Save** to persist the
-replacement on the vocabulary card; **↻** regenerates the main mode and its fallback.
-If no fallback is stored, including on older cards, the language button runs the
-full personal flow again, saves both variants and shows the fallback translation.
-With **Output → Translation**, the same setting is the main
-**Translate into** language. Personal explanations
-use short sentences, common everyday vocabulary and simple grammar around A2,
-and give reusable dictionary explanations of the main common meanings, each
-with one generic example. Common meanings come first; synonyms are grouped and
-rare senses are omitted.
-The initial prompt is generic: the reader's vocabulary is never sent with it.
-After generation, Lute checks explanations, examples, parents and phrase/word
-cards against the local database, using Learned (5), Well Known (99), explicit
-parents and offline lemmatization. If unfamiliar words occur, it makes exactly
-one revision request with those words and familiar words used in the first answer.
-The second valid answer is accepted even if unfamiliar words remain; there is
-no revision loop. Remaining unfamiliar words appear as **Words to learn**, with
-links to their cards. The selected learning target itself is excluded from this list.
-The selected word or phrase determines its dictionary meanings and grammatical
-form. The dictionary explanation ignores the surrounding passage. Phrase candidates
-are supplied only for the separate suggestions section and must not influence
-the main word's definitions or examples. Saved explanations and examples stand
-alone, without importing characters' names, places or plot details. Suggested
-phrases containing names or story-specific references are omitted. A selected
-proper name itself is still explained as a name. Full sentence
-and page paraphrases preserve the source's names and facts.
-Known child forms establish knowledge of their parent family even when a parent
-has a lower status; statuses are never changed. Sentence and page commands
-produce a simplified paraphrase. Local search/check tools are documented in
-`lute/cli/README.md`; they do not call a model or modify the database.
-
-Existing vocabulary translations are not converted automatically. Select the
-personal mode, save the language, reload the card, and press **↻** to generate
-a personal explanation, then **Save** to keep it on the card. Translation caches
-distinguish output modes and target languages, so a Russian
-cached result is not reused as a personal Finnish explanation. Saved personal
-results are reused across sentences and books, just like ordinary translations;
-use **↻** to regenerate them. Learning more vocabulary or changing the fallback
-language does not discard the main explanation. **Words to learn** is checked
-again locally when a saved explanation opens, without asking the model.
-Phrase suggestions are shown only when present in the current sentence. Queued book jobs snapshot the
-output mode and model settings, and check vocabulary against the current local
-database when each word is processed. Only a compact vocabulary fingerprint is
-used in cache keys, not a word list.
-
 **In this book** is a separate, optional usage explanation. A new translation or
 **↻** in the reader sends the selected sentence plus one sentence before and
 after it, including across page boundaries, in a dedicated `context_for_note`
 field. The model must use that passage only for `context_note`, leaving the
-dictionary meanings and examples generic. The same response includes the
-fallback-language usage note. Context is bounded to 4000 characters per sentence.
+dictionary meanings and examples generic. Context is bounded to 4000 characters per sentence.
 Notes are stored separately by language, word, output language, book and exact
 passage; each retains its source sentence, surrounding passage and page.
 Opening an already stored word in another book or passage shows the dictionary
@@ -103,8 +48,7 @@ Book review shows an available note and its passage on the answer side, labelled
 with the book and page. General review and review from **Terms** show dictionary
 meanings only. Reviews never generate notes. Notes whose source passage has
 changed are hidden; deleting a book removes its notes and preserves the shared
-dictionary entry. Earlier personal caches are carried forward without regenerating
-their answers; **↻** can replace an older explanation with the new generic format.
+dictionary entry.
 
 Clicking a word or selecting a phrase opens its term card. Codex is part of the
 card, without separate tabs or a divider: it translates the term using the sentence
@@ -118,8 +62,7 @@ it, then press **Save** at the bottom of the card to store it in your vocabulary
 Saved translations and text typed while a request is running are preserved.
 
 Every term translation from Codex is kept in a translation store in the Lute
-database, one entry per word or phrase and output profile. Personal explanations
-and translations into different fallback languages coexist. Opening a term with a stored translation
+database, one entry per word or phrase and target language. Opening a term with a stored translation
 shows it immediately, marked **saved** beside the model, even if the term card
 already exists. An empty **Translation** field otherwise starts Codex
 automatically, regardless of whether the word or phrase already has a database
@@ -257,5 +200,12 @@ Model suggestions come from the local CLI cache when it is available. The list
 can be empty until the CLI has fetched models; entering an ID still works.
 Startup automatically migrates the database and makes the usual migration
 backup.
+
+The translation-only upgrade removes the former output mode and fallback settings.
+It discards generated personal explanations while keeping target-language caches,
+book usage notes in target languages, and saved vocabulary cards. Active personal
+jobs are paused and reset to translate their full word list into their saved
+fallback language (or the language's **Translate into** setting for older jobs).
+Resume these jobs from **Jobs**. Ordinary jobs keep their progress and model settings.
 
 [Official documentation for non-interactive Codex](https://developers.openai.com/codex/noninteractive/)

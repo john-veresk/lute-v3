@@ -83,14 +83,12 @@ class CodexPanel {
     this.context = '';
     this.generation = 0;
     this.lastMode = 'auto';
-    this.lastFallback = false;
     this.options = [];
     this.parentSuggestion = null;
     this.cardRows = {words: [], phrases: []};
     this.timer = new CodexTimer(this.element('codex-timer'), window);
     this.element('codex-refresh')?.addEventListener('click', () => this.start('refresh'));
-    this.element('codex-fallback')?.addEventListener('click', () => this.start('auto', true));
-    this.element('codex-retry').addEventListener('click', () => this.start(this.lastMode, this.lastFallback));
+    this.element('codex-retry').addEventListener('click', () => this.start(this.lastMode));
     window.addEventListener('pagehide', () => { this.generation++; this.timer.stop(); });
     if (form) window.addEventListener('keydown', event => this.onKey(event));
   }
@@ -111,8 +109,6 @@ class CodexPanel {
 
   setBusy(busy) {
     this.element('codex-skeleton').hidden = !busy;
-    const fallback = this.element('codex-fallback');
-    if (fallback) fallback.disabled = busy;
     const refresh = this.element('codex-refresh');
     if (!refresh) return;
     refresh.disabled = busy;
@@ -121,8 +117,6 @@ class CodexPanel {
 
   reset() {
     this.renderContextNote({});
-    const vocabulary = this.element('codex-vocabulary');
-    if (vocabulary) { vocabulary.replaceChildren(); vocabulary.hidden = true; }
     this.element('codex-options').replaceChildren();
     this.element('codex-lemma').textContent = '';
     this.element('codex-retry').hidden = true;
@@ -141,7 +135,7 @@ class CodexPanel {
   }
 
   /** mode: auto, stored or refresh (see LOOKUP_MODES in translation/routes.py). */
-  async start(mode, fallback = false) {
+  async start(mode) {
     if (this.form) {
       this.text = this.form.text();
       this.languageId = this.form.languageId();
@@ -150,8 +144,6 @@ class CodexPanel {
     this.translationAtStart = typeof this.form?.translation === 'function' ? this.form.translation() : undefined;
     const current = ++this.generation;
     this.lastMode = mode;
-    this.lastFallback = fallback;
-    this.element('codex-fallback')?.setAttribute('aria-pressed', String(fallback));
     this.reset();
     this.setBusy(mode !== 'stored');
     try {
@@ -183,14 +175,13 @@ class CodexPanel {
     return readResponse(await this.win.fetch('/translation/jobs', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({language_id: this.languageId, text: this.text, context: this.context, kind: this.kind, mode,
-        ...(this.lastFallback ? {fallback: true} : {}),
         ...(this.bookId && this.pageNum ? {book_id: this.bookId, page_num: this.pageNum,
           ...(Number.isInteger(this.sentenceIndex) && this.sentenceIndex >= 0 ? {sentence_index: this.sentenceIndex} : {})} : {})}),
     }));
   }
 
   async poll(jobId, current) {
-    const deadline = Date.now() + 8 * 2 * 90 * 1000;
+    const deadline = Date.now() + 8 * 90 * 1000;
     while (current === this.generation) {
       const data = await readResponse(await this.win.fetch(`/translation/jobs/${jobId}`));
       if (data.status === 'error') throw new Error(data.error);
@@ -209,12 +200,11 @@ class CodexPanel {
     if (current !== this.generation) return;
     this.options = result.options;
     result.options.forEach((option, index) => this.element('codex-options').appendChild(this.renderOption(option, index)));
-    this.renderVocabulary(result.vocabulary);
     this.renderContextNote(result);
     if (!this.form) return;
     this.renderCards(result.words || [], jobId, current, 'words');
     this.renderCards(result.phrases || [], jobId, current, 'phrases');
-    if ((this.lastMode === 'refresh' || this.lastFallback) && this.translationAtStart !== undefined) {
+    if (this.lastMode === 'refresh' && this.translationAtStart !== undefined) {
       // Refresh replaces the old meaning, but preserves edits made while waiting.
       if (this.form.translation() === this.translationAtStart) this.choose(0, false);
     } else {
@@ -228,31 +218,6 @@ class CodexPanel {
     section.hidden = !result.context_note;
     this.element('codex-usage-note').textContent = result.context_note || '';
     this.element('codex-usage-source').textContent = result.context_excerpt || '';
-  }
-
-  renderVocabulary(report) {
-    const element = this.element('codex-vocabulary');
-    if (!element) return;
-    element.replaceChildren();
-    const unfamiliar = report?.unknown || [];
-    element.hidden = unfamiliar.length === 0;
-    if (!unfamiliar.length) return;
-    const label = this.doc.createElement('span');
-    label.textContent = 'Words to learn: ';
-    element.append(label);
-    unfamiliar.slice(0, 12).forEach((word, index) => {
-      const link = this.doc.createElement('a');
-      link.textContent = `${index ? ', ' : ''}${word.text}`;
-      const url = termCardUrl(this.languageId, word.text, this.embedded);
-      link.setAttribute('href', url);
-      if (this.openWord) link.addEventListener('click', event => { event.preventDefault(); this.openWord(url); });
-      element.append(link);
-    });
-    if (unfamiliar.length > 12) {
-      const more = this.doc.createElement('span');
-      more.textContent = ` +${unfamiliar.length - 12}`;
-      element.append(more);
-    }
   }
 
   async renderParent(result, current) {

@@ -97,11 +97,6 @@ def prepare(session, language, book_id, page, sentence, sentence_index=None):
     return None
 
 
-def profile_key(profile):
-    """Usage notes survive changes to the reader's known vocabulary."""
-    return "personal" if profile.startswith("personal:") else profile
-
-
 def _context_key(info):
     return hashlib.sha256(
         json.dumps(
@@ -115,7 +110,7 @@ def _query(session, language_id, text_lc, profile, info):
     return session.query(ContextNote).filter_by(
         language_id=language_id,
         text_lc=text_lc,
-        profile=profile_key(profile),
+        profile=profile,
         book_id=info["book_id"],
         context_key=_context_key(info),
     )
@@ -132,7 +127,7 @@ def save(session, language_id, text_lc, profile, info, note):
         row = ContextNote(
             language_id=language_id,
             text_lc=text_lc,
-            profile=profile_key(profile),
+            profile=profile,
             book_id=info["book_id"],
             context_key=_context_key(info),
         )
@@ -160,7 +155,7 @@ def for_review(session, language, text_lc, profile, book_id):
         .filter_by(
             language_id=language.id,
             text_lc=text_lc,
-            profile=profile_key(profile),
+            profile=profile,
             book_id=book_id,
         )
         .filter(ContextNote.note != "")
@@ -185,11 +180,8 @@ def for_review(session, language, text_lc, profile, book_id):
 
 def dictionary_result(result):
     """Keep occurrence-specific notes out of the shared dictionary result."""
-    clean = {
+    return {
         key: value
         for key, value in result.items()
         if key not in ("context_note", "context_excerpt")
     }
-    if clean.get("fallback"):
-        clean["fallback"] = dictionary_result(clean["fallback"])
-    return clean

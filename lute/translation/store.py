@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from lute.db import db
 from lute.translation import contexts
-from lute.translation.profile import cache_profile, profile_for
+from lute.translation.profile import profile_for
 
 
 class StoredTranslation(db.Model):  # pylint: disable=too-few-public-methods
@@ -52,25 +52,11 @@ def find(session, language, text, profile=None, context_info=None):
     if note:
         result["context_note"] = note
         result["context_excerpt"] = context_info["excerpt"]
-    if result.get("fallback") and result.get("fallback_language"):
-        fallback_note = contexts.find(
-            session,
-            language.id,
-            text_key(language, text),
-            cache_profile(language.name, result["fallback_language"]),
-            context_info,
-        )
-        if fallback_note:
-            result["fallback"] = {
-                **result["fallback"],
-                "context_note": fallback_note,
-                "context_excerpt": context_info["excerpt"],
-            }
     return result
 
 
 def save(session, language, text, context, result, profile=None, context_info=None):
-    "Keep the latest result per term and output profile, including its fallback."
+    "Keep the latest result per term and output profile, for the selected target language."
     profile = profile if profile is not None else profile_for(session, language)
     for attempt in range(2):
         try:
@@ -78,21 +64,10 @@ def save(session, language, text, context, result, profile=None, context_info=No
                 _save_row(
                     session, language, text, context, result, profile, context_info
                 )
-                if result.get("fallback") and result.get("fallback_language"):
-                    _save_row(
-                        session,
-                        language,
-                        text,
-                        context,
-                        result["fallback"],
-                        cache_profile(language.name, result["fallback_language"]),
-                        context_info,
-                    )
             session.commit()
             return
         except IntegrityError:
-            # Another lookup may have inserted only one of the two profiles.
-            # Reload both rows and retry so neither variant is silently lost.
+            # Another lookup may have inserted the same translation. Reload and retry.
             session.rollback()
             if attempt:
                 raise

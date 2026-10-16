@@ -145,10 +145,7 @@ def test_cursor_model_list_ignores_labels_and_color(monkeypatch):
         ("cursor-grok-4.6-medium-fast", "high", False),
     ],
 )
-@pytest.mark.parametrize("translation_mode", ["translation", "personal"])
-def test_cursor_agent_prints_json_from_ask_mode(
-    monkeypatch, model, effort, fast_mode, translation_mode
-):
+def test_cursor_agent_prints_json_from_ask_mode(monkeypatch, model, effort, fast_mode):
     def which(name):
         assert name == "cursor-agent"
         return "/usr/bin/cursor-agent"
@@ -166,12 +163,10 @@ def test_cursor_agent_prints_json_from_ask_mode(
         assert kwargs["stdin"] == subprocess.DEVNULL
         assert kwargs["timeout"] == 90
         assert not kwargs.get("shell")
-        assert ("Kissa nukkuu." in command[-1]) == (translation_mode == "translation")
+        assert "Kissa nukkuu." in command[-1]
         assert json.loads(command[-1].splitlines()[1]) == service.SCHEMA
         payload = json.loads(command[-1].rsplit("\n", 1)[1])
-        assert payload["target_language"] == (
-            "Finnish" if translation_mode == "personal" else "Russian"
-        )
+        assert payload["target_language"] == "Russian"
         reply = "```json\n" + json.dumps(RESULT) + "\n```"
         return SimpleNamespace(
             returncode=0,
@@ -197,7 +192,6 @@ def test_cursor_agent_prints_json_from_ask_mode(
             reasoning_effort=effort,
             fast_mode=fast_mode,
             cli="cursor",
-            translation_mode=translation_mode,
         )
         == RESULT
     )

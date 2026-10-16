@@ -1,7 +1,5 @@
-"""Read-only vocabulary lookup and local word-form checks, shared by CLI and jobs."""
+"""Read-only vocabulary lookup and local word-form checks for the CLI and API."""
 
-import hashlib
-import json
 import threading
 from functools import lru_cache
 import simplemma
@@ -102,15 +100,6 @@ class Vocabulary:
             roots.add(min(visited, key=lambda item: self.terms[item][0]))
         self._roots[term_id] = roots
         return roots
-
-    @property
-    def revision(self):
-        """A compact local fingerprint; no vocabulary contents belong in prompts."""
-        data = [
-            sorted(self.terms.items()),
-            sorted((child, sorted(parents)) for child, parents in self.parents.items()),
-        ]
-        return hashlib.sha256(json.dumps(data, ensure_ascii=False).encode()).hexdigest()
 
     @property
     def known_lemmas(self):

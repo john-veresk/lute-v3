@@ -8,8 +8,7 @@ from lute.models.term import Term as DBTerm
 from lute.term.model import Repository
 from lute.translation import contexts, store
 from lute.translation.cards import save_card
-from lute.translation.personal import check_explanations
-from lute.translation.profile import profile_from_key, vocabulary_for
+from lute.translation.profile import profile_from_key
 from lute.translation.service import (
     RateLimitError,
     TranslationError,
@@ -124,9 +123,7 @@ def _phrase_candidates(language, word, context):
 def setup(state):
     """One bounded job manager per application."""
     log_path = Path(state.app.config["DATAPATH"]) / "codex-translation.log"
-    state.app.extensions["codex_translation_jobs"] = TranslationJobs(
-        log_path, state.app
-    )
+    state.app.extensions["codex_translation_jobs"] = TranslationJobs(log_path)
 
 
 @bp.route("/panel")
@@ -152,22 +149,6 @@ def submit():
     context = data.get("context", "")
     kind = data.get("kind", "term")
     mode = data.get("mode", "auto")
-    fallback = data.get("fallback", False)
-    if type(fallback) is not bool or (
-        fallback
-        and (
-            language.translation_mode != "personal"
-            or not (language.translation_target or "").strip()
-        )
-    ):
-        return (
-            jsonify(error="Fallback requires personal mode and a fallback language"),
-            400,
-        )
-    output_mode = "translation" if fallback else language.translation_mode
-    target = (
-        language.translation_target if fallback else language.translation_target_name
-    )
     if mode not in LOOKUP_MODES:
         return jsonify(error="Invalid lookup mode"), 400
     if (
@@ -220,7 +201,7 @@ def submit():
             )
     key = (
         language.name,
-        target,
+        language.translation_target,
         language.codex_model,
         clean_text,
         context,
@@ -230,14 +211,8 @@ def submit():
         language.translation_fast_mode if mode != "prefetch" else False,
         phrase_texts,
         language.translation_cli or "codex",
-        output_mode,
-        vocabulary_for(db.session, language, output_mode),
     )
-    if output_mode == "personal" and kind == "term":
-        key += (None, language.translation_target)
     if context_info is not None:
-        if len(key) == 13:
-            key += (None, "")
         key += (context_info,)
     saved = None
     if kind == "term" and mode != "refresh":
@@ -246,39 +221,16 @@ def submit():
         )
     if saved is not None and mode != "prefetch":
         saved = _fit_to_context(saved, phrase_texts)
-        if output_mode == "personal":
-            report = check_explanations(db.session, language, key, saved)
-            saved["vocabulary"] = {
-                **report,
-                "revised": saved.get("vocabulary", {}).get("revised", False),
-            }
         job_id = _jobs().adopt(key, saved, language.id)
         return jsonify(job_id=job_id, saved=True), 202
     if saved is not None or mode == "stored":
         return jsonify(job_id=None), 200
-    paired_key = None
-    if fallback and kind == "term":
-        # A missing fallback refreshes both variants through the normal personal flow.
-        paired_key = (
-            key[:1]
-            + (language.translation_target_name,)
-            + key[2:11]
-            + (
-                "personal",
-                vocabulary_for(db.session, language, "personal"),
-                None,
-                language.translation_target,
-            )
-        )
-        if context_info is not None:
-            paired_key += (context_info,)
     try:
         job_id = _jobs().submit(
             key,
-            fresh=mode == "refresh" or paired_key is not None,
+            fresh=mode == "refresh",
             language_id=language.id,
             mode=mode,
-            paired_key=paired_key,
         )
     except RateLimitError as exc:
         return (
@@ -297,8 +249,6 @@ def _fit_to_context(result, phrase_texts):
     "A result saved from another sentence only offers phrases found in this one."
     phrases = [p for p in result.get("phrases", []) if p["text"] in phrase_texts]
     fitted = {**result, "phrases": phrases}
-    if result.get("fallback"):
-        fitted["fallback"] = _fit_to_context(result["fallback"], phrase_texts)
     return fitted
 
 
@@ -361,7 +311,7 @@ def _save_new_result(job_id, result):
                 key[4],
                 result,
                 profile_from_key(key),
-                key[15] if len(key) > 15 else None,
+                key[11] if len(key) > 11 else None,
             )
     except Exception:
         _jobs().release_unsaved(job_id)
@@ -380,9 +330,7 @@ def parent():
     term = Repository(db.session).find(lang_id, text)
     if term is None:
         return jsonify(exists=False, translation="", status=0)
-    translation = (
-        "" if language.translation_mode == "personal" else term.translation or ""
-    )
+    translation = term.translation or ""
     return jsonify(exists=True, translation=translation, status=term.status)
 
 
@@ -418,17 +366,11 @@ def _save_cards(card_type):
     if key is None or result is None:
         return jsonify(error="Translation expired. Translate again."), 404
     cli = key[10] if len(key) > 10 else "codex"
-    output_mode = key[11] if len(key) > 11 else "translation"
-    fallback = language.translation_mode == "personal" and output_mode == "translation"
-    target = (
-        language.translation_target if fallback else language.translation_target_name
-    )
     if (
-        key[:3] != (language.name, target, language.codex_model)
+        key[:3] != (language.name, language.translation_target, language.codex_model)
         or key[7:9]
         != (language.translation_reasoning_effort, language.translation_fast_mode)
         or cli != (language.translation_cli or "codex")
-        or (output_mode != language.translation_mode and not fallback)
         or key[5] != "term"
         or result["status"] != "complete"
     ):

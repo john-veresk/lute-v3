@@ -40,9 +40,6 @@ class Language(
     translation_target = db.Column(
         "LgTranslationTarget", db.String(80), default="Russian"
     )
-    translation_mode = db.Column(
-        "LgTranslationMode", db.String(20), default="translation"
-    )
     codex_model = db.Column("LgCodexModel", db.String(100), default="")
     codex_reasoning_effort = db.Column(
         "LgCodexReasoningEffort", db.String(20), default=""
@@ -78,7 +75,6 @@ class Language(
         self.parser_type = "spacedel"
         self.dictionaries = []
         self.translation_target = "Russian"
-        self.translation_mode = "translation"
         self.codex_model = ""
         self.codex_reasoning_effort = ""
         self.codex_fast_mode = False
@@ -148,28 +144,11 @@ class Language(
         "Fast mode is a Codex option; Cursor speed is part of the model ID."
         return False if self.translation_cli == "cursor" else self.codex_fast_mode
 
-    @property
-    def translation_target_name(self):
-        "The personal mode explains in the language being learned."
-        return (
-            self.name
-            if self.translation_mode == "personal"
-            else self.translation_target
-        )
-
-    @property
-    def translation_target_label(self):
-        "Readable output mode for translation panels and queued jobs."
-        if self.translation_mode == "personal":
-            return f"Personal {self.name}"
-        return self.translation_target
-
     def to_dict(self):
         "Return dictionary of data, for serialization."
         ret = {}
         ret["name"] = self.name
         ret["translation_target"] = self.translation_target
-        ret["translation_mode"] = self.translation_mode
         ret["codex_model"] = self.codex_model
         ret["codex_reasoning_effort"] = self.codex_reasoning_effort
         ret["codex_fast_mode"] = self.codex_fast_mode
@@ -215,7 +194,6 @@ class Language(
         mappings = {
             "name": "name",
             "translation_target": "translation_target",
-            "translation_mode": "translation_mode",
             "codex_model": "codex_model",
             "codex_reasoning_effort": "codex_reasoning_effort",
             "codex_fast_mode": "codex_fast_mode",
@@ -232,8 +210,6 @@ class Language(
         }
 
         for key in d.keys():
-            if key == "translation_mode" and d[key] not in ("translation", "personal"):
-                continue
             if key == "translation_cli" and d[key] not in ("codex", "cursor"):
                 continue
             funcname = mappings.get(key, "")

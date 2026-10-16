@@ -28,18 +28,8 @@
     </tr>
 
     <tr>
-      <td>{{ form.translation_mode.label(class="form-control-label") }}</td>
-      <td>
-        {{ form.translation_mode(class="form-control") }}
-        <p id="personal-language-help" class="small-flash-notice" {% if form.translation_mode.data != 'personal' %}hidden{% endif %}>Simple explanations in the language you are learning, using words you know.</p>
-      </td>
-    </tr>
-    <tr id="translation-target-row">
-      <td>{{ form.translation_target.label('Fallback language' if form.translation_mode.data == 'personal' else 'Translate into', class="form-control-label") }}</td>
-      <td>
-        {{ form.translation_target(class="form-control", placeholder="Russian") }}
-        <p id="translation-target-help" class="small-flash-notice" {% if form.translation_mode.data != 'personal' %}hidden{% endif %}>Use this language from the card when the simple explanation is too difficult.</p>
-      </td>
+      <td>{{ form.translation_target.label(class="form-control-label") }}</td>
+      <td>{{ form.translation_target(class="form-control", placeholder="Russian") }}</td>
     </tr>
     <tr>
       <td>{{ form.translation_cli.label(class="form-control-label") }}</td>
@@ -81,7 +71,7 @@
     </tr>
 
     {% for field in form %}
-    {% if field.name not in ('name', 'csrf_token', 'translation_mode', 'translation_target', 'translation_cli', 'codex_model', 'codex_reasoning_effort', 'codex_fast_mode', 'codex_show_timer') %}
+    {% if field.name not in ('name', 'csrf_token', 'translation_target', 'translation_cli', 'codex_model', 'codex_reasoning_effort', 'codex_fast_mode', 'codex_show_timer') %}
     <tr>
       <td>{{ field.label(class="form-control-label") }}</td>
       <td>{{ field(class="form-control") }}</td>
@@ -97,17 +87,6 @@
 
 <script>
   $(document).ready(function() {
-    function updateOutputMode() {
-      const personal = document.getElementById('translation_mode').value === 'personal';
-      const name = document.getElementById('name').value.trim() || 'language';
-      document.querySelector('#translation_mode option[value="personal"]').textContent = `Personal ${name}`;
-      document.querySelector('label[for="translation_target"]').textContent = personal ? 'Fallback language' : 'Translate into';
-      document.getElementById('translation-target-help').hidden = !personal;
-      document.getElementById('personal-language-help').hidden = !personal;
-    }
-    $('#translation_mode').on('change', updateOutputMode);
-    $('#name').on('input', updateOutputMode);
-    updateOutputMode();
     const modelEfforts = {{ codex_model_efforts|tojson }};
     const allEfforts = {{ reasoning_efforts|tojson }};
     const cliModels = {

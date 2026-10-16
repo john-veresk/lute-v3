@@ -129,10 +129,6 @@ def edit(langid):
 
     form = LanguageForm(obj=language)
     form.parser_type.choices = _dropdown_parser_choices()
-    form.translation_mode.choices[1] = (
-        "personal",
-        f"Personal {form.name.data or 'language'}",
-    )
 
     if _handle_form(language, form):
         return redirect("/")
@@ -164,10 +160,6 @@ def new(langname):
 
     form = LanguageForm(obj=language)
     form.parser_type.choices = _dropdown_parser_choices()
-    form.translation_mode.choices[1] = (
-        "personal",
-        f"Personal {form.name.data or 'language'}",
-    )
 
     if _handle_form(language, form):
         # New language, so show everything b/c user should re-choose

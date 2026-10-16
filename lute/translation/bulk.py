@@ -11,7 +11,7 @@ from lute.models.book import Book
 from lute.models.language import Language
 from lute.models.term import Term
 from lute.translation import contexts, store
-from lute.translation.profile import profile_from_key, vocabulary_for
+from lute.translation.profile import profile_from_key
 from lute.translation.service import RateLimitError, TranslationError
 
 ACTIVE = ("queued", "running", "waiting", "paused", "error")
@@ -91,11 +91,7 @@ class BookTranslationJob(db.Model):
             value = getattr(self, field)
             result[field] = value.isoformat() + "Z" if value else None
         result["prepared"] = self.items is not None if prepared is None else prepared
-        result["settings"] = {
-            key: value
-            for key, value in json.loads(self.settings).items()
-            if key not in ("known_words", "vocabulary_revision")
-        }
+        result["settings"] = json.loads(self.settings)
         result["errors"] = json.loads(self.errors)
         result.update(self.timing_payload(result["prepared"]))
         return result
@@ -177,10 +173,7 @@ def language_settings(language):
     return {
         "language_id": language.id,
         "source": language.name,
-        "target": language.translation_target_name,
-        "target_label": language.translation_target_label,
-        "translation_mode": language.translation_mode,
-        "fallback_target": language.translation_target,
+        "target": language.translation_target,
         "model": language.codex_model,
         "effort": language.translation_reasoning_effort,
         "cli": language.translation_cli or "codex",
@@ -358,12 +351,6 @@ class BookTranslationWorker:
                     job.retry_at = None
                     job.updated_at = utcnow()
                     settings = json.loads(job.settings)
-                    if (
-                        settings.get("translation_mode") == "personal"
-                        and "fallback_target" not in settings
-                    ):
-                        settings["fallback_target"] = language.translation_target
-                        job.settings = json.dumps(settings, ensure_ascii=False)
                     key = (
                         settings["source"],
                         settings["target"],
@@ -376,24 +363,12 @@ class BookTranslationWorker:
                         False,
                         (),
                         settings["cli"],
-                        settings.get("translation_mode", "translation"),
-                        vocabulary_for(
-                            db.session,
-                            language,
-                            settings.get("translation_mode", "translation"),
-                        ),
                     )
-                    if settings.get("translation_mode") == "personal":
-                        key += (None, settings.get("fallback_target", ""))
-                        info = word.get("context_info") or contexts.prepare(
-                            db.session,
-                            language,
-                            job.book_id,
-                            word["page"],
-                            word["context"],
-                        )
-                        if info is not None:
-                            key += (info,)
+                    info = word.get("context_info") or contexts.prepare(
+                        db.session, language, job.book_id, word["page"], word["context"]
+                    )
+                    if info is not None:
+                        key += (info,)
                     skipped = self._skip(language, word["text"], profile_from_key(key))
                     db.session.commit()
                 except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -430,7 +405,7 @@ class BookTranslationWorker:
                                 word["context"],
                                 result,
                                 profile_from_key(key),
-                                key[15] if len(key) > 15 else None,
+                                key[11] if len(key) > 11 else None,
                             )
                         job.done += 1
                         job.skipped += int(skipped)

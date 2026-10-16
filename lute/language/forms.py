@@ -26,27 +26,12 @@ class TranslationCliField(SelectField):
         super().process_formdata(valuelist)
 
 
-class TranslationModeField(SelectField):
-    """Older clients without an output mode keep ordinary translation."""
-
-    def process_formdata(self, valuelist):
-        if not valuelist or not valuelist[0]:
-            self.data = "translation"
-            return
-        super().process_formdata(valuelist)
-
-
 class LanguageForm(FlaskForm):
     """
     Language.
     """
 
     name = StringField("Name", validators=[DataRequired()])
-    translation_mode = TranslationModeField(
-        "Output",
-        choices=[("translation", "Translation"), ("personal", "Personal language")],
-        default="translation",
-    )
     translation_target = StringField(
         "Translate into", default="Russian", validators=[Length(max=80)]
     )

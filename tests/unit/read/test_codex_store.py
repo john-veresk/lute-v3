@@ -64,6 +64,21 @@ def test_completed_term_is_saved_and_reused(client, spanish, translations):
     assert len(translations) == 1
 
 
+def test_saved_results_stay_in_their_target_language(client, spanish, translations):
+    "Changing the target generates a new translation and keeps the previous one."
+    assert _first_option(client, _lookup(client, spanish)) == "v1"
+    spanish.translation_target = "English"
+    db.session.commit()
+    assert _first_option(client, _lookup(client, spanish)) == "v2"
+    assert translations[-1][1] == "English"
+    spanish.translation_target = "Russian"
+    db.session.commit()
+    restored = _lookup(client, spanish)
+    assert restored.json["saved"] is True
+    assert _first_option(client, restored) == "v1"
+    assert len(translations) == 2
+
+
 def test_stored_mode_never_translates(client, spanish, translations):
     response = _lookup(client, spanish, mode="stored")
     assert response.status_code == 200
