@@ -139,7 +139,7 @@ class Repository:
             left join books b on b.BkID = BtBkID
               and b.BkArchived = :is_archived {language_filter}
             group by T2ID, T2Text
-            order by T2Text
+            order by T2Text collate nocase
         """
         params = {"is_archived": is_archived, "language_id": language_id}
         rows = self.session.execute(sqltext(sql), params).fetchall()

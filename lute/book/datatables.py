@@ -46,7 +46,7 @@ def get_data_tables_list(parameters, is_archived, session):
             SELECT BtBkID, T2Text
             FROM booktags bt
             INNER JOIN tags2 t2 ON t2.T2ID = bt.BtT2ID
-            ORDER BY T2Text
+            ORDER BY T2Text COLLATE NOCASE
         ) tagssrc
         GROUP BY BtBkID
     ) AS tags ON tags.BkID = b.BkID
