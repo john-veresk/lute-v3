@@ -4,6 +4,7 @@
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
     <title>Sentences</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/styles.css') }}" />
+    {% if embedded %}<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">{% endif %}
     <link rel="stylesheet" type="text/css" href="/theme/current">
     <link rel="stylesheet" type="text/css" href="/theme/custom_styles">
     <style>
@@ -16,9 +17,11 @@
           font-style: italic;
       }
       {% if embedded %}
-      body { padding: .25rem .75rem; font-size: .95rem; }
-      ul.sentencelist { padding-inline-start: 1.25rem; }
-      ul.sentencelist li { padding-bottom: .75rem; line-height: 1.6; }
+      body { padding: .5rem .9rem; font: 1.05rem/1.5 var(--read-font); }
+      p.term { margin: .25rem 0; color: var(--ink-3); font: .8rem var(--ui-font); }
+      ul.sentencelist { margin: .5rem 0; padding: 0; list-style: none; }
+      ul.sentencelist li { padding-bottom: .75rem; }
+      a { color: var(--accent); font-family: var(--ui-font); }
       {% endif %}
     </style>
 
