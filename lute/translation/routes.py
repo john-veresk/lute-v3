@@ -214,9 +214,14 @@ def _save_new_result(job_id, result):
     if claim is None:
         return
     key, language_id = claim
-    language = db.session.get(Language, language_id)
-    if language is not None and key[5] == "term":
-        store.save(db.session, language, key[3], key[4], result)
+    try:
+        language = db.session.get(Language, language_id)
+        if language is not None and key[5] == "term":
+            store.save(db.session, language, key[3], key[4], result)
+    except Exception:
+        _jobs().release_unsaved(job_id)
+        db.session.rollback()
+        raise
 
 
 @bp.route("/parent")

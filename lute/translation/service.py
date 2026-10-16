@@ -942,6 +942,13 @@ class TranslationJobs:
             job.saved = True
             return job.key, job.language_id
 
+    def release_unsaved(self, job_id):
+        "Allow polling to retry persistence after a failed database write."
+        with self.lock:
+            job = self.jobs.get(job_id)
+            if job:
+                job.saved = False
+
     def get(self, job_id):
         """Return pending, complete, error, or None for an unknown lookup."""
         with self.lock:

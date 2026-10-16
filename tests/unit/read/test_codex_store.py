@@ -2,6 +2,7 @@
 
 import time
 import pytest
+from sqlalchemy.exc import OperationalError
 from lute.db import db
 from lute.translation import service, store
 from tests.unit.read.test_codex_translation import RESULT
@@ -72,6 +73,29 @@ def test_stored_mode_never_translates(client, spanish, translations):
 
 def test_prefetch_translates_only_unsaved_terms(client, spanish, translations):
     _result(client, _lookup(client, spanish, mode="prefetch").json["job_id"])
+    assert _lookup(client, spanish, mode="prefetch").json["job_id"] is None
+    assert len(translations) == 1
+
+
+def test_poll_retries_saving_after_a_temporary_database_failure(
+    client, spanish, translations, monkeypatch
+):
+    response = _lookup(client, spanish, mode="prefetch")
+    job_id = response.json["job_id"]
+    jobs = client.application.extensions["codex_translation_jobs"]
+    jobs.jobs[job_id].future.result(timeout=5)
+    save = store.save
+
+    def fail_once(*args):
+        monkeypatch.setattr(store, "save", save)
+        raise OperationalError("save", {}, Exception("database is locked"))
+
+    monkeypatch.setattr(store, "save", fail_once)
+    with pytest.raises(OperationalError):
+        client.get(f"/translation/jobs/{job_id}")
+
+    assert client.get(f"/translation/jobs/{job_id}").json["status"] == "complete"
+    assert store.find(db.session, spanish, "gato") is not None
     assert _lookup(client, spanish, mode="prefetch").json["job_id"] is None
     assert len(translations) == 1
 
