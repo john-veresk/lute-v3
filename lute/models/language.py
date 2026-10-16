@@ -47,6 +47,7 @@ class Language(
     codex_fast_mode = db.Column("LgCodexFastMode", db.Boolean, default=False)
     codex_show_timer = db.Column("LgCodexShowTimer", db.Boolean, default=True)
     codex_pretranslate = db.Column("LgCodexPretranslate", db.Boolean, default=False)
+    translation_cli = db.Column("LgTranslationCli", db.String(20), default="codex")
 
     dictionaries = db.relationship(
         "LanguageDictionary",
@@ -79,6 +80,7 @@ class Language(
         self.codex_fast_mode = False
         self.codex_show_timer = True
         self.codex_pretranslate = False
+        self.translation_cli = "codex"
 
     def __repr__(self):
         return f"<Language {self.id} '{self.name}'>"
@@ -127,6 +129,11 @@ class Language(
     def get_lowercase(self, s) -> str:
         return self.parser.get_lowercase(s)
 
+    @property
+    def translation_source_name(self):
+        "Short name of the CLI that translates this language."
+        return "Cursor" if self.translation_cli == "cursor" else "Codex"
+
     def to_dict(self):
         "Return dictionary of data, for serialization."
         ret = {}
@@ -137,6 +144,7 @@ class Language(
         ret["codex_fast_mode"] = self.codex_fast_mode
         ret["codex_show_timer"] = self.codex_show_timer
         ret["codex_pretranslate"] = self.codex_pretranslate
+        ret["translation_cli"] = self.translation_cli or "codex"
         ret["dictionaries"] = []
         for d in self.dictionaries:
             dd = {}
@@ -181,6 +189,7 @@ class Language(
             "codex_fast_mode": "codex_fast_mode",
             "codex_show_timer": "codex_show_timer",
             "codex_pretranslate": "codex_pretranslate",
+            "translation_cli": "translation_cli",
             "show_romanization": "show_romanization",
             "right_to_left": "right_to_left",
             "parser_type": "parser_type",
@@ -191,6 +200,8 @@ class Language(
         }
 
         for key in d.keys():
+            if key == "translation_cli" and d[key] not in ("codex", "cursor"):
+                continue
             funcname = mappings.get(key, "")
             if funcname:
                 load(key, funcname)

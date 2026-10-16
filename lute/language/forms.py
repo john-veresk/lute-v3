@@ -13,6 +13,16 @@ from wtforms.validators import DataRequired, Length, Optional, Regexp
 from lute.translation.service import REASONING_EFFORTS, available_model_efforts
 
 
+class TranslationCliField(SelectField):
+    """Missing values stay on Codex CLI; an unknown CLI is still rejected."""
+
+    def process_formdata(self, valuelist):
+        if not valuelist or valuelist[0] in ("", None):
+            self.data = "codex"
+            return
+        super().process_formdata(valuelist)
+
+
 class LanguageForm(FlaskForm):
     """
     Language.
@@ -22,8 +32,13 @@ class LanguageForm(FlaskForm):
     translation_target = StringField(
         "Translate into", default="Russian", validators=[Length(max=80)]
     )
+    translation_cli = TranslationCliField(
+        "Translation CLI",
+        choices=[("codex", "Codex CLI"), ("cursor", "Cursor Agent")],
+        default="codex",
+    )
     codex_model = StringField(
-        "Codex model",
+        "Model",
         default="",
         validators=[
             Optional(),
@@ -33,7 +48,7 @@ class LanguageForm(FlaskForm):
     )
     codex_reasoning_effort = SelectField(
         "Reasoning effort",
-        choices=[("", "Default from Codex CLI")]
+        choices=[("", "Default from the selected CLI")]
         + [(effort, effort) for effort in REASONING_EFFORTS],
         default="",
     )
@@ -66,8 +81,8 @@ class LanguageForm(FlaskForm):
             raise ValidationError("Please enter a translation language")
 
     def validate_codex_reasoning_effort(self, field):
-        "Reject unsupported explicit levels when model metadata is available."
-        if not field.data:
+        "Reject unsupported explicit levels when Codex model metadata is available."
+        if not field.data or self.translation_cli.data == "cursor":
             return
         supported = available_model_efforts().get(self.codex_model.data)
         if supported and field.data not in supported:

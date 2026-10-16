@@ -132,6 +132,7 @@ def submit():
         language.codex_reasoning_effort,
         language.codex_fast_mode if mode != "prefetch" else False,
         phrase_texts,
+        language.translation_cli or "codex",
     )
     saved = None
     if kind == "term" and mode != "refresh":
@@ -263,9 +264,11 @@ def _save_cards(card_type):
     result = _jobs().get(job_id)
     if key is None or result is None:
         return jsonify(error="Translation expired. Translate again."), 404
+    cli = key[10] if len(key) > 10 else "codex"
     if (
         key[:3] != (language.name, language.translation_target, language.codex_model)
         or key[7:9] != (language.codex_reasoning_effort, language.codex_fast_mode)
+        or cli != (language.translation_cli or "codex")
         or key[5] != "term"
         or result["status"] != "complete"
     ):

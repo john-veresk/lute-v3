@@ -32,28 +32,32 @@
       <td>{{ form.translation_target(class="form-control", placeholder="Russian") }}</td>
     </tr>
     <tr>
+      <td>{{ form.translation_cli.label(class="form-control-label") }}</td>
+      <td>
+        {{ form.translation_cli(class="form-control") }}
+        <p id="translation-cli-account" class="small-flash-notice"></p>
+      </td>
+    </tr>
+    <tr>
       <td>{{ form.codex_model.label(class="form-control-label") }}</td>
       <td>
-        {{ form.codex_model(class="form-control", list="codex-models", placeholder="Default from Codex CLI") }}
-        <datalist id="codex-models">
-          {% for model in codex_models %}<option value="{{ model }}">{% endfor %}
-        </datalist>
-        <p class="small-flash-notice">Choose a local CLI model or enter its ID. Leave blank to use the CLI default.</p>
-        <p class="small-flash-notice">Codex CLI must be installed and logged in on the computer running Lute. Text is sent through your Codex account.</p>
+        {{ form.codex_model(class="form-control", list="codex-models") }}
+        <datalist id="codex-models"></datalist>
+        <p id="translation-cli-model" class="small-flash-notice"></p>
       </td>
     </tr>
     <tr>
       <td>{{ form.codex_reasoning_effort.label(class="form-control-label") }}</td>
       <td>
         {{ form.codex_reasoning_effort(class="form-control") }}
-        <p class="small-flash-notice">Higher effort spends more time reasoning. Default uses your Codex CLI setting.</p>
+        <p id="translation-cli-effort" class="small-flash-notice"></p>
       </td>
     </tr>
     <tr>
       <td>{{ form.codex_fast_mode.label(class="form-control-label") }}</td>
       <td>
         {{ form.codex_fast_mode() }}
-        <p class="small-flash-notice">Use faster processing where supported by your model and account. Usage limits may be consumed faster.</p>
+        <p id="translation-cli-fast" class="small-flash-notice">Use faster processing where the selected CLI and model support it. Usage limits may be consumed faster.</p>
       </td>
     </tr>
     <tr>
@@ -67,12 +71,12 @@
       <td>{{ form.codex_pretranslate.label(class="form-control-label") }}</td>
       <td>
         {{ form.codex_pretranslate() }}
-        <p class="small-flash-notice">While you read, translate the page's unknown words in the background and save them, so term cards open instantly. Uses your Codex usage for every unknown word.</p>
+        <p class="small-flash-notice">While you read, translate the page's unknown words in the background and save them, so term cards open instantly. Uses the selected CLI's usage for every unknown word.</p>
       </td>
     </tr>
 
     {% for field in form %}
-    {% if field.name not in ('name', 'csrf_token', 'translation_target', 'codex_model', 'codex_reasoning_effort', 'codex_fast_mode', 'codex_show_timer', 'codex_pretranslate') %}
+    {% if field.name not in ('name', 'csrf_token', 'translation_target', 'translation_cli', 'codex_model', 'codex_reasoning_effort', 'codex_fast_mode', 'codex_show_timer', 'codex_pretranslate') %}
     <tr>
       <td>{{ field.label(class="form-control-label") }}</td>
       <td>{{ field(class="form-control") }}</td>
@@ -89,8 +93,37 @@
 <script>
   $(document).ready(function() {
     const modelEfforts = {{ codex_model_efforts|tojson }};
+    const cliModels = {
+      codex: {{ codex_models|tojson }},
+      cursor: {{ cursor_models|tojson }}
+    };
+    const cliCopy = {
+      codex: {
+        placeholder: 'Default from Codex CLI',
+        model: 'Choose a local Codex model or enter its ID. Leave blank to use the Codex CLI default.',
+        account: 'Codex CLI must be installed and logged in on the computer running Lute. Text is sent through your Codex account.',
+        effort: 'Higher effort spends more time reasoning. Default uses your Codex CLI setting.'
+      },
+      cursor: {
+        placeholder: 'Default from Cursor Agent',
+        model: 'Choose a Cursor Agent model or enter its ID. Leave blank to use the Cursor Agent default.',
+        account: 'Cursor Agent must be installed and logged in on the computer running Lute. Text is sent through your Cursor account.',
+        effort: 'Higher effort spends more time reasoning. Cursor Agent applies it to the selected model when that model supports an effort override.'
+      }
+    };
+    function updateCliCopy() {
+      const cli = $('#translation_cli').val() === 'cursor' ? 'cursor' : 'codex';
+      const copy = cliCopy[cli];
+      $('#codex_model').attr('placeholder', copy.placeholder);
+      $('#translation-cli-model').text(copy.model);
+      $('#translation-cli-account').text(copy.account);
+      $('#translation-cli-effort').text(copy.effort);
+      const list = $('#codex-models').empty();
+      (cliModels[cli] || []).forEach(model => list.append($('<option>').val(model)));
+    }
     function updateReasoningEfforts() {
-      const supported = modelEfforts[$('#codex_model').val()];
+      const cli = $('#translation_cli').val();
+      const supported = cli === 'codex' ? modelEfforts[$('#codex_model').val()] : null;
       const select = $('#codex_reasoning_effort');
       select.find('option').each(function() {
         const unavailable = this.value !== '' && supported && !supported.includes(this.value);
@@ -102,6 +135,13 @@
       const select = $('#codex_reasoning_effort');
       if (select.find('option:selected').prop('disabled')) select.val('');
     });
+    $('#translation_cli').on('change', function() {
+      updateCliCopy();
+      updateReasoningEfforts();
+      const select = $('#codex_reasoning_effort');
+      if (select.find('option:selected').prop('disabled')) select.val('');
+    });
+    updateCliCopy();
     updateReasoningEfforts();
     // Add leave page confirmation
     let dirty = false;

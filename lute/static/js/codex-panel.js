@@ -145,7 +145,7 @@ class CodexPanel {
       const job = await this.submit(mode);
       if (current !== this.generation) return;
       if (!job.job_id) {
-        this.element('codex-status').textContent = 'Press ↻ to translate with Codex.';
+        this.element('codex-status').textContent = 'Press ↻ to translate.';
         return;
       }
       this.setBusy(true);

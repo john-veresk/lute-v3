@@ -59,6 +59,121 @@ def test_new_term_form_keeps_automatic_translation(client, spanish, route):
     assert page.select_one("#translation").get_text().strip() == ""
 
 
+def test_cursor_model_list_ignores_labels_and_color(monkeypatch):
+    colored = (
+        "\x1b[2mAvailable models\x1b[22m\n\n"
+        "\x1b[32mcomposer-2.5\x1b[39m \x1b[2m- Composer 2.5\x1b[22m \x1b[2m(default)\x1b[22m\n"
+        "\x1b[36mgpt-5.2\x1b[39m \x1b[2m- GPT-5.2\x1b[22m\n"
+        "not a model line\n"
+        "Tip: use --model <id>\n"
+    )
+    assert service.parse_cursor_models(colored) == ["composer-2.5", "gpt-5.2"]
+    assert service.available_cursor_models() == []
+
+
+@pytest.mark.parametrize(
+    "effort,fast_mode,expected",
+    [
+        ("", False, "composer-2.5"),
+        ("low", False, "composer-2.5[effort=low]"),
+        ("high", True, "composer-2.5[effort=high,fast=true]"),
+        ("", True, "composer-2.5[fast=true]"),
+    ],
+)
+def test_cursor_agent_prints_json_from_ask_mode(
+    monkeypatch, effort, fast_mode, expected
+):
+    def which(name):
+        assert name == "cursor-agent"
+        return "/usr/bin/cursor-agent"
+
+    monkeypatch.setattr(service.shutil, "which", which)
+
+    def run(command, **kwargs):
+        assert command[0] == "/usr/bin/cursor-agent"
+        assert command[command.index("--output-format") + 1] == "json"
+        assert command[command.index("--mode") + 1] == "ask"
+        assert command[command.index("--sandbox") + 1] == "enabled"
+        assert "--print" in command
+        assert "--trust" in command
+        assert "--exclude-workspace-context" in command
+        assert command[command.index("--model") + 1] == expected
+        assert kwargs["stdin"] == subprocess.DEVNULL
+        assert kwargs["timeout"] == 90
+        assert not kwargs.get("shell")
+        assert "Kissa nukkuu." in command[-1]
+        assert "Russian" in command[-1]
+        reply = "```json\n" + json.dumps(RESULT) + "\n```"
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {"type": "result", "subtype": "success", "is_error": False, "result": reply}
+            ),
+            stderr="",
+        )
+
+    monkeypatch.setattr(service.subprocess, "run", run)
+    assert (
+        service.translate(
+            "Finnish",
+            "Russian",
+            "composer-2.5",
+            "kissa",
+            "Kissa nukkuu.",
+            reasoning_effort=effort,
+            fast_mode=fast_mode,
+            cli="cursor",
+        )
+        == RESULT
+    )
+
+
+def test_cursor_agent_errors_do_not_leak_the_reply(monkeypatch):
+    monkeypatch.setattr(service.shutil, "which", lambda name: "/usr/bin/cursor-agent")
+
+    def run(command, **kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "type": "result",
+                    "subtype": "error",
+                    "is_error": True,
+                    "result": "SECRET prompt",
+                }
+            ),
+            stderr="ERROR: last status: 429 Too Many Requests",
+        )
+
+    monkeypatch.setattr(service.subprocess, "run", run)
+    with pytest.raises(service.RateLimitError) as error:
+        service.translate("Finnish", "Russian", "", "kissa", "", cli="cursor")
+    assert "SECRET" not in str(error.value)
+    assert "Cursor Agent" in str(error.value)
+
+
+def test_missing_cursor_agent_is_actionable(monkeypatch):
+    monkeypatch.setattr(service.shutil, "which", lambda name: None)
+    with pytest.raises(service.TranslationError) as error:
+        service.translate("Finnish", "Russian", "", "kissa", "", cli="cursor")
+    assert "cursor-agent login" in str(error.value)
+
+
+def test_translation_cache_changes_with_cli(client, spanish, monkeypatch):
+    monkeypatch.setattr(service, "translate", lambda *args: RESULT)
+    jobs = client.application.extensions["codex_translation_jobs"]
+    payload = {"language_id": spanish.id, "text": "gato"}
+    try:
+        first = client.post("/translation/jobs", json=payload).json["job_id"]
+        spanish.translation_cli = "cursor"
+        db.session.commit()
+        second = client.post("/translation/jobs", json=payload).json["job_id"]
+        assert second != first
+        assert jobs.key_for(second)[10] == "cursor"
+    finally:
+        jobs.pool.shutdown(wait=True)
+
+
 def test_cli_uses_selected_model_and_structured_output(monkeypatch):
     monkeypatch.setattr(service.shutil, "which", lambda value: "/usr/bin/codex")
 

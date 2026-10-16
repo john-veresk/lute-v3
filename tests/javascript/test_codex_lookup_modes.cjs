@@ -34,7 +34,7 @@ async function checks() {
   await settle();
   assert.equal(known.win.requests.length, 1, 'nothing saved means no polling');
   assert.equal(known.win.timers(), 0);
-  assert.equal(known.el('codex-status').textContent, 'Press ↻ to translate with Codex.');
+  assert.equal(known.el('codex-status').textContent, 'Press ↻ to translate.');
   assert.equal(known.el('codex-skeleton').hidden, true);
 
   known.el('codex-refresh').handlers.click();

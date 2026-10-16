@@ -62,8 +62,8 @@
         </button>
         {{ form.text(class="form-control", autofocus=not embedded_in_reading_frame, value=(form.original_text.data or '')) }}
         <div class="term-head-actions">
-          <span class="codex-meta" title="Codex model{% if term_language %}, translating into {{ term_language.translation_target }}{% endif %}">
-            <span class="codex-model">{{ (term_language.codex_model if term_language else '') or 'Codex' }}</span>
+          <span class="codex-meta" title="{{ term_language.translation_source_name if term_language else 'Codex' }} model{% if term_language %}, translating into {{ term_language.translation_target }}{% endif %}">
+            <span class="codex-model">{{ (term_language.codex_model if term_language else '') or (term_language.translation_source_name if term_language else 'Codex') }}</span>
             {% if not term_language or term_language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off"></span>{% endif %}
           </span>
           <button id="term-sentences-btn" type="button" class="term-icon-btn" title="See term usage" aria-label="See term usage" aria-expanded="false">
@@ -72,13 +72,13 @@
           <button id="term-image-btn" type="button" class="term-icon-btn" title="Find an image" aria-label="Find an image" aria-expanded="false">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m20.5 16-4.8-4.8-8.2 7.8"/></svg>
           </button>
-          <button id="codex-refresh" type="button" class="term-icon-btn" title="Translate again with Codex" aria-label="Translate again with Codex">
+          <button id="codex-refresh" type="button" class="term-icon-btn" title="Translate again with {{ term_language.translation_source_name if term_language else 'Codex' }}" aria-label="Translate again with {{ term_language.translation_source_name if term_language else 'Codex' }}">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4.2h-4.2"/></svg>
           </button>
         </div>
       </div>
 
-      <section class="codex-card" aria-label="Codex translation">
+      <section class="codex-card" aria-label="{{ term_language.translation_source_name if term_language else 'Codex' }} translation">
         <div id="codex-lemma" class="codex-lemma"></div>
         <p id="codex-context" class="codex-context" hidden><span id="codex-context-before"></span><mark id="codex-context-word"></mark><span id="codex-context-after"></span></p>
         <p id="codex-status" class="codex-status" role="status" aria-live="polite"></p>
