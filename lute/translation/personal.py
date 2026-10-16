@@ -21,13 +21,18 @@ def check_result(app, language_id, key, result):
         language = db.session.get(Language, language_id)
         if language is None:
             return None
-        vocabulary = Vocabulary(db.session, language)
-        excluded = []
-        if key[5] == "term":
-            excluded = vocabulary.words(key[3]) + [result.get("lemma", "")]
-            for word in result.get("words", []):
-                excluded.extend((word["text"], word.get("lemma", "")))
-        return vocabulary.check(explanation_text(result), excluded)
+        return check_explanations(db.session, language, key, result)
+
+
+def check_explanations(session, language, key, result):
+    """Refresh local vocabulary hints without regenerating the saved dictionary."""
+    vocabulary = Vocabulary(session, language)
+    excluded = []
+    if key[5] == "term":
+        excluded = vocabulary.words(key[3]) + [result.get("lemma", "")]
+        for word in result.get("words", []):
+            excluded.extend((word["text"], word.get("lemma", "")))
+    return vocabulary.check(explanation_text(result), excluded)
 
 
 def check_and_revise(app, language_id, key, result, generate):
@@ -39,7 +44,13 @@ def check_and_revise(app, language_id, key, result, generate):
             "previous_result": {
                 name: value
                 for name, value in result.items()
-                if name not in ("fallback", "fallback_language")
+                if name
+                not in (
+                    "fallback",
+                    "fallback_language",
+                    "context_note",
+                    "context_excerpt",
+                )
             },
             "unfamiliar_words": [
                 {"text": entry["text"], "lemma": entry["lemma"]}

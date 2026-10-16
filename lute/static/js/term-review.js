@@ -2,6 +2,7 @@
 class LuteTermReview {
   constructor(root, configuration) {
     this.root = root;
+    this.bookId = Number(root.dataset?.bookId) || null;
     this.ids = [...new Set(configuration.term_ids)];
     for (let i = this.ids.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -62,6 +63,11 @@ class LuteTermReview {
     this.el('word').textContent = '';
     this.el('language').textContent = '';
     this.el('meanings').replaceChildren();
+    this.el('book-context').hidden = true;
+    this.el('book-note').textContent = '';
+    this.el('book-excerpt').textContent = '';
+    this.el('book-source').textContent = '';
+    this.el('book-source').removeAttribute('href');
     this.el('context').hidden = true;
     this.el('show-sentences').setAttribute('aria-expanded', 'false');
     this.el('context-label').textContent = 'Show sentences';
@@ -73,7 +79,8 @@ class LuteTermReview {
       while (this.index < this.ids.length) {
         this.el('progress').textContent = `Card ${this.index + 1} of ${this.ids.length}`;
         this.el('progress-bar').value = this.index;
-        const response = await fetch(`/term/review/card/${this.ids[this.index]}`, {cache: 'no-store'});
+        const bookQuery = this.bookId ? `?book_id=${this.bookId}` : '';
+        const response = await fetch(`/term/review/card/${this.ids[this.index]}${bookQuery}`, {cache: 'no-store'});
         if ([404, 410, 422].includes(response.status)) {
           this.index++;
           this.unavailable++;
@@ -116,6 +123,16 @@ class LuteTermReview {
       translation.dir = 'auto';
       meanings.appendChild(translation);
     });
+    const usage = this.bookId ? this.card.book_context : null;
+    this.el('book-context').hidden = !usage;
+    if (usage) {
+      this.el('book-source').textContent = `${usage.book_title} · Page ${usage.page}`;
+      this.el('book-source').setAttribute('href', usage.url);
+      this.el('book-excerpt').textContent = usage.excerpt;
+      this.el('book-excerpt').dir = this.card.direction;
+      this.el('book-note').textContent = usage.note;
+      this.el('book-note').dir = 'auto';
+    }
     const current = this.levels.find(button => Number(button.dataset.reviewStatus) === this.card.status);
     this.el('current-status').textContent = `Now: ${current?.dataset.label ?? this.card.status}`;
     this.levels.forEach(button => button.setAttribute('aria-pressed', String(button === current)));

@@ -10,7 +10,7 @@ from lute.db import db
 from lute.models.book import Book
 from lute.models.language import Language
 from lute.models.term import Term
-from lute.translation import store
+from lute.translation import contexts, store
 from lute.translation.profile import profile_from_key, vocabulary_for
 from lute.translation.service import RateLimitError, TranslationError
 
@@ -198,30 +198,22 @@ def collect_words(book, start_page=1):
     }
     seen = set()
     words = []
-    for page in book.texts:
-        if page.order < start_page:
+    for entry in contexts.windows(language, book.texts):
+        if entry["page"] < start_page:
             continue
-        sentence = []
-
-        def append_sentence():
-            context = (
-                "".join(token.token for token in sentence).replace("\u200b", "").strip()
+        for token in language.get_parsed_tokens(entry["sentence"]):
+            key = store.text_key(language, token.token)
+            if not token.is_word or key in seen or key in known:
+                continue
+            seen.add(key)
+            words.append(
+                {
+                    "text": token.token,
+                    "context": entry["sentence"][:4000],
+                    "page": entry["page"],
+                    "context_info": {"book_id": book.id, **entry},
+                }
             )
-            for token in sentence:
-                key = store.text_key(language, token.token)
-                if not token.is_word or key in seen or key in known:
-                    continue
-                seen.add(key)
-                words.append(
-                    {"text": token.token, "context": context[:4000], "page": page.order}
-                )
-
-        for token in language.get_parsed_tokens(page.text):
-            sentence.append(token)
-            if token.is_end_of_sentence:
-                append_sentence()
-                sentence = []
-        append_sentence()
     return words
 
 
@@ -393,6 +385,15 @@ class BookTranslationWorker:
                     )
                     if settings.get("translation_mode") == "personal":
                         key += (None, settings.get("fallback_target", ""))
+                        info = word.get("context_info") or contexts.prepare(
+                            db.session,
+                            language,
+                            job.book_id,
+                            word["page"],
+                            word["context"],
+                        )
+                        if info is not None:
+                            key += (info,)
                     skipped = self._skip(language, word["text"], profile_from_key(key))
                     db.session.commit()
                 except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -429,6 +430,7 @@ class BookTranslationWorker:
                                 word["context"],
                                 result,
                                 profile_from_key(key),
+                                key[15] if len(key) > 15 else None,
                             )
                         job.done += 1
                         job.skipped += int(skipped)

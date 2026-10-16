@@ -28,25 +28,36 @@ function makeForm(text = 'looked') {
   };
 }
 
-function makePanel({words = [], phraseCards = phrases, saveResponse, form = makeForm(), embedded = false, openWord = null} = {}) {
+function makePanel({words = [], phraseCards = phrases, saveResponse, form = makeForm(), embedded = false, openWord = null, bookId = null, pageNum = null, usage = {}} = {}) {
   const win = makeWindow(async (url, body) => {
     if (url === '/translation/jobs') return {job_id: 'job', saved: false};
     if (url === '/translation/jobs/job') return {
       status: 'complete',
-      result: {lemma: '', is_inflected: false, options: [{translation: 'смотрел', explanation: ''}], words, phrases: phraseCards},
+      result: {lemma: '', is_inflected: false, options: [{translation: 'смотрел', explanation: ''}], words, phrases: phraseCards, ...usage},
     };
     if (saveResponse) return saveResponse();
     const cards = url === '/translation/phrases' ? phraseCards : words;
     return {saved: body.indices.map(index => ({index, ...cards[index]}))};
   });
   let cardsSaved = 0;
-  const panel = new CodexPanel({window: win, form, embedded, openWord, onCardsSaved: () => { cardsSaved++; }});
+  const panel = new CodexPanel({window: win, form, embedded, openWord, bookId, pageNum, onCardsSaved: () => { cardsSaved++; }});
   panel.setLookup('looked', 'He looked after the cats.');
   panel.start('auto');
   return {win, panel, form, el: id => win.document.getElementById(id), cardsSaved: () => cardsSaved};
 }
 
 async function checks() {
+  const usage = makePanel({bookId: 7, pageNum: 2, usage: {context_note: '<script>note</script>', context_excerpt: 'Before. He looked after the cats. After.'}});
+  await settle();
+  assert.equal(usage.win.requests[0].body.book_id, 7);
+  assert.equal(usage.win.requests[0].body.page_num, 2);
+  assert.equal(usage.el('codex-usage').hidden, false);
+  assert.equal(usage.el('codex-usage-note').textContent, '<script>note</script>', 'usage is displayed as text');
+  assert.equal(usage.el('codex-usage-source').textContent, 'Before. He looked after the cats. After.');
+  usage.panel.renderContextNote({});
+  assert.equal(usage.el('codex-usage').hidden, true, 'an absent usage note leaves only dictionary meanings');
+  assert.equal(usage.el('codex-usage-note').textContent, '');
+
   const card = makePanel();
   await settle();
   assert.equal(card.el('codex-phrases').hidden, false);

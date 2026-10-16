@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from lute.db import db
+from lute.translation import contexts
 from lute.translation.profile import cache_profile, profile_for
 
 
@@ -38,22 +39,45 @@ def _find_row(session, language, text, profile):
     )
 
 
-def find(session, language, text, profile=None):
+def find(session, language, text, profile=None, context_info=None):
     "The saved result for a term and output profile, shared across books."
     profile = profile if profile is not None else profile_for(session, language)
     row = _find_row(session, language, text, profile)
     if row is None:
         return None
-    return json.loads(row.result)
+    result = json.loads(row.result)
+    note = contexts.find(
+        session, language.id, text_key(language, text), profile, context_info
+    )
+    if note:
+        result["context_note"] = note
+        result["context_excerpt"] = context_info["excerpt"]
+    if result.get("fallback") and result.get("fallback_language"):
+        fallback_note = contexts.find(
+            session,
+            language.id,
+            text_key(language, text),
+            cache_profile(language.name, result["fallback_language"]),
+            context_info,
+        )
+        if fallback_note:
+            result["fallback"] = {
+                **result["fallback"],
+                "context_note": fallback_note,
+                "context_excerpt": context_info["excerpt"],
+            }
+    return result
 
 
-def save(session, language, text, context, result, profile=None):
+def save(session, language, text, context, result, profile=None, context_info=None):
     "Keep the latest result per term and output profile, including its fallback."
     profile = profile if profile is not None else profile_for(session, language)
     for attempt in range(2):
         try:
             with session.no_autoflush:
-                _save_row(session, language, text, context, result, profile)
+                _save_row(
+                    session, language, text, context, result, profile, context_info
+                )
                 if result.get("fallback") and result.get("fallback_language"):
                     _save_row(
                         session,
@@ -62,6 +86,7 @@ def save(session, language, text, context, result, profile=None):
                         context,
                         result["fallback"],
                         cache_profile(language.name, result["fallback_language"]),
+                        context_info,
                     )
             session.commit()
             return
@@ -73,11 +98,19 @@ def save(session, language, text, context, result, profile=None):
                 raise
 
 
-def _save_row(session, language, text, context, result, profile):
+def _save_row(session, language, text, context, result, profile, context_info):
     row = _find_row(session, language, text, profile) or StoredTranslation(
         language_id=language.id, text_lc=text_key(language, text), profile=profile
     )
     row.context = context
-    row.result = json.dumps(result, ensure_ascii=False)
+    row.result = json.dumps(contexts.dictionary_result(result), ensure_ascii=False)
     row.updated = datetime.now()
     session.add(row)
+    contexts.save(
+        session,
+        language.id,
+        text_key(language, text),
+        profile,
+        context_info,
+        result.get("context_note"),
+    )

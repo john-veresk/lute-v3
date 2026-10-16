@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block body %}
-<main class="term-review" data-term-review>
+<main class="term-review" data-term-review {% if book %}data-book-id="{{ book.id }}"{% endif %}>
   <div class="review-heading">
     <h1>{% if book %}{{ book.title }}{% else %}Review{% endif %}</h1>
     <button id="review-undo" class="review-undo review-skip" type="button" title="Undo the last answer or skip (Backspace)" disabled>
@@ -32,6 +32,11 @@
     <button id="review-show-answer" class="review-reveal" type="button" hidden>Show answer <kbd>Space</kbd></button>
     <div id="review-answer" class="review-answer" hidden>
       <div id="review-meanings"></div>
+      <aside id="review-book-context" class="review-book-context" hidden>
+        <a id="review-book-source" target="_blank" rel="noopener"></a>
+        <blockquote id="review-book-excerpt"></blockquote>
+        <p id="review-book-note"></p>
+      </aside>
       <button id="review-show-sentences" class="review-context-toggle" type="button" aria-expanded="false" aria-controls="review-context">
         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h6a3 3 0 0 1 2 1 3 3 0 0 1 2-1h6v14h-6a3 3 0 0 0-2 1 3 3 0 0 0-2-1H4zM12 6v14"/></svg>
         <span id="review-context-label">Show sentences</span>

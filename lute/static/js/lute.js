@@ -207,9 +207,13 @@ function show_term_edit_form(el) {
 
 function set_lookup_context(el) {
   const sentenceId = el.data('sentence-id');
-  const items = $('span.textitem').filter(function() {
-    return $(this).data('sentence-id') === sentenceId;
-  }).toArray();
+  const sentenceIds = new Set();
+  const items = $('span.textitem').toArray().filter(item => {
+    const id = $(item).data('sentence-id');
+    if (id !== undefined) sentenceIds.add(id);
+    return id === sentenceId;
+  });
+  window.LUTE_LOOKUP_SENTENCE_INDEX = [...sentenceIds].indexOf(sentenceId);
   window.LUTE_LOOKUP_CONTEXT = _get_textitems_text(items).slice(0, 4000);
 }
 

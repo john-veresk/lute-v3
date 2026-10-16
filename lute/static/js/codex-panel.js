@@ -67,7 +67,7 @@ function termCardUrl(languageId, text, embedded) {
 }
 
 class CodexPanel {
-  constructor({window, languageId, kind = 'term', form = null, onCardsSaved = () => {}, embedded = false, openWord = null}) {
+  constructor({window, languageId, kind = 'term', form = null, onCardsSaved = () => {}, embedded = false, openWord = null, bookId = null, pageNum = null, sentenceIndex = null}) {
     this.win = window;
     this.doc = window.document;
     this.languageId = languageId;
@@ -76,6 +76,9 @@ class CodexPanel {
     this.onCardsSaved = onCardsSaved;
     this.embedded = embedded;
     this.openWord = openWord;
+    this.bookId = bookId;
+    this.pageNum = pageNum;
+    this.sentenceIndex = sentenceIndex;
     this.text = '';
     this.context = '';
     this.generation = 0;
@@ -117,6 +120,7 @@ class CodexPanel {
   }
 
   reset() {
+    this.renderContextNote({});
     const vocabulary = this.element('codex-vocabulary');
     if (vocabulary) { vocabulary.replaceChildren(); vocabulary.hidden = true; }
     this.element('codex-options').replaceChildren();
@@ -178,7 +182,10 @@ class CodexPanel {
   async submit(mode) {
     return readResponse(await this.win.fetch('/translation/jobs', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({language_id: this.languageId, text: this.text, context: this.context, kind: this.kind, mode, ...(this.lastFallback ? {fallback: true} : {})}),
+      body: JSON.stringify({language_id: this.languageId, text: this.text, context: this.context, kind: this.kind, mode,
+        ...(this.lastFallback ? {fallback: true} : {}),
+        ...(this.bookId && this.pageNum ? {book_id: this.bookId, page_num: this.pageNum,
+          ...(Number.isInteger(this.sentenceIndex) && this.sentenceIndex >= 0 ? {sentence_index: this.sentenceIndex} : {})} : {})}),
     }));
   }
 
@@ -203,6 +210,7 @@ class CodexPanel {
     this.options = result.options;
     result.options.forEach((option, index) => this.element('codex-options').appendChild(this.renderOption(option, index)));
     this.renderVocabulary(result.vocabulary);
+    this.renderContextNote(result);
     if (!this.form) return;
     this.renderCards(result.words || [], jobId, current, 'words');
     this.renderCards(result.phrases || [], jobId, current, 'phrases');
@@ -212,6 +220,14 @@ class CodexPanel {
     } else {
       this.choose(0, true);
     }
+  }
+
+  renderContextNote(result) {
+    const section = this.element('codex-usage');
+    if (!section) return;
+    section.hidden = !result.context_note;
+    this.element('codex-usage-note').textContent = result.context_note || '';
+    this.element('codex-usage-source').textContent = result.context_excerpt || '';
   }
 
   renderVocabulary(report) {

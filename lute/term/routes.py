@@ -37,6 +37,8 @@ from lute.db import db
 from lute.term.forms import TermForm
 from lute.term.review import Service as ReviewService, card_data, parse_ids
 from lute.translation.cards import save_card
+from lute.translation import contexts
+from lute.translation.profile import profile_for
 import lute.utils.formutils
 
 bp = Blueprint("term", __name__, url_prefix="/term")
@@ -172,6 +174,24 @@ def review_card(term_id):
     if not card["meanings"]:
         return jsonify({"error": "This term no longer has a translation."}), 422
     card["sentences_url"] = url_for("term.review_sentences", term_id=term.id)
+    if "book_id" in request.args:
+        book_id = request.args.get("book_id", type=int)
+        book = BookRepository(db.session).find(book_id) if book_id else None
+        if book is None or book.language_id != term.language_id:
+            return jsonify(error="Invalid review book"), 400
+        note = contexts.for_review(
+            db.session,
+            term.language,
+            term.text_lc.replace("\u200b", ""),
+            profile_for(db.session, term.language),
+            book.id,
+        )
+        if note:
+            card["book_context"] = {
+                **note,
+                "book_title": book.title,
+                "url": url_for("read.peek_page", bookid=book.id, pagenum=note["page"]),
+            }
     response = jsonify(card)
     response.headers["Cache-Control"] = "no-store"
     return response

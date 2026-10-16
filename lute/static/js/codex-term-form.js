@@ -147,10 +147,10 @@ async function postEmbeddedTermForm(form, {fetch, formData, notify, replaceDocum
  * Show Codex in the term card.  A saved translation is shown without a new
  * request; an empty Translation is translated automatically.
  */
-function startTermCodex(window, context, {embedded = false, openWord = null} = {}) {
+function startTermCodex(window, context, {embedded = false, openWord = null, bookId = null, pageNum = null, sentenceIndex = null} = {}) {
   const form = new CodexTermForm(window.document.getElementById('term-form-container'));
   const panel = new CodexPanel({
-    window, form, embedded, openWord,
+    window, form, embedded, openWord, bookId, pageNum, sentenceIndex,
     onCardsSaved: () => window.parent.postMessage({event: 'LuteCodexWordsSaved'}, window.location.origin),
   });
   panel.setLookup(form.text(), context);

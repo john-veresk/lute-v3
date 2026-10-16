@@ -6,8 +6,9 @@ from lute.db import db
 from lute.models.language import Language
 from lute.models.term import Term as DBTerm
 from lute.term.model import Repository
-from lute.translation import store
+from lute.translation import contexts, store
 from lute.translation.cards import save_card
+from lute.translation.personal import check_explanations
 from lute.translation.profile import profile_from_key, vocabulary_for
 from lute.translation.service import RateLimitError, TranslationError, TranslationJobs
 from lute.translation.vocabulary import Vocabulary
@@ -166,6 +167,21 @@ def submit():
             400,
         )
     clean_text = text.replace("\u200b", "").strip()
+    context_info = None
+    if kind == "term" and ("book_id" in data or "page_num" in data):
+        try:
+            context_info = contexts.prepare(
+                db.session,
+                language,
+                data.get("book_id"),
+                data.get("page_num"),
+                context,
+                data.get("sentence_index"),
+            )
+        except ValueError as exc:
+            return jsonify(error=str(exc)), 400
+        if language.get_lowercase(clean_text) not in language.get_lowercase(context):
+            context_info = None
     word_texts = ()
     phrase_texts = ()
     if kind == "term":
@@ -201,11 +217,24 @@ def submit():
     )
     if output_mode == "personal" and kind == "term":
         key += (None, language.translation_target)
+    if context_info is not None:
+        if len(key) == 13:
+            key += (None, "")
+        key += (context_info,)
     saved = None
     if kind == "term" and mode != "refresh":
-        saved = store.find(db.session, language, clean_text, profile_from_key(key))
+        saved = store.find(
+            db.session, language, clean_text, profile_from_key(key), context_info
+        )
     if saved is not None and mode != "prefetch":
-        job_id = _jobs().adopt(key, _fit_to_context(saved, phrase_texts), language.id)
+        saved = _fit_to_context(saved, phrase_texts)
+        if output_mode == "personal":
+            report = check_explanations(db.session, language, key, saved)
+            saved["vocabulary"] = {
+                **report,
+                "revised": saved.get("vocabulary", {}).get("revised", False),
+            }
+        job_id = _jobs().adopt(key, saved, language.id)
         return jsonify(job_id=job_id, saved=True), 202
     if saved is not None or mode == "stored":
         return jsonify(job_id=None), 200
@@ -223,6 +252,8 @@ def submit():
                 language.translation_target,
             )
         )
+        if context_info is not None:
+            paired_key += (context_info,)
     try:
         job_id = _jobs().submit(
             key,
@@ -306,7 +337,13 @@ def _save_new_result(job_id, result):
         language = db.session.get(Language, language_id)
         if language is not None and key[5] == "term":
             store.save(
-                db.session, language, key[3], key[4], result, profile_from_key(key)
+                db.session,
+                language,
+                key[3],
+                key[4],
+                result,
+                profile_from_key(key),
+                key[15] if len(key) > 15 else None,
             )
     except Exception:
         _jobs().release_unsaved(job_id)

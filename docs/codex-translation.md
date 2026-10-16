@@ -59,13 +59,13 @@ one revision request with those words and familiar words used in the first answe
 The second valid answer is accepted even if unfamiliar words remain; there is
 no revision loop. Remaining unfamiliar words appear as **Words to learn**, with
 links to their cards. The selected learning target itself is excluded from this list.
-The surrounding sentence is not sent for personal explanations. The selected
-word or phrase determines its meanings and grammatical form. Phrase candidates
+The selected word or phrase determines its dictionary meanings and grammatical
+form. The dictionary explanation ignores the surrounding passage. Phrase candidates
 are supplied only for the separate suggestions section and must not influence
 the main word's definitions or examples. Saved explanations and examples stand
 alone, without importing characters' names, places or plot details. Suggested
-phrases containing names or story-specific references are
-omitted. A selected proper name itself is still explained as a name. Full sentence
+phrases containing names or story-specific references are omitted. A selected
+proper name itself is still explained as a name. Full sentence
 and page paraphrases preserve the source's names and facts.
 Known child forms establish knowledge of their parent family even when a parent
 has a lower status; statuses are never changed. Sentence and page commands
@@ -75,14 +75,36 @@ produce a simplified paraphrase. Local search/check tools are documented in
 Existing vocabulary translations are not converted automatically. Select the
 personal mode, save the language, reload the card, and press **↻** to generate
 a personal explanation, then **Save** to keep it on the card. Translation caches
-distinguish output modes, target languages and personal vocabulary, so a Russian
+distinguish output modes and target languages, so a Russian
 cached result is not reused as a personal Finnish explanation. Saved personal
 results are reused across sentences and books, just like ordinary translations;
-use **↻** to regenerate them. Phrase suggestions are shown only when present in
-the current sentence. Queued book jobs snapshot the
+use **↻** to regenerate them. Learning more vocabulary or changing the fallback
+language does not discard the main explanation. **Words to learn** is checked
+again locally when a saved explanation opens, without asking the model.
+Phrase suggestions are shown only when present in the current sentence. Queued book jobs snapshot the
 output mode and model settings, and check vocabulary against the current local
 database when each word is processed. Only a compact vocabulary fingerprint is
 used in cache keys, not a word list.
+
+**In this book** is a separate, optional usage explanation. A new translation or
+**↻** in the reader sends the selected sentence plus one sentence before and
+after it, including across page boundaries, in a dedicated `context_for_note`
+field. The model must use that passage only for `context_note`, leaving the
+dictionary meanings and examples generic. The same response includes the
+fallback-language usage note. Context is bounded to 4000 characters per sentence.
+Notes are stored separately by language, word, output language, book and exact
+passage; each retains its source sentence, surrounding passage and page.
+Opening an already stored word in another book or passage shows the dictionary
+entry immediately and never starts another model request just to create a note.
+Use **↻** there to add one. Background book translations can also save notes while
+generating a missing dictionary entry; cached entries are skipped as before.
+
+Book review shows an available note and its passage on the answer side, labelled
+with the book and page. General review and review from **Terms** show dictionary
+meanings only. Reviews never generate notes. Notes whose source passage has
+changed are hidden; deleting a book removes its notes and preserves the shared
+dictionary entry. Earlier personal caches are carried forward without regenerating
+their answers; **↻** can replace an older explanation with the new generic format.
 
 Clicking a word or selecting a phrase opens its term card. Codex is part of the
 card, without separate tabs or a divider: it translates the term using the sentence

@@ -33,7 +33,7 @@ function fixture(ids, options = {}) {
   const names = ['show-answer', 'skip', 'retry', 'error', 'card', 'answer', 'word',
     'language', 'meanings', 'loading', 'progress', 'progress-bar', 'current-status',
     'navigation', 'help', 'complete', 'complete-title', 'summary', 'show-sentences',
-    'context', 'context-label', 'sentences', 'undo'];
+    'context', 'context-label', 'sentences', 'undo', 'book-context', 'book-note', 'book-excerpt', 'book-source'];
   names.forEach(name => { elements[name] = new Element(); });
   elements.complete.hidden = true;
   const levels = [1, 2, 3, 4, 5, 99, 98].map(status => {
@@ -43,12 +43,14 @@ function fixture(ids, options = {}) {
     return element;
   });
   const root = {
+    dataset: {bookId: options.bookId ? String(options.bookId) : ''},
     querySelector: selector => elements[selector.replace('#review-', '')],
     querySelectorAll: selector => selector === '[data-review-status]' ? levels
       : [...levels, elements['show-answer'], elements['show-sentences'], elements.skip, elements.retry, elements.undo],
   };
   const posts = [];
   const loaded = [];
+  const loadedUrls = [];
   const context = vm.createContext({
     document: {querySelector() { return null; }, createElement() { return new Element(); }, addEventListener() {}},
     Math: Object.assign(Object.create(Math), {random: () => options.random ?? .999}),
@@ -60,21 +62,42 @@ function fixture(ids, options = {}) {
         if (options.save) return options.save(posts);
         return {ok: true, json: async () => ({status: posts.at(-1).values})};
       }
-      const id = Number(url.split('/').at(-1));
+      const id = Number(url.split('?')[0].split('/').at(-1));
+      loadedUrls.push(url);
       loaded.push(id);
       if (options.load) return options.load(id, loaded);
       return {ok: true, status: 200, json: async () => ({id, text: `word${id}`, language: 'Finnish',
         sentences_url: `/term/review/card/${id}/sentences`,
         direction: 'rtl', status: posts.length ? posts.at(-1).values : 1,
-        meanings: [{parent: 'base', translation: '<script>evil()</script>\ntranslation'}]})};
+        meanings: [{parent: 'base', translation: '<script>evil()</script>\ntranslation'}],
+        ...(options.usage ? {book_context: options.usage} : {})})};
     },
   });
   vm.runInContext(source, context);
   const review = vm.runInContext('new LuteTermReview(root, configuration)', context);
-  return {review, elements, levels, posts, loaded};
+  return {review, elements, levels, posts, loaded, loadedUrls};
 }
 
 (async () => {
+  const note = {book_title: 'A book', page: 2, excerpt: 'Before. A word. After.', note: '<b>A usage explanation</b>', url: '/read/7/peek/2'};
+  const bookReview = fixture([1, 2], {bookId: 7, usage: note});
+  await tick();
+  assert.equal(bookReview.loadedUrls[0], '/term/review/card/1?book_id=7');
+  assert.equal(bookReview.elements['book-context'].hidden, true, 'the usage note never reveals the answer on the front');
+  assert.equal(bookReview.elements['book-note'].textContent, '');
+  bookReview.review.showAnswer();
+  assert.equal(bookReview.elements['book-context'].hidden, false);
+  assert.equal(bookReview.elements['book-note'].textContent, note.note, 'usage notes are plain text');
+  assert.equal(bookReview.elements['book-source'].textContent, 'A book · Page 2');
+  assert.equal(bookReview.elements['book-excerpt'].textContent, note.excerpt);
+  bookReview.review.skip();
+  await tick();
+  assert.equal(bookReview.elements['book-note'].textContent, '', 'the previous word never leaks into the next card');
+  const termsReview = fixture([1], {usage: note});
+  await tick();
+  termsReview.review.showAnswer();
+  assert.equal(termsReview.elements['book-context'].hidden, true, 'Terms review remains independent of a book');
+
   const f = fixture([1, 2]);
   await tick();
   assert.equal(f.elements.word.textContent, 'word1');

@@ -389,7 +389,7 @@ def test_book_job_prepares_fallback_using_snapshotted_language(
         store.find(db.session, english, "Cats", cache_profile("English", "Russian"))
         == reply["fallback"]
     )
-    assert store.find(db.session, english, "Cats") is None
+    assert store.find(db.session, english, "Cats")["fallback_language"] == "Russian"
 
 
 def test_translation_profiles_migration_preserves_existing_results():

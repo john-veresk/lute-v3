@@ -1,7 +1,5 @@
 """Personal output vocabulary and the identity of a translation's audience."""
 
-import hashlib
-import json
 from lute.translation.vocabulary import Vocabulary
 
 
@@ -20,26 +18,19 @@ def vocabulary_for(session, language, mode=None):
     )
 
 
-def cache_profile(
-    source, target, mode="translation", vocabulary=(), fallback_target=""
-):
-    """Separate ordinary translations from explanations for a particular reader."""
+def cache_profile(source, target, mode="translation"):
+    """Dictionary identity is independent of a sentence and the learner's progress."""
     if mode != "personal":
         return f"translation:{len(source)}:{source}{target}"
-    payload = json.dumps(
-        ["checked-v2", source, target, vocabulary, fallback_target], ensure_ascii=False
-    )
-    return "personal:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
+    return f"personal:{len(source)}:{source}"
 
 
-def profile_for(session, language):
-    """Current output identity, including vocabulary changes in personal mode."""
+def profile_for(_session, language):
+    """Current dictionary output identity; fallback languages have their own rows."""
     return cache_profile(
         language.name,
         language.translation_target_name,
         language.translation_mode,
-        vocabulary_for(session, language),
-        language.translation_target,
     )
 
 
@@ -49,6 +40,4 @@ def profile_from_key(key):
         key[0],
         key[1],
         key[11] if len(key) > 11 else "translation",
-        key[12] if len(key) > 12 else (),
-        key[14] if len(key) > 14 else "",
     )

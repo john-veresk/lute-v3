@@ -86,6 +86,11 @@
         <button id="codex-retry" type="button" class="btn" hidden>Retry</button>
         <div id="codex-skeleton" class="codex-skeleton" aria-hidden="true" hidden><span></span><span></span><span></span></div>
         <div id="codex-options" class="codex-options" role="group" aria-label="Meanings"></div>
+        <aside id="codex-usage" class="codex-usage" hidden>
+          <span class="codex-section-label">In this book</span>
+          <p id="codex-usage-note"></p>
+          <details><summary>Passage</summary><blockquote id="codex-usage-source"></blockquote></details>
+        </aside>
         <p id="codex-vocabulary" class="codex-vocabulary" hidden></p>
         <details id="codex-parent" class="codex-parent" hidden>
           <summary>
@@ -379,7 +384,10 @@
     startTermCodex(
       window,
       in_reading_frame ? (window.parent.LUTE_LOOKUP_CONTEXT || '') : '',
-      {embedded: in_reading_frame, openWord: openPhraseWord}
+      {embedded: in_reading_frame, openWord: openPhraseWord,
+       bookId: in_reading_frame ? Number(window.parent.document.getElementById('book_id')?.value) : null,
+       pageNum: in_reading_frame ? Number(window.parent.document.getElementById('page_num')?.value) : null,
+       sentenceIndex: in_reading_frame ? window.parent.LUTE_LOOKUP_SENTENCE_INDEX ?? null : null}
     );
     $('#term-sentences-btn').click(toggle_sentences);
     $('#term-image-btn').click(toggle_image_search);

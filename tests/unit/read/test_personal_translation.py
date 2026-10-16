@@ -219,7 +219,7 @@ def test_refresh_replaces_russian_cache_without_changing_existing_card(
     )
 
 
-def test_personal_cache_changes_with_vocabulary_but_reuses_other_sentences(
+def test_personal_cache_survives_vocabulary_changes_and_other_sentences(
     client, english, monkeypatch
 ):
     english.translation_mode = "personal"
@@ -233,7 +233,7 @@ def test_personal_cache_changes_with_vocabulary_but_reuses_other_sentences(
     term(english, "cat", 99)
     db.session.commit()
     updated = _lookup(client, english)
-    assert updated.json["saved"] is False
+    assert updated.json["saved"] is True
     assert updated.json["job_id"] != first_id
     _result(client, updated.json["job_id"])
     assert _lookup(client, english, context="Different sentence.").json["saved"] is True
@@ -309,7 +309,7 @@ def test_parent_suggestion_does_not_prefer_saved_russian_in_personal_mode(
     assert root.translation == "идти"
 
 
-def test_book_job_snapshots_personal_vocabulary_and_cache_profile(
+def test_book_job_keeps_cached_personal_result_after_vocabulary_changes(
     client, english, monkeypatch
 ):
     term(english, "cat", 99)
@@ -322,7 +322,7 @@ def test_book_job_snapshots_personal_vocabulary_and_cache_profile(
     db.session.commit()
     worker, translate = worker_for(client, monkeypatch)
     worker.step()
-    translate.assert_called_once()
+    translate.assert_not_called()
     row = db.session.get(store.StoredTranslation, 1)
     assert row.profile.startswith("personal:")
     job = client.get("/jobs/state").json["jobs"][0]
@@ -344,12 +344,13 @@ def test_book_job_passes_snapshot_and_saves_under_snapshot_profile(
     worker.step()
     key = translate.call_args.args[0]
     assert key[1] == "English"
-    assert key[11:] == (
+    assert key[11:15] == (
         "personal",
         vocabulary_for(db.session, english, "personal"),
         None,
         "Russian",
     )
+    assert key[15]["book_id"] == book.id
     assert store.find(db.session, english, "Dog") is None
     english.translation_mode = "personal"
     assert store.find(db.session, english, "Dog") == RESULT
