@@ -21,6 +21,11 @@ The other target is kept for switching back to **Translation**. Personal explana
 use short sentences and simple grammar around A2, prefer your Learned (5) and
 Well Known (99) vocabulary, and explain the meaning in the current sentence with
 one simple example. Familiar vocabulary is a preference, not a strict whitelist.
+Sentence context selects the meaning and grammatical form; saved explanations
+and examples stand alone, without importing characters' names, places or plot
+details. Suggested phrases containing names or story-specific references are
+omitted. A selected proper name itself is still explained as a name. Full sentence
+and page paraphrases preserve the source's names and facts.
 Known child forms are represented only by their root parents, even when a parent
 has a lower learning status; statuses are never changed. Unlinked known words
 remain in the list. Sentence and page commands produce a simplified paraphrase.
