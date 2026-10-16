@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -395,11 +396,29 @@ def _missing_message(cli):
     return "Codex CLI was not found. Install it on the Lute server and run codex login."
 
 
+def _bundled_codex_paths():
+    """Use the desktop app's CLI so model support matches the installed app."""
+    if sys.platform != "darwin":
+        return []
+    return [
+        root / app / "Contents/Resources" / entry
+        for root in (Path.home() / "Applications", Path("/Applications"))
+        for app in ("Codex.app", "ChatGPT.app")
+        for entry in ("codex-cli/bin/codex", "codex")
+    ]
+
+
 def _executable(cli):
     if cli == "cursor":
         name = os.environ.get("LUTE_CURSOR_AGENT_CLI", "cursor-agent")
     else:
-        name = os.environ.get("LUTE_CODEX_CLI", "codex")
+        name = os.environ.get("LUTE_CODEX_CLI")
+        if name is None:
+            for path in _bundled_codex_paths():
+                executable = shutil.which(str(path))
+                if executable:
+                    return executable
+            name = "codex"
     executable = shutil.which(name)
     if not executable:
         raise TranslationError(_missing_message(cli), category="cli_missing")

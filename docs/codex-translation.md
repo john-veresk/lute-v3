@@ -107,8 +107,12 @@ Install and log into Codex CLI on the computer running the Lute server:
 codex login
 ```
 
-The server must find `codex` on its PATH. If needed, set `LUTE_CODEX_CLI` to the
-absolute executable path before starting Lute. A Docker installation needs the
+On macOS, Lute first uses the CLI bundled with Codex or ChatGPT in
+`~/Applications` or `/Applications`. This keeps model support in step with the
+desktop app; an older CLI on PATH can reject models available in the app.
+Otherwise, the server must find `codex` on its PATH. Set `LUTE_CODEX_CLI` to an
+executable path to override this automatic selection before starting Lute.
+A Docker installation needs the
 CLI and its authentication inside the container; it cannot execute the host CLI.
 The CLI uses your existing Codex account and sends the selected text and sentence
 to its model provider. It is a local CLI integration, not offline inference.

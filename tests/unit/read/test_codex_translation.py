@@ -25,6 +25,56 @@ RESULT = {
 }
 
 
+@pytest.mark.parametrize("bundled_available", [False, True])
+def test_codex_prefers_bundled_cli_and_falls_back_to_path(
+    monkeypatch, tmp_path, bundled_available
+):
+    bundled = tmp_path / "ChatGPT.app" / "codex"
+    bundled.parent.mkdir()
+    bundled.write_text("#!/bin/sh\n")
+    bundled.chmod(0o755 if bundled_available else 0o644)
+    path_cli = tmp_path / "codex"
+    path_cli.write_text("#!/bin/sh\n")
+    path_cli.chmod(0o755)
+    monkeypatch.delenv("LUTE_CODEX_CLI", raising=False)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    monkeypatch.setattr(service, "_bundled_codex_paths", lambda: [bundled])
+    assert service._executable("codex") == str(
+        bundled if bundled_available else path_cli
+    )
+
+
+@pytest.mark.parametrize("cli", ["codex", "cursor"])
+def test_explicit_cli_override_takes_precedence(monkeypatch, cli):
+    name = f"/custom/{cli}"
+    env = "LUTE_CODEX_CLI" if cli == "codex" else "LUTE_CURSOR_AGENT_CLI"
+    monkeypatch.setenv(env, name)
+
+    def which(value):
+        assert value == name
+        return name
+
+    monkeypatch.setattr(service.shutil, "which", which)
+    assert service._executable(cli) == name
+
+
+def test_missing_explicit_codex_does_not_fall_back(monkeypatch):
+    monkeypatch.setenv("LUTE_CODEX_CLI", "/missing/codex")
+    with pytest.raises(service.TranslationError) as caught:
+        service._executable("codex")
+    assert caught.value.category == "cli_missing"
+
+
+def test_bundled_cli_discovery_is_mac_only(monkeypatch, tmp_path):
+    monkeypatch.setattr(service.sys, "platform", "darwin")
+    monkeypatch.setattr(service.Path, "home", lambda: tmp_path)
+    assert tmp_path / "Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex" in (
+        service._bundled_codex_paths()
+    )
+    monkeypatch.setattr(service.sys, "platform", "linux")
+    assert service._bundled_codex_paths() == []
+
+
 @pytest.mark.parametrize(
     "status,translation",
     [(0, ""), (1, ""), (99, ""), (1, "мой перевод"), (99, "мой перевод"), (1, " \n ")],
