@@ -160,3 +160,21 @@ def test_cancelled_job_settings_are_readable_but_immutable(client, spanish):
     assert (
         client.patch(f"/jobs/{job_id}/settings", json={"model": ""}).status_code == 409
     )
+
+
+def test_model_suggestions_use_selected_cli(client, monkeypatch):
+    monkeypatch.setattr(
+        "lute.translation.routes.available_models", lambda: ["codex-model"]
+    )
+    monkeypatch.setattr(
+        "lute.translation.routes.available_cursor_models", lambda: ["cursor-model"]
+    )
+    assert client.get("/translation/models").json == {
+        "cli": "codex",
+        "models": ["codex-model"],
+    }
+    assert client.get("/translation/models?cli=cursor").json == {
+        "cli": "cursor",
+        "models": ["cursor-model"],
+    }
+    assert client.get("/translation/models?cli=other").status_code == 400

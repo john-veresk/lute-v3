@@ -32,3 +32,12 @@ Running jobs finish the current word using its original settings, then use the
 new settings for the next word. The job response contains `job` and
 `applies_after_current_word`, which is true while a word is in flight. No server
 restart is needed to apply settings.
+
+`GET /translation/models?cli=cursor` (or `cli=codex`, the default) returns
+`{"cli":"cursor","models":[...]}` with cached model suggestions. The list can
+be empty when the CLI or its model metadata is unavailable. Custom IDs are
+accepted independently of this list.
+
+On the Jobs page, **Change model** opens the same settings for an active job.
+Choose the harness and a model suggestion, or enter a custom ID. Saving keeps
+the job's current status and checkpoint; **Resume** remains a separate action.

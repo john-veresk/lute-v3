@@ -54,3 +54,10 @@
 .job-card progress::-webkit-progress-bar { border-radius: 99px; background: var(--line); }
 .job-card progress::-webkit-progress-value { border-radius: 99px; background: var(--accent); }
 .job-card progress::-moz-progress-bar { border-radius: 99px; background: var(--accent); }
+
+.job-settings-dialog { box-sizing: border-box; position: fixed; inset: 0; margin: auto; width: min(480px, calc(100% - 2rem)); max-height: calc(100% - 2rem); overflow-y: auto; border: 1px solid var(--line); border-radius: 14px; padding: 1.5rem; background: var(--background-color); color: var(--ink-1); }
+.job-settings-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+.job-settings-dialog h2 { margin-top: 0; font-size: 1.15rem; }
+.job-settings-dialog label { display: block; margin: .85rem 0 .35rem; }
+.job-settings-dialog input, .job-settings-dialog select { box-sizing: border-box; width: 100%; padding: .6rem; border: 1px solid var(--line); border-radius: 6px; background: var(--background-color); color: inherit; }
+#job-settings-title { overflow-wrap: anywhere; }

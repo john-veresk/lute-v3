@@ -7,6 +7,7 @@ from lute.db import db
 from lute.models.book import Book, Text
 from lute.translation.bulk import ACTIVE, BookTranslationJob, language_settings, utcnow
 from lute.translation.settings import updated_settings
+from lute.translation.service import REASONING_EFFORTS
 
 bp = Blueprint("jobs", __name__, url_prefix="/jobs")
 
@@ -61,7 +62,7 @@ def settings(job_id):
 
 @bp.get("")
 def index():
-    return render_template("jobs/index.html")
+    return render_template("jobs/index.html", reasoning_efforts=REASONING_EFFORTS)
 
 
 @bp.get("/state")

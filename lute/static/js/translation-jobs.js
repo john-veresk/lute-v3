@@ -11,6 +11,7 @@ class TranslationJobManager {
     this.refreshing = false;
     this.bookSignature = '';
     this.selectedTags = new Set();
+    this.modelOptions = {};
     this.find('jobs-tags').addEventListener('click', event => {
       const button = event.target.closest('[data-tag]');
       if (!button) return;
@@ -46,20 +47,105 @@ class TranslationJobManager {
     this.find('jobs-add').addEventListener('click', () => this.addBooks());
     this.find('jobs-list').addEventListener('click', event => {
       const button = event.target.closest('[data-action]');
-      if (button) this.command(`/jobs/${button.closest('[data-job-id]').dataset.jobId}/${button.dataset.action}`);
+      if (!button) return;
+      const id = Number(button.closest('[data-job-id]').dataset.jobId);
+      if (button.dataset.action === 'settings') this.editSettings(id);
+      else this.command(`/jobs/${id}/${button.dataset.action}`);
+    });
+    this.find('job-settings-cli').addEventListener('change', () => {
+      this.modelsByCli[this.editorCli] = this.find('job-settings-model').value;
+      this.editorCli = this.find('job-settings-cli').value;
+      this.find('job-settings-model').value = this.modelsByCli[this.editorCli] || '';
+      this.configureEditor();
+    });
+    this.find('job-settings-form').addEventListener('submit', event => {
+      event.preventDefault();
+      this.saveSettings();
+    });
+    this.find('job-settings-cancel').addEventListener('click', () => this.find('job-settings-dialog').close());
+    this.find('job-settings-dialog').addEventListener('cancel', event => {
+      if (this.settingsSaving) event.preventDefault();
+    });
+    this.find('job-settings-dialog').addEventListener('close', () => {
+      this.find('jobs-list').querySelector(`[data-job-id="${this.editingJob}"] [data-action="settings"]`)?.focus();
     });
     this.refresh();
   }
 
   find(id) { return document.getElementById(id); }
 
-  async request(url, body) {
+  async request(url, body, method = 'POST') {
     const options = {cache: 'no-store'};
-    if (body !== undefined) Object.assign(options, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+    if (body !== undefined) Object.assign(options, {method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
     const response = await fetch(url, options);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || `Request failed (${response.status}).`);
     return data;
+  }
+
+  editSettings(id) {
+    if (this.busy) return;
+    const job = this.state.jobs.find(item => item.id === id);
+    if (!job || !this.active(job)) return;
+    this.editingJob = id;
+    this.editorCli = job.settings.cli;
+    this.modelsByCli = {[this.editorCli]: job.settings.model};
+    this.find('job-settings-title').textContent = `Job ${id} · ${job.title}`;
+    this.find('job-settings-cli').value = this.editorCli;
+    this.find('job-settings-model').value = job.settings.model;
+    this.find('job-settings-effort').value = job.settings.effort || '';
+    this.find('job-settings-error').hidden = true;
+    this.configureEditor();
+    this.find('job-settings-dialog').showModal();
+  }
+
+  async configureEditor() {
+    const cli = this.editorCli;
+    const cursor = cli === 'cursor';
+    this.find('job-settings-effort-row').hidden = cursor;
+    this.find('job-settings-effort').disabled = cursor;
+    this.find('job-settings-model').placeholder = 'CLI default';
+    this.find('job-settings-help').textContent = cursor
+      ? 'Choose or enter an exact model ID, including effort and speed. Leave blank for the CLI default.'
+      : 'Choose or enter a model ID. Leave blank for the CLI default. Jobs use standard speed.';
+    const list = this.find('job-settings-models');
+    list.replaceChildren();
+    try {
+      if (!this.modelOptions[cli]) this.modelOptions[cli] = (await this.request(`/translation/models?cli=${cli}`)).models;
+      if (this.editorCli !== cli) return;
+      list.replaceChildren();
+      this.modelOptions[cli].forEach(model => {
+        const option = document.createElement('option');
+        option.value = model;
+        list.append(option);
+      });
+    } catch (_error) {
+      if (this.editorCli === cli) this.find('job-settings-help').textContent = 'Model suggestions are unavailable. Enter a model ID, or leave blank for the CLI default.';
+    }
+  }
+
+  async saveSettings() {
+    if (this.busy || !this.find('job-settings-form').reportValidity()) return;
+    const cli = this.find('job-settings-cli').value;
+    const body = {cli, model: this.find('job-settings-model').value, effort: cli === 'cursor' ? '' : this.find('job-settings-effort').value};
+    this.busy = this.settingsSaving = true;
+    const error = this.find('job-settings-error');
+    error.hidden = true;
+    this.updateButtons();
+    ['save', 'cancel', 'cli', 'model', 'effort'].forEach(name => { this.find(`job-settings-${name}`).disabled = true; });
+    try {
+      await this.request(`/jobs/${this.editingJob}/settings`, body, 'PATCH');
+      this.find('job-settings-dialog').close();
+      this.error();
+    } catch (failure) {
+      error.textContent = failure.message;
+      error.hidden = false;
+    } finally {
+      this.busy = this.settingsSaving = false;
+      ['save', 'cancel', 'cli', 'model', 'effort'].forEach(name => { this.find(`job-settings-${name}`).disabled = name === 'effort' && cli === 'cursor'; });
+      this.updateButtons();
+      await this.refresh();
+    }
   }
 
   error(message = '') {
@@ -267,7 +353,7 @@ class TranslationJobManager {
         field('errors').append(item);
       }
       const index = waiting.findIndex(item => item.id === job.id);
-      const actions = {pause: ['queued', 'running', 'waiting'].includes(job.status), resume: ['paused', 'error'].includes(job.status), cancel: this.active(job), up: index > 0, down: index >= 0 && index < waiting.length - 1};
+      const actions = {pause: ['queued', 'running', 'waiting'].includes(job.status), resume: ['paused', 'error'].includes(job.status), settings: this.active(job), cancel: this.active(job), up: index > 0, down: index >= 0 && index < waiting.length - 1};
       card.querySelectorAll('[data-action]').forEach(button => {
         button.hidden = !actions[button.dataset.action];
         button.disabled = this.busy;

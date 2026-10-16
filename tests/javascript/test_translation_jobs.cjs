@@ -73,6 +73,53 @@ function fixture() {
   assert.equal(locked.busy, false);
   assert.equal(locked.selected.size, 0);
 
+  const editor = fixture().manager;
+  const editorControls = {};
+  for (const name of ['title', 'cli', 'model', 'effort', 'error', 'effort-row', 'help', 'save', 'cancel']) editorControls[`job-settings-${name}`] = {};
+  editorControls['job-settings-models'] = {children: [], replaceChildren() { this.children = []; }, append(item) { this.children.push(item); }};
+  editorControls['job-settings-form'] = {reportValidity: () => true};
+  editorControls['job-settings-dialog'] = {open: false, showModal() { this.open = true; }, close() { this.open = false; }};
+  editor.find = id => editorControls[id];
+  editor.modelOptions = {cursor: ['cursor-grok-4.6-medium'], codex: ['codex-model']};
+  editor.state.jobs = [{id: 8, title: '<book>', status: 'paused', settings: {cli: 'cursor', model: 'cursor-grok-4.6-medium', effort: ''}}];
+  editor.editSettings(8);
+  assert.equal(editorControls['job-settings-dialog'].open, true);
+  assert.equal(editorControls['job-settings-title'].textContent, 'Job 8 · <book>');
+  assert.equal(editorControls['job-settings-model'].value, 'cursor-grok-4.6-medium');
+  assert.equal(editorControls['job-settings-effort-row'].hidden, true);
+  assert.equal(editorControls['job-settings-models'].children[0].value, 'cursor-grok-4.6-medium');
+  editorControls['job-settings-model'].value = 'another-model';
+  let patch;
+  editor.request = async (url, body, method) => { patch = {url, body, method}; return {}; };
+  editor.refresh = async () => {};
+  await editor.saveSettings();
+  assert.equal(patch.url, '/jobs/8/settings');
+  assert.equal(patch.method, 'PATCH');
+  assert.equal(JSON.stringify(patch.body), JSON.stringify({cli: 'cursor', model: 'another-model', effort: ''}));
+  assert.equal(editorControls['job-settings-dialog'].open, false);
+  assert.equal(editorControls['job-settings-save'].disabled, false);
+  assert.equal(editorControls['job-settings-effort'].disabled, true);
+  editor.editSettings(8);
+  editor.request = async () => { throw new Error('Cannot save'); };
+  await editor.saveSettings();
+  assert.equal(editorControls['job-settings-dialog'].open, true, 'failed saves keep the editor and draft open');
+  assert.equal(editorControls['job-settings-error'].textContent, 'Cannot save');
+  assert.equal(editor.busy, false);
+
+  // Late suggestions for the previous harness must not replace current choices.
+  editor.modelOptions = {};
+  let resolveCursor;
+  editor.request = url => url.endsWith('cursor')
+    ? new Promise(resolve => { resolveCursor = resolve; })
+    : Promise.resolve({models: ['codex-model']});
+  editor.editorCli = 'cursor';
+  const cursorSuggestions = editor.configureEditor();
+  editor.editorCli = 'codex';
+  await editor.configureEditor();
+  resolveCursor({models: ['cursor-model']});
+  await cursorSuggestions;
+  assert.equal(editorControls['job-settings-models'].children[0].value, 'codex-model');
+
   const polling = fixture().manager;
   let respond;
   polling.request = () => new Promise(resolve => { respond = resolve; });

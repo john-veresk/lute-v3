@@ -31,6 +31,30 @@
       <div id="jobs-list"></div>
     </section>
   </div>
+  <dialog id="job-settings-dialog" class="job-settings-dialog" aria-labelledby="job-settings-heading">
+    <form id="job-settings-form">
+      <h2 id="job-settings-heading">Change model</h2>
+      <p id="job-settings-title"></p>
+      <label for="job-settings-cli">Harness</label>
+      <select id="job-settings-cli"><option value="codex">Codex CLI</option><option value="cursor">Cursor Agent</option></select>
+      <label for="job-settings-model">Model</label>
+      <input id="job-settings-model" type="text" list="job-settings-models" maxlength="100" pattern="[a-zA-Z0-9][a-zA-Z0-9._:\/\-]*" autocomplete="off" aria-describedby="job-settings-help">
+      <datalist id="job-settings-models"></datalist>
+      <p id="job-settings-help" class="jobs-note"></p>
+      <div id="job-settings-effort-row">
+        <label for="job-settings-effort">Reasoning effort</label>
+        <select id="job-settings-effort"><option value="">CLI default</option>
+          {% for effort in reasoning_efforts %}<option value="{{ effort }}">{{ effort }}</option>{% endfor %}
+        </select>
+      </div>
+      <p class="jobs-note">Applies to this job only, starting with the next word. Progress is kept. Paused jobs stay paused.</p>
+      <p id="job-settings-error" class="job-error" role="alert" hidden></p>
+      <div class="job-actions">
+        <button id="job-settings-save" type="submit" class="app-button app-button-primary">Save model</button>
+        <button id="job-settings-cancel" type="button" class="app-button">Cancel</button>
+      </div>
+    </form>
+  </dialog>
 </section>
 <template id="job-card-template">
   <article class="job-card">
@@ -46,6 +70,7 @@
       <button type="button" class="app-button" data-action="down" title="Move book down" aria-label="Move book down">↓</button>
       <button type="button" class="app-button" data-action="pause">Pause</button>
       <button type="button" class="app-button" data-action="resume">Resume</button>
+      <button type="button" class="app-button" data-action="settings">Change model</button>
       <button type="button" class="app-button" data-action="cancel">Cancel</button>
     </div>
     <details><summary>Details &amp; errors</summary><p data-field="times"></p><p data-field="context" class="job-context"></p><ul data-field="errors"></ul></details>

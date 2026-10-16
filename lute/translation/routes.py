@@ -10,7 +10,13 @@ from lute.translation import contexts, store
 from lute.translation.cards import save_card
 from lute.translation.personal import check_explanations
 from lute.translation.profile import profile_from_key, vocabulary_for
-from lute.translation.service import RateLimitError, TranslationError, TranslationJobs
+from lute.translation.service import (
+    RateLimitError,
+    TranslationError,
+    TranslationJobs,
+    available_models,
+    available_cursor_models,
+)
 from lute.translation.vocabulary import Vocabulary
 
 bp = Blueprint("translation", __name__, url_prefix="/translation")
@@ -18,6 +24,18 @@ bp = Blueprint("translation", __name__, url_prefix="/translation")
 # auto: a saved result, otherwise translate.  stored: only a saved result.
 # prefetch: translate only terms without a saved result.  refresh: always translate.
 LOOKUP_MODES = ("auto", "stored", "prefetch", "refresh")
+
+
+@bp.get("/models")
+def models():
+    """Cached suggestions only; custom model IDs remain valid."""
+    cli = request.args.get("cli", "codex")
+    if cli not in ("codex", "cursor"):
+        return jsonify(error="CLI must be codex or cursor"), 400
+    return jsonify(
+        cli=cli,
+        models=available_cursor_models() if cli == "cursor" else available_models(),
+    )
 
 
 @bp.route("/vocabulary", methods=["GET", "POST"])
