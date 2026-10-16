@@ -80,12 +80,14 @@ class CodexPanel {
     this.context = '';
     this.generation = 0;
     this.lastMode = 'auto';
+    this.lastFallback = false;
     this.options = [];
     this.parentSuggestion = null;
     this.cardRows = {words: [], phrases: []};
     this.timer = new CodexTimer(this.element('codex-timer'), window);
     this.element('codex-refresh')?.addEventListener('click', () => this.start('refresh'));
-    this.element('codex-retry').addEventListener('click', () => this.start(this.lastMode));
+    this.element('codex-fallback')?.addEventListener('click', () => this.start('refresh', true));
+    this.element('codex-retry').addEventListener('click', () => this.start(this.lastMode, this.lastFallback));
     window.addEventListener('pagehide', () => { this.generation++; this.timer.stop(); });
     if (form) window.addEventListener('keydown', event => this.onKey(event));
   }
@@ -106,6 +108,8 @@ class CodexPanel {
 
   setBusy(busy) {
     this.element('codex-skeleton').hidden = !busy;
+    const fallback = this.element('codex-fallback');
+    if (fallback) fallback.disabled = busy;
     const refresh = this.element('codex-refresh');
     if (!refresh) return;
     refresh.disabled = busy;
@@ -133,7 +137,7 @@ class CodexPanel {
   }
 
   /** mode: auto, stored or refresh (see LOOKUP_MODES in translation/routes.py). */
-  async start(mode) {
+  async start(mode, fallback = false) {
     if (this.form) {
       this.text = this.form.text();
       this.languageId = this.form.languageId();
@@ -142,6 +146,8 @@ class CodexPanel {
     this.translationAtStart = typeof this.form?.translation === 'function' ? this.form.translation() : undefined;
     const current = ++this.generation;
     this.lastMode = mode;
+    this.lastFallback = fallback;
+    this.element('codex-fallback')?.setAttribute('aria-pressed', String(fallback));
     this.reset();
     this.setBusy(mode !== 'stored');
     try {
@@ -172,12 +178,12 @@ class CodexPanel {
   async submit(mode) {
     return readResponse(await this.win.fetch('/translation/jobs', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({language_id: this.languageId, text: this.text, context: this.context, kind: this.kind, mode}),
+      body: JSON.stringify({language_id: this.languageId, text: this.text, context: this.context, kind: this.kind, mode, ...(this.lastFallback ? {fallback: true} : {})}),
     }));
   }
 
   async poll(jobId, current) {
-    const deadline = Date.now() + 8 * 90 * 1000;
+    const deadline = Date.now() + 8 * 2 * 90 * 1000;
     while (current === this.generation) {
       const data = await readResponse(await this.win.fetch(`/translation/jobs/${jobId}`));
       if (data.status === 'error') throw new Error(data.error);

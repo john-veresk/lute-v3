@@ -17,7 +17,11 @@ ready or fails. Uncheck it to hide the timer for that language.
 
 **Output → Personal Finnish** (named after the language you are learning) explains
 words and phrases in simple Finnish instead of translating into **Translate into**.
-The other target is kept for switching back to **Translation**. Personal explanations
+**Fallback language** selects a language such as Russian or English. Its button
+in each card regenerates that card in the chosen language without changing the
+language's main mode. Press **Save** to persist the replacement; **↻** returns
+to the main mode. With **Output → Translation**, the same setting is the main
+**Translate into** language. Personal explanations
 use short sentences, common everyday vocabulary and simple grammar around A2,
 and explain the meaning in the current sentence with one simple example.
 The initial prompt is generic: the reader's vocabulary is never sent with it.

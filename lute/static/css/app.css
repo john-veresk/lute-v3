@@ -260,6 +260,22 @@ a.app-brand.home-link {
 
 .model-picker input { width: 100%; }
 
+#edit-lang { max-width: 760px; }
+#edit-lang #language { width: 100%; border-spacing: 0 .65rem; }
+#edit-lang #language td { vertical-align: top; }
+#edit-lang #language td:first-child { width: 15rem; padding: .4rem 1rem .4rem 0; }
+#edit-lang #language input[type="text"],
+#edit-lang #language select { width: 100%; max-width: 28rem; min-height: 2.2rem; padding: .35rem .5rem; box-sizing: border-box; }
+#edit-lang .small-flash-notice { padding: 0; border: 0; background: none; color: var(--ink-2); font-size: .82rem; line-height: 1.45; }
+@media (max-width: 640px) {
+    #edit-lang #language, #edit-lang #language tbody,
+    #edit-lang #language tr, #edit-lang #language td { display: block; width: 100%; }
+    #edit-lang #language tr { margin-bottom: 1rem; }
+    #edit-lang #language td:first-child { width: auto; padding: 0 0 .3rem; font-weight: 600; }
+    #edit-lang #language input[type="text"], #edit-lang #language select,
+    #edit-lang #language .model-picker { max-width: none; width: 100%; }
+}
+
 .model-suggestions {
     position: absolute;
     z-index: 20;

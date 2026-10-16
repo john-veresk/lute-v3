@@ -57,14 +57,14 @@ def test_cyclic_parents_do_not_hang_or_drop_known_vocabulary(english):
     assert known_words(db.session, english) == ("a",)
 
 
-def test_personal_mode_is_saved_without_a_separate_target(client, spanish):
+def test_personal_mode_keeps_a_configurable_fallback_language(client, spanish):
     response = client.post(
         f"/language/edit/{spanish.id}",
         data={
             "name": spanish.name,
             "parser_type": spanish.parser_type,
             "translation_mode": "personal",
-            "translation_target": "",
+            "translation_target": "English",
         },
     )
     assert response.status_code == 302
@@ -76,7 +76,11 @@ def test_personal_mode_is_saved_without_a_separate_target(client, spanish):
     assert (
         page.select_one("#translation_mode option[selected]").text == "Personal Spanish"
     )
-    assert page.select_one("#translation-target-row").has_attr("hidden")
+    assert not page.select_one("#translation-target-row").has_attr("hidden")
+    assert (
+        page.select_one('label[for="translation_target"]').text == "Fallback language"
+    )
+    assert spanish.translation_target == "English"
     assert (
         b"Personal Spanish"
         in client.get(f"/translation/panel?language_id={spanish.id}").data

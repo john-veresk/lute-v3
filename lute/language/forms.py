@@ -96,7 +96,7 @@ class LanguageForm(FlaskForm):
 
     def validate_translation_target(self, field):
         "Codex needs a target language."
-        if self.translation_mode.data != "personal" and not (field.data or "").strip():
+        if not (field.data or "").strip():
             raise ValidationError("Please enter a translation language")
 
     def validate_codex_reasoning_effort(self, field):

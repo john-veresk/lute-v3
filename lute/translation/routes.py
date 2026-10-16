@@ -105,7 +105,9 @@ def _phrase_candidates(language, word, context):
 def setup(state):
     """One bounded job manager per application."""
     log_path = Path(state.app.config["DATAPATH"]) / "codex-translation.log"
-    state.app.extensions["codex_translation_jobs"] = TranslationJobs(log_path, state.app)
+    state.app.extensions["codex_translation_jobs"] = TranslationJobs(
+        log_path, state.app
+    )
 
 
 @bp.route("/panel")
@@ -131,6 +133,22 @@ def submit():
     context = data.get("context", "")
     kind = data.get("kind", "term")
     mode = data.get("mode", "auto")
+    fallback = data.get("fallback", False)
+    if type(fallback) is not bool or (
+        fallback
+        and (
+            language.translation_mode != "personal"
+            or not (language.translation_target or "").strip()
+        )
+    ):
+        return (
+            jsonify(error="Fallback requires personal mode and a fallback language"),
+            400,
+        )
+    output_mode = "translation" if fallback else language.translation_mode
+    target = (
+        language.translation_target if fallback else language.translation_target_name
+    )
     if mode not in LOOKUP_MODES:
         return jsonify(error="Invalid lookup mode"), 400
     if (
@@ -168,7 +186,7 @@ def submit():
             )
     key = (
         language.name,
-        language.translation_target_name,
+        target,
         language.codex_model,
         clean_text,
         context,
@@ -178,8 +196,8 @@ def submit():
         language.codex_fast_mode if mode != "prefetch" else False,
         phrase_texts,
         language.translation_cli or "codex",
-        language.translation_mode,
-        vocabulary_for(db.session, language),
+        output_mode,
+        vocabulary_for(db.session, language, output_mode),
     )
     saved = None
     if kind == "term" and mode != "refresh":
@@ -324,12 +342,16 @@ def _save_cards(card_type):
     if key is None or result is None:
         return jsonify(error="Translation expired. Translate again."), 404
     cli = key[10] if len(key) > 10 else "codex"
+    output_mode = key[11] if len(key) > 11 else "translation"
+    fallback = language.translation_mode == "personal" and output_mode == "translation"
+    target = (
+        language.translation_target if fallback else language.translation_target_name
+    )
     if (
-        key[:3]
-        != (language.name, language.translation_target_name, language.codex_model)
+        key[:3] != (language.name, target, language.codex_model)
         or key[7:9] != (language.codex_reasoning_effort, language.codex_fast_mode)
         or cli != (language.translation_cli or "codex")
-        or (key[11] if len(key) > 11 else "translation") != language.translation_mode
+        or (output_mode != language.translation_mode and not fallback)
         or key[5] != "term"
         or result["status"] != "complete"
     ):

@@ -34,9 +34,12 @@
         <p id="personal-language-help" class="small-flash-notice" {% if form.translation_mode.data != 'personal' %}hidden{% endif %}>Simple explanations in the language you are learning, using words you know.</p>
       </td>
     </tr>
-    <tr id="translation-target-row" {% if form.translation_mode.data == 'personal' %}hidden{% endif %}>
-      <td>{{ form.translation_target.label(class="form-control-label") }}</td>
-      <td>{{ form.translation_target(class="form-control", placeholder="Russian") }}</td>
+    <tr id="translation-target-row">
+      <td>{{ form.translation_target.label('Fallback language' if form.translation_mode.data == 'personal' else 'Translate into', class="form-control-label") }}</td>
+      <td>
+        {{ form.translation_target(class="form-control", placeholder="Russian") }}
+        <p id="translation-target-help" class="small-flash-notice" {% if form.translation_mode.data != 'personal' %}hidden{% endif %}>Use this language from the card when the simple explanation is too difficult.</p>
+      </td>
     </tr>
     <tr>
       <td>{{ form.translation_cli.label(class="form-control-label") }}</td>
@@ -98,7 +101,8 @@
       const personal = document.getElementById('translation_mode').value === 'personal';
       const name = document.getElementById('name').value.trim() || 'language';
       document.querySelector('#translation_mode option[value="personal"]').textContent = `Personal ${name}`;
-      document.getElementById('translation-target-row').hidden = personal;
+      document.querySelector('label[for="translation_target"]').textContent = personal ? 'Fallback language' : 'Translate into';
+      document.getElementById('translation-target-help').hidden = !personal;
       document.getElementById('personal-language-help').hidden = !personal;
     }
     $('#translation_mode').on('change', updateOutputMode);

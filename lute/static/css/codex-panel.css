@@ -1,6 +1,9 @@
 /* Codex in the term card, and the sentence translation panel. */
 .codex-vocabulary { margin: .6rem .3rem; color: var(--ink-3); font-size: .85rem; line-height: 1.5; }
 .codex-vocabulary a { color: inherit; text-decoration: underline dotted; text-underline-offset: .2em; }
+.codex-fallback { max-width: 8rem; min-height: 28px; padding: .2rem .5rem; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); color: var(--ink-3); font: inherit; font-size: .78rem; cursor: pointer; }
+.codex-fallback[aria-pressed="true"] { background: var(--surface-2); color: var(--font-color); }
+.codex-fallback:disabled { cursor: default; opacity: .55; }
 
 body:has(> .codex-panel) { margin: 0; }
 

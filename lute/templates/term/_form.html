@@ -72,6 +72,7 @@
           <button id="term-image-btn" type="button" class="term-icon-btn" title="Find an image" aria-label="Find an image" aria-expanded="false">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m20.5 16-4.8-4.8-8.2 7.8"/></svg>
           </button>
+          {% with language=term_language %}{% include 'read/_translation_fallback.html' %}{% endwith %}
           <button id="codex-refresh" type="button" class="term-icon-btn" title="Translate again with {{ term_language.translation_source_name if term_language else 'Codex' }}" aria-label="Translate again with {{ term_language.translation_source_name if term_language else 'Codex' }}">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4.2h-4.2"/></svg>
           </button>
