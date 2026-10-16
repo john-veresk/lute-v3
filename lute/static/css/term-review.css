@@ -15,6 +15,7 @@
 }
 
 .review-heading h1 {
+    flex: 1;
     margin: 0;
     overflow: hidden;
     color: var(--ink-2);
@@ -225,6 +226,11 @@
 }
 
 .review-skip:hover { background: var(--surface-2); color: var(--font-color); }
+
+.review-undo { display: inline-flex; align-items: center; gap: .4rem; }
+.review-undo svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.review-undo:disabled { opacity: .4; cursor: default; }
+.review-undo:disabled:hover { background: none; color: var(--ink-2); }
 
 .review-note,
 .review-alert {

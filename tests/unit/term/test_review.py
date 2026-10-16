@@ -371,3 +371,13 @@ def test_review_save_updates_synchronized_family_and_live_cards(
     db.session.expire_all()
     for term in terms.values():
         assert client.get(f"/term/review/card/{term.id}").json["status"] == status
+
+    # Review's Undo uses the same API to restore the previous level for the family.
+    response = client.post(
+        "/term/ajax_edit_from_index",
+        json={"term_id": terms["gatos"].id, "update_type": "status", "values": 2},
+    )
+    assert response.status_code == 200
+    db.session.expire_all()
+    for term in terms.values():
+        assert client.get(f"/term/review/card/{term.id}").json["status"] == 2

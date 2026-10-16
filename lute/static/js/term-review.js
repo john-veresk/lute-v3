@@ -15,12 +15,14 @@ class LuteTermReview {
     this.card = null;
     this.revealed = false;
     this.busy = false;
+    this.history = [];
     this.levels = [...root.querySelectorAll('[data-review-status]')];
     this.el('show-answer').addEventListener('click', () => this.showAnswer());
     this.el('show-sentences').addEventListener('click', () => this.toggleSentences());
     this.el('card').addEventListener('click', () => this.showAnswer());
     this.el('skip').addEventListener('click', () => this.skip());
     this.el('retry').addEventListener('click', () => this.loadCurrent());
+    this.el('undo').addEventListener('click', () => this.undo());
     this.levels.forEach(button => button.addEventListener('click', () => this.rate(Number(button.dataset.reviewStatus))));
     document.addEventListener('keydown', event => this.handleKey(event));
     this.loadCurrent();
@@ -31,6 +33,7 @@ class LuteTermReview {
   setBusy(busy) {
     this.busy = busy;
     this.root.querySelectorAll('button').forEach(button => { button.disabled = busy; });
+    this.el('undo').disabled = busy || this.history.length === 0;
     this.el('card').setAttribute('aria-busy', String(busy));
   }
 
@@ -49,6 +52,9 @@ class LuteTermReview {
   async loadCurrent() {
     if (this.busy) return;
     this.clearError();
+    this.el('card').hidden = false;
+    this.el('navigation').hidden = false;
+    this.el('complete').hidden = true;
     this.card = null;
     this.revealed = false;
     this.el('answer').hidden = true;
@@ -122,6 +128,7 @@ class LuteTermReview {
     if (this.busy || !this.card || !this.revealed) return;
     if (!this.levels.some(button => Number(button.dataset.reviewStatus) === status)) return;
     this.clearError();
+    const previous = this.snapshot();
     this.setBusy(true);
     try {
       const response = await fetch('/term/ajax_edit_from_index', {
@@ -136,6 +143,7 @@ class LuteTermReview {
       this.setBusy(false);
       return;
     }
+    this.history.push(previous);
     this.rated++;
     this.index++;
     this.setBusy(false);
@@ -155,9 +163,51 @@ class LuteTermReview {
 
   skip() {
     if (this.busy || this.index >= this.ids.length) return;
+    this.history.push(this.snapshot());
     this.skipped++;
     this.index++;
     this.loadCurrent();
+  }
+
+  snapshot() {
+    return {
+      index: this.index,
+      rated: this.rated,
+      skipped: this.skipped,
+      unavailable: this.unavailable,
+      card: this.card,
+    };
+  }
+
+  async undo() {
+    if (this.busy || !this.history.length) return;
+    const previous = this.history.at(-1);
+    this.clearError();
+    this.setBusy(true);
+    if (previous.rated < this.rated) {
+      try {
+        // Use the same status API so synchronized forms are restored as well.
+        const response = await fetch('/term/ajax_edit_from_index', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({term_id: previous.card.id, update_type: 'status', values: previous.card.status}),
+        });
+        if (!response.ok) throw new Error('Unable to undo');
+        await response.json();
+      } catch (error) {
+        this.showError('Could not undo the answer. Try Undo again.');
+        this.setBusy(false);
+        return;
+      }
+    }
+    this.history.pop();
+    this.index = previous.index;
+    this.rated = previous.rated;
+    this.skipped = previous.skipped;
+    this.unavailable = previous.unavailable;
+    this.setBusy(false);
+    await this.loadCurrent();
+    if (previous.card && this.card?.id === previous.card.id) this.showAnswer();
   }
 
   handleKey(event) {
@@ -167,6 +217,9 @@ class LuteTermReview {
       // Suppress native button activation, including a focused level button.
       event.preventDefault();
       this.showAnswer();
+    } else if (event.key === 'Backspace') {
+      event.preventDefault();
+      this.undo();
     } else if (/^[1-5]$/.test(event.key)) {
       event.preventDefault();
       this.rate(Number(event.key));
