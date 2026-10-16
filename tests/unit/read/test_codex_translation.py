@@ -123,7 +123,6 @@ def test_cursor_agent_prints_json_from_ask_mode(
         assert command[command.index("--sandbox") + 1] == "enabled"
         assert "--print" in command
         assert "--trust" in command
-        assert "--exclude-workspace-context" in command
         assert command[command.index("--model") + 1] == expected
         assert kwargs["stdin"] == subprocess.DEVNULL
         assert kwargs["timeout"] == 90

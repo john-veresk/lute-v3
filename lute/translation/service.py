@@ -725,7 +725,6 @@ def _cursor_command(executable, workdir, model, prompt):
         "--sandbox",
         "enabled",
         "--trust",
-        "--exclude-workspace-context",
         "--workspace",
         workdir,
     ]
