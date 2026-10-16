@@ -166,7 +166,7 @@ def test_cursor_agent_prints_json_from_ask_mode(
         assert kwargs["stdin"] == subprocess.DEVNULL
         assert kwargs["timeout"] == 90
         assert not kwargs.get("shell")
-        assert "Kissa nukkuu." in command[-1]
+        assert ("Kissa nukkuu." in command[-1]) == (translation_mode == "translation")
         assert json.loads(command[-1].splitlines()[1]) == service.SCHEMA
         payload = json.loads(command[-1].rsplit("\n", 1)[1])
         assert payload["target_language"] == (

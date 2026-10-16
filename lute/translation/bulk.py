@@ -393,9 +393,7 @@ class BookTranslationWorker:
                     )
                     if settings.get("translation_mode") == "personal":
                         key += (None, settings.get("fallback_target", ""))
-                    skipped = self._skip(
-                        language, word["text"], profile_from_key(key), word["context"]
-                    )
+                    skipped = self._skip(language, word["text"], profile_from_key(key))
                     db.session.commit()
                 except Exception as exc:  # pylint: disable=broad-exception-caught
                     db.session.rollback()
@@ -463,8 +461,8 @@ class BookTranslationWorker:
         timing.finished_at = utcnow()
 
     @staticmethod
-    def _skip(language, text, profile=None, context=None):
-        if store.find(db.session, language, text, profile, context) is not None:
+    def _skip(language, text, profile=None):
+        if store.find(db.session, language, text, profile) is not None:
             return True
         return (
             db.session.query(Term.id)

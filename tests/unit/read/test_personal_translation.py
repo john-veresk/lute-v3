@@ -3,6 +3,7 @@
 import json
 import sqlite3
 from pathlib import Path
+from unittest.mock import Mock
 import pytest
 from bs4 import BeautifulSoup
 from lute.db import db
@@ -120,7 +121,7 @@ def test_personal_lookup_passes_only_a_local_revision(
     jobs.pool.shutdown(wait=True)
 
 
-def test_personal_prompt_covers_terms_sentences_and_cards_without_translation_rules():
+def test_personal_prompt_explains_common_meanings_without_book_context():
     prompt = service._prompt(
         "Finnish",
         "Finnish",
@@ -135,11 +136,22 @@ def test_personal_prompt_covers_terms_sentences_and_cards_without_translation_ru
     payload = json.loads(raw)
     assert "known_words" not in payload
     assert "revision" not in payload
-    assert payload["sentence_context"] == "Älä keskeytä."
+    assert "sentence_context" not in payload
+    assert "Älä keskeytä." not in prompt
     assert "simplified paraphrase" in instructions
-    assert "only the meaning in sentence_context" in instructions
-    assert "common meanings outside sentence_context" not in instructions
+    assert "main common distinct meanings" in instructions
+    assert "independent of any book or sentence context" in instructions
     assert "return a word card for EACH entry" in instructions
+
+
+@pytest.mark.parametrize("kind", ["term", "sentence"])
+def test_personal_prompt_does_not_change_with_surrounding_sentence(kind):
+    def prompt(context):
+        return service._prompt(
+            "Finnish", "Finnish", "kuusi", context, kind, [], (), "personal"
+        )
+
+    assert prompt("Metsässä kasvaa kuusi.") == prompt("Kello on kuusi.")
 
 
 @pytest.mark.parametrize("cli", ["codex", "cursor"])
@@ -168,6 +180,8 @@ def test_personal_output_reaches_both_cli_prompts(monkeypatch, cli):
     prompt = calls[0][3 if cli == "cursor" else 5]
     payload = json.loads(prompt.rsplit("\n", 1)[1])
     assert payload["target_language"] == "Finnish"
+    assert "sentence_context" not in payload
+    assert "Kissa nukkuu." not in prompt
     assert "known_words" not in payload
     assert "local-only-revision-must-not-reach-provider" not in prompt
 
@@ -205,7 +219,7 @@ def test_refresh_replaces_russian_cache_without_changing_existing_card(
     )
 
 
-def test_personal_cache_changes_with_vocabulary_and_sentence(
+def test_personal_cache_changes_with_vocabulary_but_reuses_other_sentences(
     client, english, monkeypatch
 ):
     english.translation_mode = "personal"
@@ -222,10 +236,52 @@ def test_personal_cache_changes_with_vocabulary_and_sentence(
     assert updated.json["saved"] is False
     assert updated.json["job_id"] != first_id
     _result(client, updated.json["job_id"])
-    assert (
-        _lookup(client, english, context="Different sentence.").json["saved"] is False
-    )
+    assert _lookup(client, english, context="Different sentence.").json["saved"] is True
     client.application.extensions["codex_translation_jobs"].pool.shutdown(wait=True)
+
+
+@pytest.mark.parametrize("mode", ["auto", "stored", "prefetch"])
+def test_personal_explanation_is_reused_between_books(
+    client, english, monkeypatch, mode
+):
+    english.translation_mode = "personal"
+    make_books(english, ["The cats sleep.", "The cats run."])
+    phrase = {"text": "cats sleep", "translation": "Kissat nukkuvat."}
+    fallback = {**RESULT, "phrases": [phrase]}
+    saved = {
+        **RESULT,
+        "phrases": [phrase],
+        "fallback": fallback,
+        "fallback_language": "Russian",
+    }
+    store.save(db.session, english, "cats", "The cats sleep.", saved)
+    generate = Mock()
+    monkeypatch.setattr(service, "translate", generate)
+    response = _lookup(client, english, mode=mode, text="Cats", context="The cats run.")
+    if mode == "prefetch":
+        assert response.json["job_id"] is None
+    else:
+        assert response.json["saved"] is True
+        result = _result(client, response.json["job_id"])["result"]
+        assert result["options"] == saved["options"]
+        assert result["phrases"] == []
+        assert result["fallback"]["phrases"] == []
+    generate.assert_not_called()
+    assert store.find(db.session, english, "cats") == saved
+
+
+def test_book_job_skips_personal_explanation_from_another_book(
+    client, english, monkeypatch
+):
+    english.translation_mode = "personal"
+    books = make_books(english, ["Dog.", "Dog!"])
+    store.save(db.session, english, "Dog", "Dog.", RESULT)
+    enqueue(client, [books[1]])
+    worker, generate = worker_for(client, monkeypatch)
+    assert worker.step()
+    generate.assert_not_called()
+    job = client.get("/jobs/state").json["jobs"][0]
+    assert (job["status"], job["translated"], job["skipped"]) == ("complete", 0, 1)
 
 
 def test_inflight_result_keeps_its_original_profile(client, english, monkeypatch):

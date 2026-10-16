@@ -203,9 +203,7 @@ def submit():
         key += (None, language.translation_target)
     saved = None
     if kind == "term" and mode != "refresh":
-        saved = store.find(
-            db.session, language, clean_text, profile_from_key(key), context
-        )
+        saved = store.find(db.session, language, clean_text, profile_from_key(key))
     if saved is not None and mode != "prefetch":
         job_id = _jobs().adopt(key, _fit_to_context(saved, phrase_texts), language.id)
         return jsonify(job_id=job_id, saved=True), 202
@@ -249,7 +247,10 @@ def submit():
 def _fit_to_context(result, phrase_texts):
     "A result saved from another sentence only offers phrases found in this one."
     phrases = [p for p in result.get("phrases", []) if p["text"] in phrase_texts]
-    return {**result, "phrases": phrases}
+    fitted = {**result, "phrases": phrases}
+    if result.get("fallback"):
+        fitted["fallback"] = _fit_to_context(result["fallback"], phrase_texts)
+    return fitted
 
 
 @bp.route("/jobs/<job_id>")

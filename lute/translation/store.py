@@ -38,17 +38,11 @@ def _find_row(session, language, text, profile):
     )
 
 
-def find(session, language, text, profile=None, context=None):
-    "The saved result for a term, or None."
+def find(session, language, text, profile=None):
+    "The saved result for a term and output profile, shared across books."
     profile = profile if profile is not None else profile_for(session, language)
     row = _find_row(session, language, text, profile)
     if row is None:
-        return None
-    if (
-        row.profile.startswith("personal:")
-        and context is not None
-        and row.context != context
-    ):
         return None
     return json.loads(row.result)
 

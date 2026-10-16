@@ -48,7 +48,9 @@ full personal flow again, saves both variants and shows the fallback translation
 With **Output → Translation**, the same setting is the main
 **Translate into** language. Personal explanations
 use short sentences, common everyday vocabulary and simple grammar around A2,
-and explain the meaning in the current sentence with one simple example.
+and give reusable dictionary explanations of the main common meanings, each
+with one generic example. Common meanings come first; synonyms are grouped and
+rare senses are omitted.
 The initial prompt is generic: the reader's vocabulary is never sent with it.
 After generation, Lute checks explanations, examples, parents and phrase/word
 cards against the local database, using Learned (5), Well Known (99), explicit
@@ -57,9 +59,12 @@ one revision request with those words and familiar words used in the first answe
 The second valid answer is accepted even if unfamiliar words remain; there is
 no revision loop. Remaining unfamiliar words appear as **Words to learn**, with
 links to their cards. The selected learning target itself is excluded from this list.
-Sentence context selects the meaning and grammatical form; saved explanations
-and examples stand alone, without importing characters' names, places or plot
-details. Suggested phrases containing names or story-specific references are
+The surrounding sentence is not sent for personal explanations. The selected
+word or phrase determines its meanings and grammatical form. Phrase candidates
+are supplied only for the separate suggestions section and must not influence
+the main word's definitions or examples. Saved explanations and examples stand
+alone, without importing characters' names, places or plot details. Suggested
+phrases containing names or story-specific references are
 omitted. A selected proper name itself is still explained as a name. Full sentence
 and page paraphrases preserve the source's names and facts.
 Known child forms establish knowledge of their parent family even when a parent
@@ -71,8 +76,10 @@ Existing vocabulary translations are not converted automatically. Select the
 personal mode, save the language, reload the card, and press **↻** to generate
 a personal explanation, then **Save** to keep it on the card. Translation caches
 distinguish output modes, target languages and personal vocabulary, so a Russian
-cached result is not reused as a personal Finnish explanation. Personal results
-from a different sentence are also regenerated. Queued book jobs snapshot the
+cached result is not reused as a personal Finnish explanation. Saved personal
+results are reused across sentences and books, just like ordinary translations;
+use **↻** to regenerate them. Phrase suggestions are shown only when present in
+the current sentence. Queued book jobs snapshot the
 output mode and model settings, and check vocabulary against the current local
 database when each word is processed. Only a compact vocabulary fingerprint is
 used in cache keys, not a word list.

@@ -119,6 +119,8 @@ def test_phrase_with_empty_lemma_completes_and_is_saved(
         calls.append(payload)
         assert payload["words_to_translate"] == phrase.split()
         assert payload["fallback_language"] == "Russian"
+        assert "sentence_context" not in payload
+        assert context not in prompt
         assert "known_words" not in payload
         if len(calls) == 2:
             assert "fallback" not in payload["revision"]["previous_result"]
@@ -148,7 +150,7 @@ def test_phrase_with_empty_lemma_completes_and_is_saved(
     assert generated["vocabulary"]["unknown"] == []
     assert generated["vocabulary"]["revised"] is needs_revision
     assert len(calls) == (2 if needs_revision else 1)
-    assert store.find(db.session, learner, phrase, context=context) == generated
+    assert store.find(db.session, learner, phrase) == generated
 
 
 def test_revision_payload_contains_only_output_feedback_not_a_full_dictionary():
