@@ -63,6 +63,20 @@ def find_broadcast_url(html, broadcast_date):
     return candidates.pop()
 
 
+def latest_broadcast_date(html):
+    """Choose the newest dated broadcast, regardless of card order."""
+    soup = BeautifulSoup(html, "html.parser")
+    dates = set()
+    for timestamp in soup.select("time[datetime]"):
+        try:
+            dates.add(date.fromisoformat(timestamp["datetime"][:10]))
+        except ValueError:
+            continue
+    if not dates:
+        raise ValueError("No dated broadcasts found on the archive page")
+    return max(dates)
+
+
 def extract_broadcast(html, expected_date=None):
     """Extract only the article body, preserving Finnish and paragraph order."""
     soup = BeautifulSoup(html, "html.parser")
@@ -107,10 +121,23 @@ def save_broadcast(output_dir, title, broadcast_date, text, source_url):
     stem = f"selkouutiset-{broadcast_date.isoformat()}-fi"
     text_path = output_dir / f"{stem}.txt"
     csv_path = output_dir / f"{stem}.csv"
-    # Do not replace a previously extracted or manually corrected text silently.
+    row = {
+        "title": title,
+        "text": text,
+        "language": "Finnish",
+        "tags": "selkouutiset",
+        "url": source_url,
+    }
+    # A repeat run can reuse identical files, but never replace corrected text.
     if text_path.exists() or csv_path.exists():
+        if text_path.is_file() and csv_path.is_file():
+            with csv_path.open(encoding="utf-8", newline="") as stream:
+                rows = list(csv.DictReader(stream))
+            if text_path.read_text(encoding="utf-8") == text and rows == [row]:
+                return text_path, csv_path
         raise ValueError(
-            f"Output already exists for {broadcast_date}; choose another --output-dir"
+            f"Different or incomplete output exists for {broadcast_date}; "
+            "choose another --output-dir"
         )
     text_path.write_text(text, encoding="utf-8")
     with csv_path.open("w", encoding="utf-8", newline="") as stream:
@@ -118,38 +145,41 @@ def save_broadcast(output_dir, title, broadcast_date, text, source_url):
             stream, fieldnames=["title", "text", "language", "tags", "url"]
         )
         writer.writeheader()
-        writer.writerow(
-            {
-                "title": title,
-                "text": text,
-                "language": "Finnish",
-                "tags": "selkouutiset",
-                "url": source_url,
-            }
-        )
+        writer.writerow(row)
     return text_path, csv_path
 
 
 def main(argv=None):
     """Command-line entry point; extraction does not modify the Lute database."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
         "--date", type=date.fromisoformat, help="Broadcast date: YYYY-MM-DD"
+    )
+    selection.add_argument(
+        "--latest",
+        action="store_true",
+        help="Extract the newest broadcast in the archive",
     )
     parser.add_argument(
         "--url", help="Direct Yle article URL (also works for older broadcasts)"
     )
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     args = parser.parse_args(argv)
-    if args.date is None and args.url is None:
-        parser.error("supply --date or --url")
+    if args.date is None and args.url is None and not args.latest:
+        parser.error("supply --date, --latest or --url")
+    if args.latest and args.url:
+        parser.error("--latest cannot be combined with --url")
     try:
         with requests.Session() as session:
             session.headers["User-Agent"] = "Lute-Selkouutiset-Extractor/1.0"
             if args.url:
                 url = article_url(args.url)
             else:
-                url = find_broadcast_url(fetch_html(session, ARCHIVE_URL), args.date)
+                archive = fetch_html(session, ARCHIVE_URL)
+                if args.latest:
+                    args.date = latest_broadcast_date(archive)
+                url = find_broadcast_url(archive, args.date)
             title, broadcast_date, text = extract_broadcast(
                 fetch_html(session, url), args.date
             )

@@ -9,6 +9,7 @@ from scripts.extract_selkouutiset import (
     article_url,
     extract_broadcast,
     find_broadcast_url,
+    latest_broadcast_date,
     main,
     save_broadcast,
 )
@@ -68,6 +69,16 @@ def test_archive_rejects_ambiguous_cards():
         find_broadcast_url(html, DAY)
 
 
+def test_latest_uses_newest_date_not_card_order():
+    html = """<time datetime="2026-10-11T12:00:00+0300"/>
+        <time datetime="2026-10-15T17:00:00+0300"/>
+        <time datetime="2026-10-14T17:00:00+0300"/>
+        <time datetime="invalid"/>"""
+    assert latest_broadcast_date(html) == DAY
+    with pytest.raises(ValueError):
+        latest_broadcast_date("<html/>")
+
+
 @pytest.mark.parametrize(
     "url",
     [
@@ -99,6 +110,41 @@ def test_csv_preserves_text_and_import_metadata(tmp_path):
     with pytest.raises(ValueError):
         save_broadcast(tmp_path, title, day, "Changed", URL)
     assert txt.read_text(encoding="utf-8") == text
+    previous_mtime = (txt.stat().st_mtime_ns, csv_path.stat().st_mtime_ns)
+    assert save_broadcast(tmp_path, title, day, text, URL) == (txt, csv_path)
+    assert (txt.stat().st_mtime_ns, csv_path.stat().st_mtime_ns) == previous_mtime
+
+
+def test_refuses_incomplete_existing_output(tmp_path):
+    title, day, text = extract_broadcast(HTML, DAY)
+    txt, csv_path = save_broadcast(tmp_path, title, day, text, URL)
+    csv_path.unlink()
+    with pytest.raises(ValueError):
+        save_broadcast(tmp_path, title, day, text, URL)
+    assert txt.read_text(encoding="utf-8") == text
+
+
+def test_latest_cli_resolves_date_and_saves_csv(tmp_path, monkeypatch):
+    import requests
+
+    archive = f'<div><a href="{URL}">Story</a><time datetime="2026-10-15T17:00:00+0300"/></div>'
+    calls = []
+
+    def get(_session, url, **_kwargs):
+        calls.append(url)
+        response = requests.Response()
+        response.status_code = 200
+        response._content = (HTML if url == URL else archive).encode("utf-8")
+        return response
+
+    monkeypatch.setattr(requests.Session, "get", get)
+    assert main(["--latest", "--output-dir", str(tmp_path)]) == 0
+    assert calls == ["https://yle.fi/selkouutiset/kaikki-lahetykset", URL]
+    csv_path = tmp_path / "selkouutiset-2026-10-15-fi.csv"
+    with csv_path.open(encoding="utf-8", newline="") as stream:
+        row = next(csv.DictReader(stream))
+    assert row["title"] == "Selkouutiset | torstai 15.10.2026"
+    assert row["tags"] == "selkouutiset"
 
 
 def test_cli_reports_network_failure_without_writing_files(tmp_path, monkeypatch):
