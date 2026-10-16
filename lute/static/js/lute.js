@@ -203,6 +203,7 @@ function show_term_edit_form(el) {
   const wid = parseInt(el.data('wid'));
   set_lookup_context(el);
   _show_wordframe_url(`/read/edit_term/${wid}`);
+  window.pretranslate_page?.(_get_order(el));
 }
 
 function set_lookup_context(el) {
@@ -259,6 +260,7 @@ function show_multiword_term_edit_form(selected) {
   // "/" in the term cause problems with routing, so hack a fix.
   const sendtext = text.replace(/\//g, "LUTESLASH");
   _show_wordframe_url(`/read/termform/${lid}/${sendtext}`);
+  window.pretranslate_page?.(_get_order(selected.eq(-1)));
 }
 
 

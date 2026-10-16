@@ -47,6 +47,13 @@ uses standard processing, even when **Fast mode** is enabled for the language.
 Translations started from a term card or the sentence/page commands still use
 the language's **Fast mode** setting.
 
+Opening a word or selecting a phrase in the reading text rebuilds the waiting
+queue from the words after that selection on the current page. The background
+translation already running finishes first. Opening an earlier word moves the
+queue back too, so pre-translation follows where you are reading. Stored
+translations are still skipped, and the progress counter restarts for the new
+queue.
+
 Sentence and page translation commands also use Codex. The sentences icon and
 the image icon beside ↻ open term usage and the Bing image search inside the card.
 

@@ -371,18 +371,20 @@
     onProgress: render_pretranslate_progress,
   });
 
-  // The page's unknown words, each with its sentence as the lookup context.
-  function pretranslate_page() {
+  // Rebuild from the reading position, including when the reader goes back.
+  function pretranslate_page(afterOrder = -1) {
     if (!LUTE_CODEX_PRETRANSLATE) return;
     const sentences = {};
     $('span.textitem').each(function() {
       const id = $(this).data('sentence-id');
       (sentences[id] ||= []).push(this);
     });
-    const words = $('span.textitem.word.status0').toArray().map(el => ({
-      text: el.textContent,
-      context: _get_textitems_text(sentences[$(el).data('sentence-id')]).slice(0, 4000),
-    }));
+    const words = $('span.textitem.word.status0').toArray()
+      .filter(el => _get_order($(el)) > afterOrder)
+      .map(el => ({
+        text: el.textContent,
+        context: _get_textitems_text(sentences[$(el).data('sentence-id')]).slice(0, 4000),
+      }));
     pretranslator.run(words);
   }
 
