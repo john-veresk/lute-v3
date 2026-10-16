@@ -297,3 +297,30 @@ def test_shared_profile_migration_reuses_latest_result_without_discarding_histor
         4,
     )
     connection.close()
+
+
+def test_existing_context_table_gets_sentence_positions_without_losing_notes():
+    connection = sqlite3.connect(":memory:")
+    migrations = Path("lute/db/schema/migrations")
+    connection.executescript(
+        (migrations / "20261016_translation_contexts.sql").read_text()
+    )
+    connection.execute(
+        """INSERT INTO translationcontexts
+        (language_id, book_id, text_lc, profile, context_key, page, sentence,
+         excerpt, note, updated) VALUES (1, 1, 'cats', 'personal', 'old', 1,
+         'The cats sleep.', 'The cats sleep.', 'Sleeping cats.', '2026-10-16')"""
+    )
+    connection.executescript(
+        (migrations / "20261016_translation_contexts_position.sql").read_text()
+    )
+    assert connection.execute(
+        "SELECT note, sentence_index FROM translationcontexts"
+    ).fetchall() == [("Sleeping cats.", -1)]
+    connection.execute(
+        "UPDATE translationcontexts SET sentence_index = 0 WHERE context_key = 'old'"
+    )
+    assert connection.execute(
+        "SELECT sentence_index FROM translationcontexts"
+    ).fetchone() == (0,)
+    connection.close()

@@ -7,7 +7,6 @@ CREATE TABLE translationcontexts (
   profile TEXT NOT NULL,
   context_key TEXT NOT NULL,
   page INTEGER NOT NULL,
-  sentence_index INTEGER NOT NULL,
   sentence TEXT NOT NULL,
   excerpt TEXT NOT NULL,
   note TEXT NOT NULL,
