@@ -24,8 +24,6 @@
   <div class="settings-nav-group">
     <h2>About</h2>
     {{ item('/version', 'Version') }}
-    <a href="https://luteorg.github.io/lute-manual/" target="_blank" rel="noopener">Manual</a>
-    <a href="https://discord.gg/CzFUQP5m8u" target="_blank" rel="noopener">Discord</a>
   </div>
   {% if backup_enabled and backup_directory != '' and backup_time_since is not none %}
   <p class="settings-nav-note">Last backup {{ backup_time_since }}.
