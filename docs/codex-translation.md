@@ -115,6 +115,27 @@ language, model, reasoning effort and Fast mode. Changing either option starts
 a new lookup instead of reusing a translation from the previous settings.
 Errors appear in the panel with a Retry button.
 
+When Codex returns **HTTP 429**, Lute pauses new CLI requests for 30 seconds.
+Repeated throttles increase this delay to 60 seconds and then 120 seconds
+(the maximum). A successful request after the pause resets the delay. Requests
+already running may finish; queued requests also respect the pause. Saved
+translations remain available. The panel reports the wait, and API responses
+include `retry_after` (plus `Retry-After` on rejected submissions).
+
+Background pre-translation waits and retries the same word after a 429; its
+progress shows **Paused** and does not count the word until translation succeeds
+or a stored translation is found. Other failures stop background processing and
+show **Translation failed**, without advancing the counter. Reload the page to
+restart it. Turning a page during the pause replaces the old waiting words.
+
+Diagnostics are written to `codex-translation.log` in the configured Lute data
+directory. Each CLI attempt records its job ID, lookup mode, model, reasoning
+effort, Fast mode, input lengths, duration and outcome. Failures include the HTTP
+status and CLI exit code when available, the failure category, validation reason
+and cooldown. Times are UTC. Book text, prompts, translations, raw CLI output
+and authentication data are not logged. The log rotates at 2 MB and keeps three
+previous files.
+
 Model suggestions come from the local CLI cache when it is available. The list
 can be empty until the CLI has fetched models; entering an ID still works.
 Startup automatically migrates the database and makes the usual migration

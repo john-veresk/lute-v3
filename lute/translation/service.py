@@ -1,7 +1,10 @@
 """Bounded, cached background translation through the local Codex CLI."""
 
 import json
+import logging
+import math
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -11,11 +14,95 @@ import uuid
 from collections import OrderedDict
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 
 class TranslationError(Exception):
     """An actionable translation failure."""
+
+    def __init__(
+        self,
+        message,
+        category="translation_failed",
+        http_status=None,
+        exit_code=None,
+        detail="",
+    ):
+        super().__init__(message)
+        self.category = category
+        self.http_status = http_status
+        self.exit_code = exit_code
+        self.detail = detail
+
+
+class RateLimitError(TranslationError):
+    """A service throttle, with a delay shared by all translation jobs."""
+
+    def __init__(self, retry_after=30, exit_code=None):
+        super().__init__(
+            f"Codex request limit reached (HTTP 429). Try again in {retry_after} s.",
+            category="rate_limited",
+            http_status=429,
+            exit_code=exit_code,
+        )
+        self.retry_after = retry_after
+
+
+def _cli_error(stderr, exit_code):
+    """Extract known failure types; never retain raw CLI output or prompts."""
+    if isinstance(stderr, bytes):
+        stderr = stderr.decode("utf-8", errors="replace")
+    # CLI stderr also echoes the prompt. Inspect only diagnostic lines.
+    diagnostics = "\n".join(
+        line
+        for line in (stderr or "").splitlines()
+        if re.match(
+            r"^(ERROR:|Error:|Reconnecting|\d{4}-\d\d-\d\dT\S+\s+(?:ERROR|WARN)\b)",
+            line,
+        )
+    )
+    statuses = re.findall(
+        r"(?:last status:|unexpected status|HTTP error:|status code:?)\s*(\d{3})\b",
+        diagnostics,
+        re.IGNORECASE,
+    )
+    if "429" in statuses or "429 Too Many Requests" in diagnostics:
+        return RateLimitError(exit_code=exit_code)
+    status = int(statuses[-1]) if statuses else None
+    category = "cli_failed"
+    if status in (401, 403):
+        category = "authentication_or_access"
+    elif status:
+        category = "http_error"
+    elif re.search(
+        r"model.*(?:not supported|does not exist|not found)", diagnostics, re.I
+    ):
+        category = "unsupported_model"
+    elif re.search(r"connection|network|stream disconnected|dns", diagnostics, re.I):
+        category = "network_error"
+    return TranslationError(
+        "Codex could not translate. Check codex login, the selected model and your usage limits, then retry.",
+        category=category,
+        http_status=status,
+        exit_code=exit_code,
+    )
+
+
+def _diagnostic_logger(log_path):
+    """Reuse one rotating handler per data directory, including app reloads."""
+    logger = logging.getLogger(f"lute.translation.{Path(log_path).resolve()}")
+    if not logger.handlers:
+        handler = RotatingFileHandler(
+            log_path, maxBytes=2_000_000, backupCount=3, encoding="utf-8"
+        )
+        formatter = logging.Formatter("%(asctime)sZ %(levelname)s %(message)s")
+        formatter.converter = time.gmtime
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+    return logger
 
 
 SCHEMA = {
@@ -164,7 +251,8 @@ def translate(
     executable = shutil.which(os.environ.get("LUTE_CODEX_CLI", "codex"))
     if not executable:
         raise TranslationError(
-            "Codex CLI was not found. Install it on the Lute server and run codex login."
+            "Codex CLI was not found. Install it on the Lute server and run codex login.",
+            category="cli_missing",
         )
     words_to_translate = (
         list(word_texts) if kind == "term" and len(word_texts) > 1 else []
@@ -261,16 +349,19 @@ def translate(
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
-            raise TranslationError("Codex translation timed out. Try again.") from exc
+            error = _cli_error(exc.stderr, None)
+            if isinstance(error, RateLimitError):
+                raise error from exc
+            raise TranslationError(
+                "Codex translation timed out. Try again.", category="timeout"
+            ) from exc
         except OSError as exc:
             raise TranslationError(
-                "Could not start Codex CLI. Check the server's CLI installation."
+                "Could not start Codex CLI. Check the server's CLI installation.",
+                category="cli_start_failed",
             ) from exc
         if result.returncode:
-            # Do not expose CLI logs, paths, authentication data or the book text.
-            raise TranslationError(
-                "Codex could not translate. Check codex login, the selected model and your usage limits, then retry."
-            )
+            raise _cli_error(result.stderr, result.returncode)
         try:
             data = json.loads(output.read_text(encoding="utf-8"))
             options = data["options"]
@@ -345,7 +436,9 @@ def translate(
             return data
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise TranslationError(
-                "Codex returned an invalid translation. Try again."
+                "Codex returned an invalid translation. Try again.",
+                category="invalid_response",
+                detail=str(exc) if type(exc) is ValueError else type(exc).__name__,
             ) from exc
 
 
@@ -361,30 +454,104 @@ class _Job:
 class TranslationJobs:
     """Keep HTTP workers free and share repeated lookups, including in-flight ones."""
 
-    def __init__(self):
+    def __init__(self, log_path=None):
         self.pool = ThreadPoolExecutor(
             max_workers=2, thread_name_prefix="lute-translation"
         )
         self.lock = threading.Lock()
         self.jobs = OrderedDict()
+        self.logger = (
+            _diagnostic_logger(log_path) if log_path else logging.getLogger(__name__)
+        )
+        self.cooldown_until = 0
+        self.rate_limit_count = 0
 
     def _drop_finished(self, now):
-        "Failures can be retried at once; results are cached for an hour."
+        "Keep finished jobs available for polling, with a one-hour lifetime."
         for job_id, job in list(self.jobs.items()):
-            if job.future.done() and (
-                now - job.started > 3600 or job.future.exception() is not None
-            ):
+            if job.future.done() and now - job.started > 3600:
                 del self.jobs[job_id]
 
-    def _add(self, job):
+    def _retry_after(self):
+        "Seconds until another CLI invocation is permitted; caller holds lock."
+        return max(0, math.ceil(self.cooldown_until - time.monotonic()))
+
+    def _run(self, key, job_id, mode):
+        "Guard queued jobs too, so a throttle stops the entire waiting queue."
+        with self.lock:
+            delay = self._retry_after()
+            if delay:
+                raise RateLimitError(delay)
+        started = time.monotonic()
+        metadata = {
+            "job_id": job_id,
+            "mode": mode,
+            "source": key[0],
+            "target": key[1],
+            "model": key[2] or "CLI default",
+            "kind": key[5],
+            "text_chars": len(key[3]),
+            "context_chars": len(key[4]),
+            "reasoning_effort": key[7] if len(key) > 7 else "",
+            "fast_mode": key[8] if len(key) > 8 else False,
+        }
+        self.logger.info(json.dumps({**metadata, "event": "started"}))
+        try:
+            result = translate(*key)
+        except Exception as exc:
+            # No raw stderr, exception messages, credentials or book text in logs.
+            failure = {
+                "category": getattr(exc, "category", type(exc).__name__),
+                "http_status": getattr(exc, "http_status", None),
+                "exit_code": getattr(exc, "exit_code", None),
+                "detail": getattr(exc, "detail", ""),
+            }
+            if isinstance(exc, RateLimitError):
+                with self.lock:
+                    self.rate_limit_count = min(self.rate_limit_count + 1, 3)
+                    delay = 30 * (2 ** (self.rate_limit_count - 1))
+                    self.cooldown_until = max(
+                        self.cooldown_until, time.monotonic() + delay
+                    )
+                    exc.retry_after = self._retry_after()
+                    exc.args = (
+                        f"Codex request limit reached (HTTP 429). Try again in {exc.retry_after} s.",
+                    )
+                    failure["retry_after"] = exc.retry_after
+            self.logger.warning(
+                json.dumps(
+                    {
+                        **metadata,
+                        **failure,
+                        "event": "failed",
+                        "elapsed_s": round(time.monotonic() - started, 3),
+                    }
+                )
+            )
+            raise
+        with self.lock:
+            if not self._retry_after():
+                self.rate_limit_count = 0
+        self.logger.info(
+            json.dumps(
+                {
+                    **metadata,
+                    "event": "complete",
+                    "elapsed_s": round(time.monotonic() - started, 3),
+                }
+            )
+        )
+        return result
+
+    def _add(self, job, job_id=None):
         while len(self.jobs) >= 128:
             done_id = next(j for j, item in self.jobs.items() if item.future.done())
             del self.jobs[done_id]
-        job_id = uuid.uuid4().hex
+        job_id = job_id or uuid.uuid4().hex
         self.jobs[job_id] = job
         return job_id
 
-    def submit(self, key, fresh=False, language_id=None):
+    def submit(self, key, fresh=False, language_id=None, mode="auto"):
         """Cache up to 128 results, with at most 8 pending jobs.
 
         A fresh lookup ignores cached results but still joins an in-flight one.
@@ -395,16 +562,21 @@ class TranslationJobs:
             for job_id, job in list(self.jobs.items()):
                 if job.key != key:
                     continue
-                if fresh and job.future.done():
+                if job.future.done() and (fresh or job.future.exception() is not None):
                     del self.jobs[job_id]
                 else:
                     return job_id
+            delay = self._retry_after()
+            if delay:
+                raise RateLimitError(delay)
             if sum(not job.future.done() for job in self.jobs.values()) >= 8:
                 raise TranslationError(
                     "Codex is busy translating other words. Try again shortly."
                 )
-            future = self.pool.submit(translate, *key)
-            return self._add(_Job(key, future, now, language_id))
+            job_id = uuid.uuid4().hex
+            future = self.pool.submit(self._run, key, job_id, mode)
+            self._add(_Job(key, future, now, language_id), job_id)
+            return job_id
 
     def adopt(self, key, result, language_id=None):
         "Serve a saved result like a completed lookup, without saving it again."
@@ -447,6 +619,15 @@ class TranslationJobs:
             return {"status": "pending"}
         try:
             return {"status": "complete", "result": future.result()}
+        except RateLimitError as exc:
+            with self.lock:
+                delay = self._retry_after()
+            return {
+                "status": "error",
+                "error": str(exc),
+                "retry_after": delay,
+                "error_code": "rate_limited",
+            }
         except TranslationError as exc:
             return {"status": "error", "error": str(exc)}
         except Exception:  # pylint: disable=broad-exception-caught

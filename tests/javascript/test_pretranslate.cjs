@@ -10,13 +10,13 @@ const Pretranslator = vm.runInContext('Pretranslator', context);
 
 const response = (data, status = 200) => ({ok: status < 400, status, json: async () => data});
 
-function makePretranslator(reply, onProgress) {
+function makePretranslator(reply, onProgress, wait = async () => {}) {
   const requests = [];
   let inFlight = 0;
   let maxInFlight = 0;
   const pretranslator = new Pretranslator({
     languageId: 1,
-    wait: async () => {},
+    wait,
     onProgress,
     fetch: async (url, options) => {
       const body = options && JSON.parse(options.body);
@@ -61,6 +61,63 @@ async function checks() {
   });
   await retry.pretranslator.run([words[0]]);
   assert.equal(retry.requests.filter(r => r.url === '/translation/jobs').length, 2, 'a busy Codex is retried later');
+
+  const throttleProgress = [];
+  const pauses = [];
+  let throttles = 2;
+  const throttled = makePretranslator(async (url, body) => {
+    if (url === '/translation/jobs') return response({job_id: body.text}, 202);
+    return throttles-- > 0
+      ? response({status: 'error', error_code: 'rate_limited', retry_after: throttles ? 30 : 120})
+      : response({status: 'complete'});
+  }, event => throttleProgress.push({...event}), async ms => pauses.push(ms));
+  await throttled.pretranslator.run([words[0]]);
+  assert.deepEqual(pauses, [30000, 120000], 'a CLI 429 pauses before retrying the same word');
+  assert.deepEqual(throttled.requests.filter(r => r.body).map(r => r.body.text), ['Kissa', 'Kissa', 'Kissa']);
+  assert.deepEqual(throttleProgress.map(p => p.done), [0, 0, 0, 1], 'errors and cooldown do not advance progress');
+  assert.equal(throttleProgress[1].paused, true);
+
+  const refusedPauses = [];
+  let refused = true;
+  const refusedJob = makePretranslator(async url => {
+    if (url === '/translation/jobs' && refused) {
+      refused = false;
+      return response({error_code: 'rate_limited', retry_after: 60}, 429);
+    }
+    return url === '/translation/jobs' ? response({job_id: 'job'}, 202) : response({status: 'complete'});
+  }, undefined, async ms => refusedPauses.push(ms));
+  await refusedJob.pretranslator.run([words[0]]);
+  assert.deepEqual(refusedPauses, [60000], 'submission honors the server cooldown');
+
+  for (const failure of ['cli', 'http', 'network']) {
+    const failedProgress = [];
+    const failed = makePretranslator(async url => {
+      if (failure === 'network') throw new Error('offline');
+      if (failure === 'http') return response({}, 500);
+      return url === '/translation/jobs' ? response({job_id: 'failed'}, 202) : response({status: 'error'});
+    }, event => failedProgress.push({...event}));
+    await failed.pretranslator.run(words);
+    assert.equal(failed.pretranslator.done, 0, `${failure} does not count as a processed word`);
+    assert.equal(failedProgress.at(-1).error, true, `${failure} is reported as a failed translation`);
+    assert.equal(failed.pretranslator.draining, null, 'failure allows a later run');
+  }
+
+  let pausedRelease;
+  let oldThrottled = true;
+  const pausePaging = makePretranslator(async (url, body) => {
+    if (url === '/translation/jobs') return response({job_id: body.text}, 202);
+    if (oldThrottled) {
+      oldThrottled = false;
+      return response({status: 'error', error_code: 'rate_limited', retry_after: 30});
+    }
+    return response({status: 'complete'});
+  }, undefined, () => new Promise(resolve => { pausedRelease = resolve; }));
+  const pausedPage = pausePaging.pretranslator.run(words);
+  await new Promise(resolve => setImmediate(resolve));
+  const changedPage = pausePaging.pretranslator.run([{text: 'koira', context: 'Koira.'}]);
+  pausedRelease();
+  await Promise.all([pausedPage, changedPage]);
+  assert.deepEqual(pausePaging.requests.filter(r => r.body).map(r => r.body.text), ['Kissa', 'koira'], 'paging during cooldown discards the old word');
 
   let release;
   const paging = makePretranslator(async (url, body) => {

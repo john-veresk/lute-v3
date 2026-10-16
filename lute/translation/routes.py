@@ -1,5 +1,6 @@
 """Translation panels and background jobs."""
 
+from pathlib import Path
 from flask import Blueprint, current_app, jsonify, render_template, request
 from lute.db import db
 from lute.models.language import Language
@@ -7,7 +8,7 @@ from lute.models.term import Term as DBTerm
 from lute.term.model import Repository
 from lute.translation import store
 from lute.translation.cards import save_card
-from lute.translation.service import TranslationError, TranslationJobs
+from lute.translation.service import RateLimitError, TranslationError, TranslationJobs
 
 bp = Blueprint("translation", __name__, url_prefix="/translation")
 
@@ -58,7 +59,8 @@ def _phrase_candidates(language, word, context):
 @bp.record_once
 def setup(state):
     """One bounded job manager per application."""
-    state.app.extensions["codex_translation_jobs"] = TranslationJobs()
+    log_path = Path(state.app.config["DATAPATH"]) / "codex-translation.log"
+    state.app.extensions["codex_translation_jobs"] = TranslationJobs(log_path)
 
 
 @bp.route("/panel")
@@ -140,7 +142,17 @@ def submit():
     if saved is not None or mode == "stored":
         return jsonify(job_id=None), 200
     try:
-        job_id = _jobs().submit(key, fresh=mode == "refresh", language_id=language.id)
+        job_id = _jobs().submit(
+            key, fresh=mode == "refresh", language_id=language.id, mode=mode
+        )
+    except RateLimitError as exc:
+        return (
+            jsonify(
+                error=str(exc), error_code="rate_limited", retry_after=exc.retry_after
+            ),
+            429,
+            {"Retry-After": str(exc.retry_after)},
+        )
     except TranslationError as exc:
         return jsonify(error=str(exc)), 429
     return jsonify(job_id=job_id, saved=False), 202

@@ -324,12 +324,14 @@
   }
 
   /** Shown only while this page still has words waiting for a translation. */
-  function render_pretranslate_progress({done, total}) {
+  function render_pretranslate_progress({done, total, paused = false, error = false}) {
     if (!pretranslateProgress) return;
     clearTimeout(pretranslateHideTimer);
     const bar = pretranslateProgress.querySelector('[role="progressbar"]');
     const fill = bar.firstElementChild;
     const count = pretranslateProgress.querySelector('.pretranslate-progress-count');
+    pretranslateProgress.querySelector('.pretranslate-progress-label').textContent =
+      error ? 'Translation failed' : paused ? 'Paused' : 'Translating';
     const hide = () => {
       pretranslateProgress.hidden = true;
       pretranslateProgress.classList.remove('is-leaving');
