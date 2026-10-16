@@ -1,0 +1,112 @@
+"""Standalone extraction tests, independent of Lute's database fixtures."""
+
+import csv
+from datetime import date
+
+import pytest
+
+from scripts.extract_selkouutiset import (
+    article_url,
+    extract_broadcast,
+    find_broadcast_url,
+    main,
+    save_broadcast,
+)
+
+DAY = date(2026, 10, 15)
+URL = "https://yle.fi/a/74-12345678"
+# Synthetic content: do not store a copyrighted broadcast as a test fixture.
+HTML = """
+<nav><h1>Yle</h1><p>Menu</p></nav>
+<article class="yle__article">
+  <header><h1>Selkouutiset | torstai 15.10.2026</h1><p>Summary</p></header>
+  <section class="yle__article__content">
+    <h2>Sää</h2><p>Tänään on <strong>lämmin</strong> sää.</p>
+    <figure><figcaption><p>Photo credit</p></figcaption></figure>
+    <aside><p>Related story</p></aside>
+    <p>Yöllä on kylmä.</p>
+  </section>
+  <footer><p>Contact details</p></footer>
+</article>
+"""
+
+
+def test_extracts_body_in_order_without_navigation_or_captions():
+    title, day, text = extract_broadcast(HTML, DAY)
+    assert title == "Selkouutiset | torstai 15.10.2026"
+    assert day == DAY
+    assert text == "Sää\n\nTänään on lämmin sää.\n\nYöllä on kylmä.\n"
+
+
+@pytest.mark.parametrize(
+    "html,day",
+    [
+        (HTML, date(2026, 10, 14)),
+        ("<html/>", DAY),
+        (HTML.replace("<p>", "<div>").replace("</p>", "</div>"), DAY),
+    ],
+)
+def test_rejects_wrong_date_or_missing_body(html, day):
+    with pytest.raises(ValueError):
+        extract_broadcast(html, day)
+
+
+def test_archive_matches_date_within_one_card():
+    html = f"""<main>
+      <div><a href="/a/74-99999999">Other</a><time datetime="2026-10-14T17:00:00+0300"/></div>
+      <div><a href="{URL}">Story</a><div><time datetime="2026-10-15T17:00:00+0300"/></div></div>
+    </main>"""
+    assert find_broadcast_url(html, DAY) == URL
+    with pytest.raises(ValueError):
+        find_broadcast_url(html, date(2026, 1, 1))
+
+
+def test_archive_rejects_ambiguous_cards():
+    html = """<div><a href="/a/74-11111111">One</a><a href="/a/74-22222222">Two</a>
+        <time datetime="2026-10-15T17:00:00+0300"/></div>"""
+    with pytest.raises(ValueError):
+        find_broadcast_url(html, DAY)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://yle.fi/a/74-123",
+        "https://other.test/a/74-123",
+        "https://yle.fi/selkouutiset",
+        "https://yle.fi/a/74-123?x=1",
+    ],
+)
+def test_rejects_non_article_urls(url):
+    with pytest.raises(ValueError):
+        article_url(url)
+
+
+def test_csv_preserves_text_and_import_metadata(tmp_path):
+    title, day, text = extract_broadcast(HTML, DAY)
+    txt, csv_path = save_broadcast(tmp_path, title, day, text, URL)
+    assert txt.read_text(encoding="utf-8") == text
+    with csv_path.open(encoding="utf-8", newline="") as stream:
+        assert list(csv.DictReader(stream)) == [
+            {
+                "title": title,
+                "text": text,
+                "language": "Finnish",
+                "tags": "selkouutiset",
+                "url": URL,
+            }
+        ]
+    with pytest.raises(ValueError):
+        save_broadcast(tmp_path, title, day, "Changed", URL)
+    assert txt.read_text(encoding="utf-8") == text
+
+
+def test_cli_reports_network_failure_without_writing_files(tmp_path, monkeypatch):
+    import requests
+
+    def fail(*args, **kwargs):
+        raise requests.ConnectionError("Offline")
+
+    monkeypatch.setattr(requests.Session, "get", fail)
+    assert main(["--url", URL, "--output-dir", str(tmp_path)]) == 1
+    assert not list(tmp_path.iterdir())
