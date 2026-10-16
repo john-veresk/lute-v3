@@ -3,7 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const timers = [];
+function element() {
+  return {dataset: {}, children: [], append(child) { this.children.push(child); }};
+}
 const context = vm.createContext({
+  document: {activeElement: null, createElement: element},
   setTimeout: callback => { timers.push(callback); return timers.length; },
   clearTimeout() {},
 });
@@ -85,5 +89,40 @@ function fixture() {
   polling.request = async () => ({books: [], jobs: []});
   await polling.refresh();
   assert.equal(polling.lastError, '', 'successful reconnection clears the connection error');
+
+  const timing = fixture().manager;
+  assert.equal(timing.duration(null), '—');
+  assert.equal(timing.duration(12.34), '12.3 s');
+  assert.equal(timing.duration(90), '1 min 30 s');
+  assert.equal(timing.duration(3660), '1 h 1 min');
+  assert(timing.timingSummary({status: 'paused', average_word_seconds: null, eta_seconds: null}).includes('no measured translations yet'));
+  const measured = {id: 8, status: 'paused', settings: {}, average_word_seconds: 10,
+    timed_word_count: 1, eta_seconds: 20, current_word_elapsed_seconds: null,
+    word_timings: [{word: '<word>', page: 7, duration_seconds: 10, attempts: 2, status: 'translated'}]};
+  assert(timing.timingSummary(measured).includes('Average per word: 10.0 s (1 measured)'));
+  assert(timing.timingSummary(measured).includes('ETA after resume: 20.0 s'));
+  assert(timing.timingSummary({...measured, status: 'running', current_word_elapsed_seconds: 3}).includes('Current word: 3.0 s'));
+  const list = {cards: [], replaceChildren() { this.cards = []; }, append(card) { this.cards.push(card); },
+    querySelectorAll: () => [{dataset: {field: 'word-timing-details'}, closest: () => ({dataset: {jobId: '8'}})}]};
+  const jobControls = {'jobs-list': list, 'jobs-summary': {}, 'jobs-empty': {},
+    'job-card-template': {content: {firstElementChild: {cloneNode() {
+      const fields = {};
+      const details = [element(), Object.assign(element(), {dataset: {field: 'word-timing-details'}})];
+      return {dataset: {}, fields, details,
+        querySelector(selector) { return fields[selector] ||= element(); },
+        querySelectorAll: selector => selector === 'details' ? details : []};
+    }}}}};
+  timing.find = id => jobControls[id];
+  timing.state.jobs = [measured, {status: 'cancelled'}];
+  Manager.prototype.renderJobs.call(timing);
+  assert.equal(list.cards.length, 1, 'cancelled jobs stay hidden');
+  assert.equal(list.cards[0].details[0].open, false);
+  assert.equal(list.cards[0].details[1].open, true, 'word timings stay expanded after polling');
+  const rows = list.cards[0].fields['[data-field="word-timings"]'].children;
+  assert.deepEqual(rows[0].children.map(cell => cell.textContent), ['<word>', 7, '10.0 s', 2, 'Translated']);
+  timing.state.jobs = [{status: 'cancelled'}];
+  Manager.prototype.renderJobs.call(timing);
+  assert.equal(list.cards.length, 0);
+  assert.equal(jobControls['jobs-empty'].hidden, false);
   console.log('Translation jobs UI checks passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

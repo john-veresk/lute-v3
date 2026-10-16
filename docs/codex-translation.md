@@ -14,6 +14,23 @@ phrases, sentences and pages.
 Codex panel, including waiting for the result. It stops when the response is
 ready or fails. Uncheck it to hide the timer for that language.
 **Jobs**, after Review in the main navigation, manages bulk book translations.
+Job cards show the current word's elapsed processing time, the average per
+translated word, and an approximate ETA. Expand **Time per word** for each word's
+duration, page, attempts and result. Timings persist across pauses and restarts;
+they include active retry attempts but exclude pauses and retry delays. Skipped
+words are recorded separately and excluded from the average. ETA uses the
+remaining word count and this job's measured average, so cached results can make
+it finish sooner. For paused jobs ETA means processing time after resuming.
+Previously processed words have no measurements; the average and ETA remain
+unavailable until a translation is measured. An interrupted attempt cannot be
+measured across a server restart and is marked **Interrupted**.
+
+`GET /jobs/state` and job command responses include `word_timings` (word index,
+word, page, `duration_seconds`, attempts and status), `current_word_elapsed_seconds`,
+`average_word_seconds`, `timed_word_count`, `eta_seconds` and `estimated_finish_at`.
+Durations are in seconds; unavailable estimates are `null`. `estimated_finish_at`
+is a UTC timestamp only while a job is running or waiting to retry. ETA includes
+any scheduled retry delay; it excludes time spent waiting behind other jobs.
 
 **Output → Personal Finnish** (named after the language you are learning) explains
 words and phrases in simple Finnish instead of translating into **Translate into**.

@@ -11,7 +11,12 @@ from lute.models.term import Term
 from lute.models.language import Language
 from lute.models.book import BookTag
 from lute.translation import store
-from lute.translation.bulk import BookTranslationJob, BookTranslationWorker, utcnow
+from lute.translation.bulk import (
+    BookTranslationJob,
+    BookTranslationWordTiming,
+    BookTranslationWorker,
+    utcnow,
+)
 from lute.translation.service import RateLimitError, TranslationError
 from tests.unit.read.test_codex_translation import RESULT
 from tests.utils import make_book
@@ -418,3 +423,142 @@ def test_automatic_recovery_clears_current_error_but_keeps_history(
     assert job.error == ""
     assert job.error_count == 1
     assert job.payload()["errors"][0]["message"] == "Temporary network error"
+
+
+def job_state(client, job_id):
+    """Read timing fields through the public polling endpoint."""
+    return next(
+        job for job in client.get("/jobs/state").json["jobs"] if job["id"] == job_id
+    )
+
+
+def test_word_timings_average_and_eta_exclude_skips_and_pauses(
+    client, spanish, monkeypatch
+):
+    book = make_books(spanish, ["Gato perro casa."])[0]
+    store.save(db.session, spanish, "perro", "", RESULT)
+    job_id = enqueue(client, [book])[0]
+    initial = job_state(client, job_id)
+    assert initial["average_word_seconds"] is None
+    assert initial["eta_seconds"] is None
+    worker, _ = worker_for(client, monkeypatch)
+    clock = Mock(side_effect=[0, 10, 1000, 1000.2, 2000, 2020])
+    monkeypatch.setattr("lute.translation.bulk.monotonic", clock)
+    worker.step()
+    state = job_state(client, job_id)
+    assert state["average_word_seconds"] == 10
+    assert state["timed_word_count"] == 1
+    assert state["eta_seconds"] == 20
+    assert state["estimated_finish_at"] is not None
+    assert state["word_timings"][0] == {
+        "word_index": 0,
+        "word": "Gato",
+        "page": 1,
+        "duration_seconds": 10,
+        "attempts": 1,
+        "status": "translated",
+    }
+    paused = client.post(f"/jobs/{job_id}/pause").json
+    assert paused["eta_seconds"] == 20
+    assert paused["estimated_finish_at"] is None
+    assert client.post(f"/jobs/{job_id}/resume").status_code == 200
+    worker.step()
+    state = job_state(client, job_id)
+    assert state["word_timings"][1]["status"] == "skipped"
+    assert state["word_timings"][1]["duration_seconds"] == 0.2
+    assert state["average_word_seconds"] == 10
+    assert state["eta_seconds"] == 10
+    worker.step()
+    db.session.remove()
+    state = job_state(client, job_id)
+    assert state["status"] == "complete"
+    assert state["average_word_seconds"] == 15
+    assert state["timed_word_count"] == 2
+    assert state["eta_seconds"] == 0
+    assert state["estimated_finish_at"] is None
+    assert len(state["word_timings"]) == 3
+
+
+def test_word_timing_accumulates_retries_without_backoff(client, spanish, monkeypatch):
+    book = make_books(spanish, ["Gato."])[0]
+    job_id = enqueue(client, [book])[0]
+    worker, translate = worker_for(client, monkeypatch)
+    monkeypatch.setattr(
+        "lute.translation.bulk.monotonic", Mock(side_effect=[0, 5, 100, 115])
+    )
+    translate.side_effect = TranslationError("Temporary error")
+    worker.step()
+    state = job_state(client, job_id)
+    assert state["word_timings"][0]["duration_seconds"] == 5
+    assert state["word_timings"][0]["status"] == "error"
+    assert state["average_word_seconds"] is None
+    job = get_job(job_id)
+    job.retry_at = utcnow() - timedelta(seconds=1)
+    db.session.commit()
+    translate.side_effect = None
+    worker.step()
+    state = job_state(client, job_id)
+    assert state["word_timings"][0]["duration_seconds"] == 20
+    assert state["word_timings"][0]["attempts"] == 2
+    assert state["average_word_seconds"] == 20
+
+
+def test_live_word_timer_and_waiting_eta(client, spanish, monkeypatch):
+    book = make_books(spanish, ["Gato perro casa."])[0]
+    job_id = enqueue(client, [book])[0]
+    worker, translate = worker_for(client, monkeypatch)
+    now = utcnow()
+    monkeypatch.setattr("lute.translation.bulk.utcnow", lambda: now)
+    monkeypatch.setattr(
+        "lute.translation.bulk.monotonic", Mock(side_effect=[0, 10, 20, 27])
+    )
+    worker.step()
+
+    def in_flight(*_args):
+        nonlocal now
+        now += timedelta(seconds=7)
+        state = job_state(client, job_id)
+        assert state["current_word_elapsed_seconds"] == 7
+        assert state["word_timings"][1]["duration_seconds"] == 7
+        assert state["eta_seconds"] == 13
+        raise RateLimitError(30)
+
+    translate.side_effect = in_flight
+    worker.step()
+    state = job_state(client, job_id)
+    assert state["status"] == "waiting"
+    assert state["current_word_elapsed_seconds"] is None
+    assert state["eta_seconds"] == 50
+    assert state["average_word_seconds"] == 10
+    assert state["word_timings"][1]["duration_seconds"] == 7
+
+
+def test_restart_does_not_count_downtime_as_word_processing(
+    client, spanish, monkeypatch
+):
+    book = make_books(spanish, ["Gato."])[0]
+    job_id = enqueue(client, [book])[0]
+    job = get_job(job_id)
+    job.status = "running"
+    db.session.add(
+        BookTranslationWordTiming(
+            job_id=job_id,
+            word_index=0,
+            word="Gato",
+            page=1,
+            duration_seconds=5,
+            attempts=1,
+            status="running",
+            started_at=utcnow() - timedelta(hours=1),
+        )
+    )
+    db.session.commit()
+    restarted = BookTranslationWorker(client.application)
+    monkeypatch.setattr(restarted, "_run", lambda: None)
+    restarted.start()
+    restarted.stop()
+    state = job_state(client, job_id)
+    assert state["status"] == "paused"
+    assert state["current_word_elapsed_seconds"] is None
+    assert state["word_timings"][0]["duration_seconds"] == 5
+    assert state["word_timings"][0]["status"] == "interrupted"

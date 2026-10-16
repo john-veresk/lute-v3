@@ -2,6 +2,7 @@
 
 import json
 import threading
+from time import monotonic
 from datetime import datetime, timedelta, timezone
 from flask import current_app
 from sqlalchemy.orm import deferred
@@ -52,6 +53,12 @@ class BookTranslationJob(db.Model):
     started_at = db.Column(db.DateTime, nullable=True)
     finished_at = db.Column(db.DateTime, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    word_timings = db.relationship(
+        "BookTranslationWordTiming",
+        cascade="all, delete-orphan",
+        order_by="BookTranslationWordTiming.word_index",
+        lazy="selectin",
+    )
 
     def payload(self, prepared=None):
         """Public state, without the potentially large work list."""
@@ -90,7 +97,79 @@ class BookTranslationJob(db.Model):
             if key not in ("known_words", "vocabulary_revision")
         }
         result["errors"] = json.loads(self.errors)
+        result.update(self.timing_payload(result["prepared"]))
         return result
+
+    def timing_payload(self, prepared):
+        """Estimate remaining processing from this job's measured translations only."""
+        now = utcnow()
+        timings = [timing.payload(now) for timing in self.word_timings]
+        translated = [
+            timing.duration_seconds
+            for timing in self.word_timings
+            if timing.status == "translated"
+        ]
+        average = sum(translated) / len(translated) if translated else None
+        current = next(
+            (timing for timing in timings if timing["status"] == "running"), None
+        )
+        elapsed = current["duration_seconds"] if current else None
+        eta = None
+        if self.status == "complete":
+            eta = 0
+        elif prepared and average is not None and self.status != "cancelled":
+            eta = max(0, self.total - self.done) * average
+            if elapsed is not None:
+                eta = max(0, eta - min(elapsed, average))
+            if self.status == "waiting" and self.retry_at:
+                eta += max(0, (self.retry_at - now).total_seconds())
+        finish = (
+            now + timedelta(seconds=eta)
+            if eta is not None and self.status in ("running", "waiting")
+            else None
+        )
+        return {
+            "word_timings": timings,
+            "timed_word_count": len(translated),
+            "average_word_seconds": round(average, 3) if average is not None else None,
+            "current_word_elapsed_seconds": elapsed,
+            "eta_seconds": round(eta, 3) if eta is not None else None,
+            "estimated_finish_at": finish.isoformat() + "Z" if finish else None,
+        }
+
+
+class BookTranslationWordTiming(db.Model):
+    """One word's active time, accumulated across retries and persisted on pause."""
+
+    __tablename__ = "booktranslationwordtimings"
+
+    job_id = db.Column(
+        db.Integer,
+        db.ForeignKey("booktranslationjobs.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    word_index = db.Column(db.Integer, primary_key=True)
+    word = db.Column(db.Text, nullable=False)
+    page = db.Column(db.Integer, nullable=False)
+    duration_seconds = db.Column(db.Float, nullable=False, default=0)
+    attempts = db.Column(db.Integer, nullable=False, default=0)
+    status = db.Column(db.String(20), nullable=False)
+    started_at = db.Column(db.DateTime, nullable=True)
+    finished_at = db.Column(db.DateTime, nullable=True)
+
+    def payload(self, now):
+        """Include the currently running attempt without writing during polling."""
+        seconds = self.duration_seconds
+        if self.started_at is not None:
+            seconds += max(0, (now - self.started_at).total_seconds())
+        return {
+            "word_index": self.word_index,
+            "word": self.word,
+            "page": self.page,
+            "duration_seconds": round(seconds, 3),
+            "attempts": self.attempts,
+            "status": self.status,
+        }
 
 
 def language_settings(language):
@@ -161,6 +240,11 @@ class BookTranslationWorker:
     def start(self):
         """Recover interrupted jobs as paused, requiring an explicit resume."""
         with self.app.app_context(), self.lock:
+            for timing in db.session.query(BookTranslationWordTiming).filter_by(
+                status="running"
+            ):
+                timing.status = "interrupted"
+                timing.started_at = None
             for job in db.session.query(BookTranslationJob).filter(
                 BookTranslationJob.status.in_(("running", "waiting"))
             ):
@@ -255,6 +339,25 @@ class BookTranslationWorker:
                         self.inflight = None
                         return True
                     word = items[job.done]
+                    word_index = job.done
+                    attempt_started = monotonic()
+                    timing = db.session.get(
+                        BookTranslationWordTiming, (job_id, word_index)
+                    )
+                    if timing is None:
+                        timing = BookTranslationWordTiming(
+                            job_id=job_id,
+                            word_index=word_index,
+                            word=word["text"],
+                            page=word["page"],
+                            duration_seconds=0,
+                            attempts=0,
+                        )
+                        db.session.add(timing)
+                    timing.status = "running"
+                    timing.started_at = utcnow()
+                    timing.finished_at = None
+                    timing.attempts += 1
                     job.current_word = word["text"]
                     job.current_context = word["context"]
                     job.current_page = word["page"]
@@ -304,6 +407,9 @@ class BookTranslationWorker:
                 try:
                     job = db.session.get(BookTranslationJob, job_id)
                     if failure:
+                        self._finish_timing(
+                            job_id, word_index, attempt_started, "error"
+                        )
                         self._failure(job_id, failure)
                     else:
                         # Save even when paused/cancelled during the in-flight request.
@@ -323,6 +429,12 @@ class BookTranslationWorker:
                         job.attempts = 0
                         job.error = ""
                         job.updated_at = utcnow()
+                        self._finish_timing(
+                            job_id,
+                            word_index,
+                            attempt_started,
+                            "skipped" if skipped else "translated",
+                        )
                         if job.status == "running" and job.done == job.total:
                             job.status = "complete"
                             job.current_word = ""
@@ -332,6 +444,14 @@ class BookTranslationWorker:
                 finally:
                     self.inflight = None
             return True
+
+    @staticmethod
+    def _finish_timing(job_id, word_index, attempt_started, status):
+        timing = db.session.get(BookTranslationWordTiming, (job_id, word_index))
+        timing.duration_seconds += max(0, monotonic() - attempt_started)
+        timing.status = status
+        timing.started_at = None
+        timing.finished_at = utcnow()
 
     @staticmethod
     def _skip(language, text, profile=None, context=None):

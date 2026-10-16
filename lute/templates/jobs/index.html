@@ -39,6 +39,7 @@
     <progress data-field="progress" max="1" value="0" aria-label="Book translation progress"></progress>
     <div class="job-counts"><span data-field="counts"></span><span data-field="percent"></span></div>
     <p class="job-current" data-field="current"></p>
+    <p class="job-timing" data-field="timing" role="status"></p>
     <p class="job-error" data-field="error" hidden></p>
     <div class="job-actions">
       <button type="button" class="app-button" data-action="up" title="Move book up" aria-label="Move book up">↑</button>
@@ -48,6 +49,13 @@
       <button type="button" class="app-button" data-action="cancel">Cancel</button>
     </div>
     <details><summary>Details &amp; errors</summary><p data-field="times"></p><p data-field="context" class="job-context"></p><ul data-field="errors"></ul></details>
+    <details data-field="word-timing-details"><summary>Time per word</summary>
+      <p class="jobs-note">Active processing time, including retries. Pauses and retry delays are excluded. Measurements start with the next processed word.</p>
+      <div class="job-timing-table"><table>
+        <thead><tr><th scope="col">Word</th><th scope="col">Page</th><th scope="col">Time</th><th scope="col">Attempts</th><th scope="col">Status</th></tr></thead>
+        <tbody data-field="word-timings"></tbody>
+      </table></div>
+    </details>
   </article>
 </template>
 <script src="/static/js/never_cache/translation-jobs.js" defer></script>

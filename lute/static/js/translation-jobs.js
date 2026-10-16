@@ -215,7 +215,7 @@ class TranslationJobManager {
 
   renderJobs() {
     const list = this.find('jobs-list');
-    const opened = new Set([...list.querySelectorAll('details[open]')].map(el => el.closest('[data-job-id]').dataset.jobId));
+    const opened = new Set([...list.querySelectorAll('details[open]')].map(el => `${el.closest('[data-job-id]').dataset.jobId}:${el.dataset.field || 'details'}`));
     const focused = document.activeElement?.closest('[data-action]');
     const focus = focused ? [focused.closest('[data-job-id]').dataset.jobId, focused.dataset.action] : null;
     list.replaceChildren();
@@ -245,6 +245,18 @@ class TranslationJobManager {
       field('counts').textContent = job.prepared ? `${job.done} / ${job.total} words · ${job.translated} translated · ${job.skipped} skipped` : 'Waiting to scan unknown words';
       field('percent').textContent = `${percent}%`;
       field('current').textContent = job.current_word ? `Page ${job.current_page} · ${job.current_word}` : job.status === 'complete' ? 'All unknown words processed.' : '';
+      field('timing').textContent = this.timingSummary(job);
+      field('word-timing-details').hidden = !job.word_timings?.length;
+      for (const timing of job.word_timings || []) {
+        const row = document.createElement('tr');
+        const labels = {translated: 'Translated', skipped: 'Skipped', error: 'Failed', running: 'Processing', interrupted: 'Interrupted'};
+        for (const value of [timing.word, timing.page, this.duration(timing.duration_seconds), timing.attempts, labels[timing.status] || timing.status]) {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.append(cell);
+        }
+        field('word-timings').append(row);
+      }
       field('error').textContent = job.error;
       field('error').hidden = !job.error;
       field('times').textContent = [`Created: ${this.time(job.created_at)}`, job.started_at && `Started: ${this.time(job.started_at)}`, job.finished_at && `Finished: ${this.time(job.finished_at)}`, `Updated: ${this.time(job.updated_at)}`, `Errors: ${job.error_count}`].filter(Boolean).join(' · ');
@@ -261,7 +273,9 @@ class TranslationJobManager {
         button.disabled = this.busy;
         if (button.dataset.action === 'resume' && job.status === 'error') button.textContent = 'Retry';
       });
-      card.querySelector('details').open = opened.has(String(job.id));
+      card.querySelectorAll('details').forEach(details => {
+        details.open = opened.has(`${job.id}:${details.dataset.field || 'details'}`);
+      });
       list.append(card);
     });
     if (focus) list.querySelector(`[data-job-id="${focus[0]}"] [data-action="${focus[1]}"]:not([hidden])`)?.focus();
@@ -273,6 +287,26 @@ class TranslationJobManager {
   }
 
   time(value) { return value ? new Date(value).toLocaleString() : '—'; }
+
+  duration(seconds) {
+    if (seconds === null || seconds === undefined) return '—';
+    if (seconds < 60) return `${seconds.toFixed(1)} s`;
+    const total = Math.ceil(seconds);
+    if (total < 3600) return `${Math.floor(total / 60)} min ${total % 60} s`;
+    return `${Math.floor(total / 3600)} h ${Math.floor(total % 3600 / 60)} min`;
+  }
+
+  timingSummary(job) {
+    const parts = [];
+    if (job.current_word_elapsed_seconds !== null && job.current_word_elapsed_seconds !== undefined) parts.push(`Current word: ${this.duration(job.current_word_elapsed_seconds)}`);
+    parts.push(job.average_word_seconds === null || job.average_word_seconds === undefined
+      ? 'Average per word: — (no measured translations yet)'
+      : `Average per word: ${this.duration(job.average_word_seconds)} (${job.timed_word_count} measured)`);
+    const eta = this.duration(job.eta_seconds);
+    parts.push(['paused', 'error', 'queued'].includes(job.status) ? `ETA after ${job.status === 'queued' ? 'start' : 'resume'}: ${eta}` : `ETA: ${eta}`);
+    if (job.estimated_finish_at) parts.push(`Expected finish: ${this.time(job.estimated_finish_at)}`);
+    return parts.join(' · ');
+  }
 }
 
 new TranslationJobManager(document.getElementById('translation-jobs'));

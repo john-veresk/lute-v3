@@ -27,6 +27,12 @@
 .job-error, #jobs-error { color: var(--danger); overflow-wrap: anywhere; }
 #jobs-error { border: 1px solid currentColor; border-radius: 8px; padding: .8rem 1rem; margin: 1rem 0; }
 .job-context { white-space: pre-wrap; overflow-wrap: anywhere; }
+.job-timing { color: var(--ink-2); font-size: .85rem; line-height: 1.5; }
+.job-timing-table { overflow-x: auto; max-height: 320px; margin-top: .75rem; }
+.job-timing-table table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.job-timing-table th, .job-timing-table td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); }
+.job-timing-table td:first-child { overflow-wrap: anywhere; }
+.job-timing-table th { position: sticky; top: 0; background: var(--background-color); }
 .job-card details summary { cursor: pointer; }
 .job-card details li { margin: .5rem 0; overflow-wrap: anywhere; }
 @media (max-width: 760px) {
