@@ -42,7 +42,10 @@ the page you are reading in the background, one word at a time with its sentence
 and saves them in the translation store, so their cards open without waiting.
 Words that are already stored are skipped. Turning a page replaces the words
 still waiting; the word being translated finishes first. Each unknown word is a
-Codex request and counts toward your usage.
+Codex request and counts toward your usage. Background pre-translation always
+uses standard processing, even when **Fast mode** is enabled for the language.
+Translations started from a term card or the sentence/page commands still use
+the language's **Fast mode** setting.
 
 Sentence and page translation commands also use Codex. The sentences icon and
 the image icon beside ↻ open term usage and the Bing image search inside the card.

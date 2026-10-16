@@ -128,7 +128,7 @@ def submit():
         kind,
         word_texts,
         language.codex_reasoning_effort,
-        language.codex_fast_mode,
+        language.codex_fast_mode if mode != "prefetch" else False,
         phrase_texts,
     )
     saved = None

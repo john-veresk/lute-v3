@@ -76,6 +76,20 @@ def test_prefetch_translates_only_unsaved_terms(client, spanish, translations):
     assert len(translations) == 1
 
 
+def test_prefetch_uses_standard_speed_even_when_fast_mode_is_enabled(
+    client, spanish, translations
+):
+    spanish.codex_fast_mode = True
+    db.session.commit()
+    background = _lookup(client, spanish, mode="prefetch")
+    _result(client, background.json["job_id"])
+    assert translations[0][8] is False
+
+    foreground = _lookup(client, spanish, mode="refresh")
+    _result(client, foreground.json["job_id"])
+    assert translations[1][8] is True
+
+
 def test_refresh_replaces_the_saved_result(client, spanish, translations):
     _result(client, _lookup(client, spanish).json["job_id"])
     refreshed = _lookup(client, spanish, mode="refresh")
