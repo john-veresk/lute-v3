@@ -60,6 +60,13 @@ def _cli_error(stderr, exit_code, cli="codex"):
     """Extract known failure types; never retain raw CLI output or prompts."""
     if isinstance(stderr, bytes):
         stderr = stderr.decode("utf-8", errors="replace")
+    if cli == "cursor" and (stderr or "").startswith("Cannot use this model:"):
+        return TranslationError(
+            "Cursor Agent does not support the selected model or model options. "
+            "Check the language settings and retry.",
+            category="unsupported_model",
+            exit_code=exit_code,
+        )
     # CLI stderr also echoes the prompt. Inspect only diagnostic lines.
     diagnostics = "\n".join(
         line
@@ -342,11 +349,25 @@ def cursor_model_efforts(model_ids):
 
 
 def cursor_model_argument(model, reasoning_effort, fast_mode):
-    "Cursor Agent accepts effort and fast mode as bracket overrides on a model id."
+    "Use advertised model variants; reserve bracket overrides for custom model ids."
     model = (model or "").strip()
     if not model or "[" in model:
         return model
-    _base, effort, fast = split_cursor_model(model)
+    base, effort, fast = split_cursor_model(model)
+    models = available_cursor_models()
+    if model in models:
+        variants = {}
+        for candidate in models:
+            candidate_base, candidate_effort, candidate_fast = split_cursor_model(
+                candidate
+            )
+            if candidate_base == base:
+                variants[(candidate_effort, candidate_fast)] = candidate
+        wanted_effort = reasoning_effort or effort
+        return variants.get(
+            (wanted_effort, fast_mode or fast),
+            variants.get((wanted_effort, fast), model),
+        )
     params = []
     if reasoning_effort and reasoning_effort != effort:
         params.append(f"effort={reasoning_effort}")

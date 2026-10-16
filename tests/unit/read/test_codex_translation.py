@@ -68,8 +68,9 @@ def test_missing_explicit_codex_does_not_fall_back(monkeypatch):
 def test_bundled_cli_discovery_is_mac_only(monkeypatch, tmp_path):
     monkeypatch.setattr(service.sys, "platform", "darwin")
     monkeypatch.setattr(service.Path, "home", lambda: tmp_path)
-    assert tmp_path / "Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex" in (
-        service._bundled_codex_paths()
+    assert (
+        tmp_path / "Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"
+        in (service._bundled_codex_paths())
     )
     monkeypatch.setattr(service.sys, "platform", "linux")
     assert service._bundled_codex_paths() == []
@@ -136,6 +137,50 @@ def test_cursor_effort_options_follow_the_model_family():
     )
 
 
+@pytest.mark.parametrize(
+    "model,effort,fast_mode,expected",
+    [
+        ("cursor-grok-4.6-medium", "medium", True, "cursor-grok-4.6-medium-fast"),
+        ("cursor-grok-4.6-medium", "high", False, "cursor-grok-4.6-high"),
+        ("cursor-grok-4.6-medium", "high", True, "cursor-grok-4.6-high-fast"),
+        ("cursor-grok-4.6-medium-fast", "high", False, "cursor-grok-4.6-high-fast"),
+        ("composer-2.5", "", True, "composer-2.5-fast"),
+        ("gemini-3.7-flash-high", "high", True, "gemini-3.7-flash-high"),
+        ("custom-model[effort=low]", "high", True, "custom-model[effort=low]"),
+    ],
+)
+def test_cursor_known_aliases_use_advertised_variants(
+    monkeypatch, model, effort, fast_mode, expected
+):
+    monkeypatch.setattr(
+        service,
+        "available_cursor_models",
+        lambda: [
+            "cursor-grok-4.6-medium",
+            "cursor-grok-4.6-medium-fast",
+            "cursor-grok-4.6-high",
+            "cursor-grok-4.6-high-fast",
+            "composer-2.5",
+            "composer-2.5-fast",
+            "gemini-3.7-flash-high",
+        ],
+    )
+    assert service.cursor_model_argument(model, effort, fast_mode) == expected
+
+
+def test_cursor_unsupported_model_error_is_actionable_and_does_not_leak_output():
+    error = service._cli_error(
+        "Cannot use this model: PRIVATE MODEL. Available models: PRIVATE LIST",
+        1,
+        "cursor",
+    )
+    assert error.category == "unsupported_model"
+    assert error.exit_code == 1
+    assert "language settings" in str(error)
+    assert "PRIVATE" not in str(error)
+    assert error.detail == ""
+
+
 def test_cursor_model_list_ignores_labels_and_color(monkeypatch):
     colored = (
         "\x1b[2mAvailable models\x1b[22m\n\n"
@@ -149,22 +194,28 @@ def test_cursor_model_list_ignores_labels_and_color(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "effort,fast_mode,expected",
+    "model,effort,fast_mode,expected",
     [
-        ("", False, "composer-2.5"),
-        ("low", False, "composer-2.5[effort=low]"),
-        ("high", True, "composer-2.5[effort=high,fast=true]"),
-        ("", True, "composer-2.5[fast=true]"),
+        ("composer-2.5", "", False, "composer-2.5"),
+        ("composer-2.5", "low", False, "composer-2.5[effort=low]"),
+        ("composer-2.5", "high", True, "composer-2.5[effort=high,fast=true]"),
+        ("composer-2.5", "", True, "composer-2.5[fast=true]"),
+        ("cursor-grok-4.6-medium", "medium", True, "cursor-grok-4.6-medium-fast"),
     ],
 )
 def test_cursor_agent_prints_json_from_ask_mode(
-    monkeypatch, effort, fast_mode, expected
+    monkeypatch, model, effort, fast_mode, expected
 ):
     def which(name):
         assert name == "cursor-agent"
         return "/usr/bin/cursor-agent"
 
     monkeypatch.setattr(service.shutil, "which", which)
+    monkeypatch.setattr(
+        service,
+        "available_cursor_models",
+        lambda: ["cursor-grok-4.6-medium", "cursor-grok-4.6-medium-fast"],
+    )
 
     def run(command, **kwargs):
         assert command[0] == "/usr/bin/cursor-agent"
@@ -183,7 +234,12 @@ def test_cursor_agent_prints_json_from_ask_mode(
         return SimpleNamespace(
             returncode=0,
             stdout=json.dumps(
-                {"type": "result", "subtype": "success", "is_error": False, "result": reply}
+                {
+                    "type": "result",
+                    "subtype": "success",
+                    "is_error": False,
+                    "result": reply,
+                }
             ),
             stderr="",
         )
@@ -193,7 +249,7 @@ def test_cursor_agent_prints_json_from_ask_mode(
         service.translate(
             "Finnish",
             "Russian",
-            "composer-2.5",
+            model,
             "kissa",
             "Kissa nukkuu.",
             reasoning_effort=effort,
