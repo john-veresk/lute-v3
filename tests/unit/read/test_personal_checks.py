@@ -118,11 +118,14 @@ def test_phrase_with_empty_lemma_completes_and_is_saved(
         payload = json.loads(prompt.rsplit("\n", 1)[1])
         calls.append(payload)
         assert payload["words_to_translate"] == phrase.split()
+        assert payload["fallback_language"] == "Russian"
         assert "known_words" not in payload
-        output = result
+        if len(calls) == 2:
+            assert "fallback" not in payload["revision"]["previous_result"]
+        output = {**result, "fallback": result}
         if needs_revision and len(calls) == 1:
             output = {
-                **result,
+                **output,
                 "options": [
                     {"translation": "Panin sen varovasti lattialle.", "explanation": ""}
                 ],
@@ -140,6 +143,8 @@ def test_phrase_with_empty_lemma_completes_and_is_saved(
     generated = completed["result"]
     assert generated["lemma"] == ""
     assert generated["words"] == result["words"]
+    assert generated["fallback_language"] == "Russian"
+    assert generated["fallback"]["words"] == result["words"]
     assert generated["vocabulary"]["unknown"] == []
     assert generated["vocabulary"]["revised"] is needs_revision
     assert len(calls) == (2 if needs_revision else 1)

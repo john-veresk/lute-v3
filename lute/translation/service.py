@@ -197,6 +197,17 @@ SCHEMA = {
 }
 
 
+def _response_schema(fallback_target):
+    """Request both card variants in one model response for personal term lookups."""
+    if not fallback_target:
+        return SCHEMA
+    return {
+        **SCHEMA,
+        "properties": {**SCHEMA["properties"], "fallback": SCHEMA},
+        "required": SCHEMA["required"] + ["fallback"],
+    }
+
+
 REASONING_EFFORTS = (
     "none",
     "minimal",
@@ -444,6 +455,7 @@ def _prompt(
     phrase_texts,
     translation_mode="translation",
     revision_feedback=None,
+    fallback_target="",
 ):
     data = {
         "source_language": source,
@@ -457,6 +469,8 @@ def _prompt(
     if translation_mode == "personal":
         if revision_feedback:
             data["revision"] = revision_feedback
+        if fallback_target:
+            data["fallback_language"] = fallback_target
         return _personal_prompt(json.dumps(data, ensure_ascii=False))
     payload = json.dumps(data, ensure_ascii=False)
     return (
@@ -548,6 +562,19 @@ def _personal_prompt(payload):
         "Preserve the actual meaning, the selected word, lemma and grammatical form, "
         "and all required word cards. Keep examples generic. Do not ask for more feedback "
         "or perform another revision: return the complete revised result in the same JSON schema. "
+        "If fallback_language is provided, also fill the nested fallback object in the SAME response. "
+        "The top-level fields must still contain only simple explanations in target_language. "
+        "In fallback, translate the ORIGINAL selected text, its dictionary headword and its word/phrase cards "
+        "into fallback_language; do not translate the simple explanations or their example sentences. "
+        "Use concise natural translations, with brief explanations in fallback_language. "
+        "Provide the selected word's main common distinct meanings in fallback.options, putting its contextual "
+        "meaning first; group synonyms and omit rare senses. For a phrase, translate it as a whole. "
+        "For an inflected term, provide the headword's main dictionary meanings in fallback.lemma_options "
+        "and set fallback.lemma_translation to the first meaning in the base form. "
+        "Copy lemma, is_inflected, every word text and each word's lemma/is_inflected from the main result. "
+        "The fallback word and phrase lists must contain exactly the same texts in the same order as the "
+        "main result, including EVERY suggested phrase. Translate each complete phrase naturally. "
+        "After a revision, make fallback match the revised card lists. "
         "Return only the requested JSON.\n" + payload
     )
 
@@ -567,12 +594,15 @@ def translate(
     translation_mode="translation",
     vocabulary_revision="",
     revision_feedback=None,
+    fallback_target="",
 ):
     """Run without a shell, in an empty read-only workspace, with JSON output."""
     if cli not in ("codex", "cursor"):
         raise TranslationError("Unknown translation CLI.", category="cli_missing")
     if translation_mode == "personal":
         target = source
+    if translation_mode != "personal" or kind != "term":
+        fallback_target = ""
     executable = _executable(cli)
     words_to_translate = (
         list(word_texts) if kind == "term" and len(word_texts) > 1 else []
@@ -587,6 +617,7 @@ def translate(
         phrase_texts,
         translation_mode,
         revision_feedback,
+        fallback_target,
     )
     with tempfile.TemporaryDirectory(prefix=f"lute-{cli}-") as workdir:
         if cli == "cursor":
@@ -598,6 +629,7 @@ def translate(
                 kind,
                 words_to_translate,
                 phrase_texts,
+                fallback_target,
             )
         return _translate_with_codex(
             executable,
@@ -609,10 +641,13 @@ def translate(
             kind,
             words_to_translate,
             phrase_texts,
+            fallback_target,
         )
 
 
-def _parse_translation(raw, kind, words_to_translate, phrase_texts, cli):
+def _parse_translation(
+    raw, kind, words_to_translate, phrase_texts, cli, fallback_target=""
+):
     try:
         data = json.loads(raw)
         options = data["options"]
@@ -684,6 +719,28 @@ def _parse_translation(raw, kind, words_to_translate, phrase_texts, cli):
             ):
                 raise ValueError("Phrase card does not match the sentence context")
             seen_phrases.add(phrase["text"])
+        if fallback_target:
+            fallback = _parse_translation(
+                json.dumps(data["fallback"], ensure_ascii=False),
+                kind,
+                words_to_translate,
+                phrase_texts,
+                cli,
+            )
+            if (
+                fallback["lemma"] != data["lemma"]
+                or fallback["is_inflected"] != data["is_inflected"]
+                or [p["text"] for p in fallback["phrases"]]
+                != [p["text"] for p in phrases]
+                or any(
+                    first["lemma"] != second["lemma"]
+                    or first["is_inflected"] != second["is_inflected"]
+                    for first, second in zip(words, fallback["words"])
+                )
+            ):
+                raise ValueError("Fallback cards do not match the personal result")
+            data["fallback"] = fallback
+            data["fallback_language"] = fallback_target
         return data
     except (ValueError, KeyError, TypeError) as exc:
         raise TranslationError(
@@ -714,10 +771,11 @@ def _translate_with_codex(
     kind,
     words_to_translate,
     phrase_texts,
+    fallback_target="",
 ):
     schema = Path(workdir) / "schema.json"
     output = Path(workdir) / "translation.json"
-    schema.write_text(json.dumps(SCHEMA), encoding="utf-8")
+    schema.write_text(json.dumps(_response_schema(fallback_target)), encoding="utf-8")
     command = [
         executable,
         "exec",
@@ -755,6 +813,7 @@ def _translate_with_codex(
         words_to_translate,
         phrase_texts,
         "codex",
+        fallback_target,
     )
 
 
@@ -786,12 +845,13 @@ def _translate_with_cursor(
     kind,
     words_to_translate,
     phrase_texts,
+    fallback_target="",
 ):
     # Cursor's --output-format=json wraps the answer; it does not constrain its schema.
     prompt = (
         "Return exactly one JSON object matching this JSON Schema, including every required field. "
         "Do not return Markdown, prose, or extra fields. Response JSON Schema:\n"
-        + json.dumps(SCHEMA, ensure_ascii=False)
+        + json.dumps(_response_schema(fallback_target), ensure_ascii=False)
         + "\n"
         + prompt
     )
@@ -812,7 +872,9 @@ def _translate_with_cursor(
         raise TranslationError(
             _invalid_message("cursor"), category="invalid_response"
         ) from exc
-    return _parse_translation(raw, kind, words_to_translate, phrase_texts, "cursor")
+    return _parse_translation(
+        raw, kind, words_to_translate, phrase_texts, "cursor", fallback_target
+    )
 
 
 @dataclass

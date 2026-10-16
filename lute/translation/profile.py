@@ -20,11 +20,15 @@ def vocabulary_for(session, language, mode=None):
     )
 
 
-def cache_profile(source, target, mode="translation", vocabulary=()):
+def cache_profile(
+    source, target, mode="translation", vocabulary=(), fallback_target=""
+):
     """Separate ordinary translations from explanations for a particular reader."""
     if mode != "personal":
         return f"translation:{len(source)}:{source}{target}"
-    payload = json.dumps(["checked-v1", source, target, vocabulary], ensure_ascii=False)
+    payload = json.dumps(
+        ["checked-v2", source, target, vocabulary, fallback_target], ensure_ascii=False
+    )
     return "personal:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -35,6 +39,7 @@ def profile_for(session, language):
         language.translation_target_name,
         language.translation_mode,
         vocabulary_for(session, language),
+        language.translation_target,
     )
 
 
@@ -45,4 +50,5 @@ def profile_from_key(key):
         key[1],
         key[11] if len(key) > 11 else "translation",
         key[12] if len(key) > 12 else (),
+        key[14] if len(key) > 14 else "",
     )

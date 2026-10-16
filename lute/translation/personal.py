@@ -36,14 +36,18 @@ def check_and_revise(app, language_id, key, result, generate):
     revised = False
     if report and report["unknown"]:
         feedback = {
-            "previous_result": result,
+            "previous_result": {
+                name: value
+                for name, value in result.items()
+                if name not in ("fallback", "fallback_language")
+            },
             "unfamiliar_words": [
                 {"text": entry["text"], "lemma": entry["lemma"]}
                 for entry in report["unknown"]
             ],
             "familiar_words": sorted({entry["lemma"] for entry in report["known"]}),
         }
-        result = generate(*(key + (feedback,)))
+        result = generate(*(key[:13] + (feedback,) + key[14:]))
         revised = True
         report = check_result(app, language_id, key, result)
     if report is not None:

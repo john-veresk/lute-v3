@@ -180,6 +180,7 @@ def language_settings(language):
         "target": language.translation_target_name,
         "target_label": language.translation_target_label,
         "translation_mode": language.translation_mode,
+        "fallback_target": language.translation_target,
         "model": language.codex_model,
         "effort": language.translation_reasoning_effort,
         "cli": language.translation_cli or "codex",
@@ -365,6 +366,12 @@ class BookTranslationWorker:
                     job.retry_at = None
                     job.updated_at = utcnow()
                     settings = json.loads(job.settings)
+                    if (
+                        settings.get("translation_mode") == "personal"
+                        and "fallback_target" not in settings
+                    ):
+                        settings["fallback_target"] = language.translation_target
+                        job.settings = json.dumps(settings, ensure_ascii=False)
                     key = (
                         settings["source"],
                         settings["target"],
@@ -384,6 +391,8 @@ class BookTranslationWorker:
                             settings.get("translation_mode", "translation"),
                         ),
                     )
+                    if settings.get("translation_mode") == "personal":
+                        key += (None, settings.get("fallback_target", ""))
                     skipped = self._skip(
                         language, word["text"], profile_from_key(key), word["context"]
                     )

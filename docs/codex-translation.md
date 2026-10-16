@@ -35,9 +35,17 @@ any scheduled retry delay; it excludes time spent waiting behind other jobs.
 **Output → Personal Finnish** (named after the language you are learning) explains
 words and phrases in simple Finnish instead of translating into **Translate into**.
 **Fallback language** selects a language such as Russian or English. Its button
-in each card regenerates that card in the chosen language without changing the
-language's main mode. Press **Save** to persist the replacement; **↻** returns
-to the main mode. With **Output → Translation**, the same setting is the main
+in each card shows that card in the chosen language without changing the
+language's main mode. For term lookups, the model prepares both the simple
+explanation and the fallback translation in the same response, including the
+base form, word cards and every suggested phrase. Both variants are kept in the
+translation store, so pressing the language button uses the saved translation
+without another model request. This also applies to background book jobs, which
+snapshot the fallback language when queued. Press **Save** to persist the
+replacement on the vocabulary card; **↻** regenerates the main mode and its fallback.
+Older personal results need one regeneration with **↻**, or a new book job,
+to prepare both variants. If no fallback is stored, the language button generates
+it on demand. With **Output → Translation**, the same setting is the main
 **Translate into** language. Personal explanations
 use short sentences, common everyday vocabulary and simple grammar around A2,
 and explain the meaning in the current sentence with one simple example.
@@ -81,7 +89,8 @@ it, then press **Save** at the bottom of the card to store it in your vocabulary
 Saved translations and text typed while a request is running are preserved.
 
 Every term translation from Codex is kept in a translation store in the Lute
-database, one entry per word or phrase. Opening a term with a stored translation
+database, one entry per word or phrase and output profile. Personal explanations
+and translations into different fallback languages coexist. Opening a term with a stored translation
 shows it immediately, marked **saved** beside the model, even if the term card
 already exists. An empty **Translation** field otherwise starts Codex
 automatically, regardless of whether the word or phrase already has a database

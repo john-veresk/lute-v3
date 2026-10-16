@@ -199,6 +199,8 @@ def submit():
         output_mode,
         vocabulary_for(db.session, language, output_mode),
     )
+    if output_mode == "personal" and kind == "term":
+        key += (None, language.translation_target)
     saved = None
     if kind == "term" and mode != "refresh":
         saved = store.find(

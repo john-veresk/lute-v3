@@ -114,7 +114,8 @@ def test_personal_lookup_passes_only_a_local_revision(
     jobs = client.application.extensions["codex_translation_jobs"]
     key = jobs.key_for(response.json["job_id"])
     assert key[1] == "English"
-    assert key[11:] == ("personal", vocabulary_for(db.session, english))
+    assert key[11:13] == ("personal", vocabulary_for(db.session, english))
+    assert key[13:] == ((None, "Russian") if kind == "term" else ())
     assert isinstance(key[12], str) and len(key[12]) == 64
     jobs.pool.shutdown(wait=True)
 
@@ -287,7 +288,12 @@ def test_book_job_passes_snapshot_and_saves_under_snapshot_profile(
     worker.step()
     key = translate.call_args.args[0]
     assert key[1] == "English"
-    assert key[11:] == ("personal", vocabulary_for(db.session, english, "personal"))
+    assert key[11:] == (
+        "personal",
+        vocabulary_for(db.session, english, "personal"),
+        None,
+        "Russian",
+    )
     assert store.find(db.session, english, "Dog") is None
     english.translation_mode = "personal"
     assert store.find(db.session, english, "Dog") == RESULT

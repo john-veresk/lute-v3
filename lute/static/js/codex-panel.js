@@ -86,7 +86,7 @@ class CodexPanel {
     this.cardRows = {words: [], phrases: []};
     this.timer = new CodexTimer(this.element('codex-timer'), window);
     this.element('codex-refresh')?.addEventListener('click', () => this.start('refresh'));
-    this.element('codex-fallback')?.addEventListener('click', () => this.start('refresh', true));
+    this.element('codex-fallback')?.addEventListener('click', () => this.start('auto', true));
     this.element('codex-retry').addEventListener('click', () => this.start(this.lastMode, this.lastFallback));
     window.addEventListener('pagehide', () => { this.generation++; this.timer.stop(); });
     if (form) window.addEventListener('keydown', event => this.onKey(event));
@@ -206,7 +206,7 @@ class CodexPanel {
     if (!this.form) return;
     this.renderCards(result.words || [], jobId, current, 'words');
     this.renderCards(result.phrases || [], jobId, current, 'phrases');
-    if (this.lastMode === 'refresh' && this.translationAtStart !== undefined) {
+    if ((this.lastMode === 'refresh' || this.lastFallback) && this.translationAtStart !== undefined) {
       // Refresh replaces the old meaning, but preserves edits made while waiting.
       if (this.form.translation() === this.translationAtStart) this.choose(0, false);
     } else {

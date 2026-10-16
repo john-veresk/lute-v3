@@ -65,13 +65,16 @@ async function checks() {
   await settle();
   assert.equal(edited.fields['#translation'].value, 'typed while waiting', 'refresh preserves edits made during the request');
 
-  const fallback = openCard('simple Finnish', {job_id: 'job', saved: false});
+  const fallback = openCard('simple Finnish', {job_id: 'job', saved: true});
   await settle();
   fallback.el('codex-fallback').handlers.click();
   assert.equal(fallback.win.requests.at(-1).body.fallback, true, 'fallback uses a per-request override');
+  assert.equal(fallback.win.requests.at(-1).body.mode, 'auto', 'fallback reuses its prepared translation');
   assert.equal(fallback.el('codex-fallback').disabled, true);
   await settle();
   assert.equal(fallback.fields['#translation'].value, 'кошки', 'fallback replaces the card text');
+  assert.equal(fallback.el('codex-timer').textContent, 'saved', 'prepared fallback is served from the database');
+  assert.equal(fallback.win.timers(), 0, 'prepared fallback never starts a model timer');
   fallback.el('codex-refresh').handlers.click();
   assert.equal(fallback.win.requests.at(-1).body.fallback, undefined, 'refresh returns to the primary mode');
   await settle();
