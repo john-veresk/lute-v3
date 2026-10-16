@@ -5,6 +5,8 @@
   {% endfor %}
 </select>
 
+<div id="book-tag-filter" class="book-tag-filter" aria-label="Filter by tag" hidden></div>
+
 <table id="booktable" class="table dataTable stripe">
   <thead>
     <tr>
@@ -16,10 +18,12 @@
         <a href="/refresh_all_stats" class="refresh" title="Refresh stats for all books"></a>
       </th>
       <th style="text-align: left">Last read</th>
-      <th style="text-align: left">Actions</th>
+      <th aria-label="Actions"></th>
     </tr>
   </thead>
 </table>
+
+<div id="book-menu" class="book-menu" role="menu" hidden></div>
 
 <!-- the config widget for datatables.  Moved into the datatables table footer during setup. -->
 <div id="datatables_config_widget">
@@ -91,7 +95,8 @@
       },
       buttons: [
         {
-          extend: 'colvis'
+          extend: 'colvis',
+          columns: ':not(.no-colvis)'
         }
       ],
       {% if status != 'Archived' %}
@@ -112,13 +117,13 @@
       stateDuration: 0,  /* never expire saved state. */
       search: { search: initial_search },
       columns: [
-        { name: "BkTitle", width: "40%", render: render_book_title },
+        { name: "BkTitle", width: "34%", render: render_book_title },
         { name: "LgName", width: "10%", data: "LgName" },
-        { name: "TagList", width: "10%", data: "TagList" },
-        { name: "WordCount", width: "10%", data: "WordCount" },
+        { name: "TagList", width: "20%", render: render_book_tags },
+        { name: "WordCount", width: "8%", data: "WordCount" },
         { name: "UnknownPercent", "searchable": false, render: render_book_stats_graph_placeholder },
         { name: "LastOpenedDate", "searchable": false, render: render_last_opened_date },
-        { width: "8%", "searchable": false, "orderable": false, render: render_book_actions },
+        { className: "book-actions-cell no-colvis", "searchable": false, "orderable": false, render: render_book_actions },
       ],
       createdRow: function(row, data, dataIndex) { ajax_in_book_stats(row, data, dataIndex); },
       ajax: {
@@ -128,6 +133,7 @@
         // data sent to the controller.
         data: {
           filtLanguage: () => $("#defaultLanguageSelect").val(),
+          filtTagIDs: () => selected_tag_ids.join(','),
         },
 
         type: "POST",
@@ -150,6 +156,7 @@
       const langid = $(this).val();
       $.post(`/settings/set/current_language_id/${langid}`);
       $('#booktable').DataTable().draw();
+      load_tag_counts();
     });
   };
 
@@ -169,7 +176,10 @@
     // Language filter is set up first, because its value
     // is used during the initial datatable draw.
     setup_language_filter(current_language_id);
+    setup_tag_filter();
     setup_book_datatable("{{ initial_search or '' }}");
+    setup_book_tags_cells();
+    setup_book_menu();
 
     move_datatables_controls_to_config_widget();
 
@@ -185,18 +195,11 @@
     f.submit();
   }
 
-  function confirm_archive(el) {
-    const booktitle = decodeURIComponent($(el).data('bktitle'));
-    const bookid = $(el).data('bkid');
-    if (!confirm(`Archiving "${booktitle}".  Click OK to proceed, or Cancel.`)) {
+  function confirm_delete(bookid, booktitle) {
+    if (!confirm(`Deleting "${booktitle}".  Click OK to proceed, or Cancel.`)) {
       return;
     }
-    do_action_post('archive', bookid);
-  }
-
-  function confirm_unarchive(el) {
-    const bookid = $(el).data('bkid');
-    do_action_post('unarchive', bookid);
+    do_action_post('delete', bookid);
   }
 
   //  function confirm_reparse(bookid) {
@@ -206,19 +209,260 @@
   //    do_action_post('reparse', bookid);
   //  }
 
-  function edit_book(el) {
-    const bookid = $(el).data('bkid');
-    document.location = `/book/edit/${bookid}`;
-  }
+  const book_menu_actions = {
+    edit: (row) => { document.location = `/book/edit/${row.BkID}`; },
+    archive: (row) => do_action_post('archive', row.BkID),
+    unarchive: (row) => do_action_post('unarchive', row.BkID),
+    delete: (row) => confirm_delete(row.BkID, row.BkTitle),
+  };
 
-  function confirm_delete(el) {
-    const booktitle = decodeURIComponent($(el).data('bktitle'));
-    const bookid = $(el).data('bkid');
-    if (!confirm(`Deleting "${booktitle}".  Click OK to proceed, or Cancel.`)) {
-      return;
+  // Book data is looked up by id, because responsive layout can
+  // move cells into child rows.
+  let book_row_data = function(bkid) {
+    return book_listing_table.rows().data().toArray().find(r => r.BkID == bkid);
+  };
+
+  let escape_html = function(s) {
+    const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(s).replace(/[&<>"']/g, c => entities[c]);
+  };
+
+  // Row actions menu. ==================================================
+
+  let book_menu_items = function(row) {
+    const archive_item = (row.BkArchived == 0) ? ['archive', 'Archive'] : ['unarchive', 'Unarchive'];
+    return [['edit', 'Edit'], archive_item, ['delete', 'Delete']];
+  };
+
+  let close_book_menu = function() {
+    $('#book-menu').prop('hidden', true).removeData('bkid');
+    $('.book-menu-toggle[aria-expanded="true"]').attr('aria-expanded', 'false');
+  };
+
+  let place_book_menu = function(menu, toggle) {
+    const r = toggle.getBoundingClientRect();
+    const fits_below = r.bottom + menu.outerHeight() + 8 < window.innerHeight;
+    menu.css({
+      top: fits_below ? r.bottom + 4 : r.top - menu.outerHeight() - 4,
+      left: Math.max(8, r.right - menu.outerWidth()),
+    });
+  };
+
+  let open_book_menu = function(toggle) {
+    const bkid = $(toggle).data('bkid');
+    const items = book_menu_items(book_row_data(bkid)).map(([action, label]) =>
+      `<button type="button" role="menuitem" class="book-menu-${action}" data-action="${action}">${label}</button>`);
+    const menu = $('#book-menu').html(items.join('')).data('bkid', bkid).prop('hidden', false);
+    place_book_menu(menu, toggle);
+    $(toggle).attr('aria-expanded', 'true');
+    menu.find('button').first().focus();
+  };
+
+  let setup_book_menu = function() {
+    $('#booktable').on('click', '.book-menu-toggle', function(e) {
+      e.stopPropagation();
+      const was_open = $(this).attr('aria-expanded') == 'true';
+      close_book_menu();
+      if (!was_open)
+        open_book_menu(this);
+    });
+    $('#book-menu').on('click', 'button', function() {
+      const row = book_row_data($('#book-menu').data('bkid'));
+      close_book_menu();
+      book_menu_actions[$(this).data('action')](row);
+    });
+    $(document).on('click', function(e) {
+      if (!$(e.target).closest('#book-menu').length)
+        close_book_menu();
+    });
+    $(document).on('keydown', function(e) {
+      if (e.key == 'Escape' && !$('#book-menu').prop('hidden')) {
+        const toggle = $('.book-menu-toggle[aria-expanded="true"]');
+        close_book_menu();
+        toggle.focus();
+      }
+    });
+    $(window).on('scroll resize', close_book_menu);
+  };
+
+  // Tag filter. ========================================================
+
+  const TAG_FILTER_STORAGE_KEY = 'lute_book_tag_filter_{{ status or "active" }}';
+  let all_tags = [];  // [{ id, text, count }] for the current listing.
+  let selected_tag_ids = [];
+
+  let load_selected_tag_ids = function() {
+    try {
+      return JSON.parse(localStorage.getItem(TAG_FILTER_STORAGE_KEY)) || [];
     }
-    do_action_post('delete', bookid);
-  }
+    catch (e) {
+      return [];
+    }
+  };
+
+  let set_selected_tag_ids = function(ids) {
+    selected_tag_ids = ids;
+    localStorage.setItem(TAG_FILTER_STORAGE_KEY, JSON.stringify(ids));
+    render_tag_filter();
+    book_listing_table.draw();
+  };
+
+  let toggle_tag_filter = function(tag_id) {
+    const ids = selected_tag_ids.includes(tag_id) ?
+          selected_tag_ids.filter(id => id != tag_id) :
+          [...selected_tag_ids, tag_id];
+    set_selected_tag_ids(ids);
+  };
+
+  let tag_id_for = function(text) {
+    return all_tags.find(t => t.text == text)?.id;
+  };
+
+  let render_tag_pill = function(tag) {
+    const pressed = selected_tag_ids.includes(tag.id);
+    return `<button type="button" class="tag-pill" data-tag-id="${tag.id}" aria-pressed="${pressed}">
+      ${escape_html(tag.text)}<span class="tag-pill-count">${tag.count}</span></button>`;
+  };
+
+  let render_tag_filter = function() {
+    const shown = all_tags.filter(t => t.count > 0 || selected_tag_ids.includes(t.id));
+    const clear = selected_tag_ids.length == 0 ? '' :
+          '<button type="button" class="tag-pill-clear">Clear</button>';
+    $('#book-tag-filter')
+      .html(shown.map(render_tag_pill).join('') + clear)
+      .prop('hidden', shown.length == 0);
+    $('#booktable .book-tag').each(function() {
+      $(this).toggleClass('book-tag-selected', selected_tag_ids.includes(tag_id_for($(this).attr('data-tag'))));
+    });
+  };
+
+  let load_tag_counts = function() {
+    const params = {
+      archived: {{ 1 if status == 'Archived' else 0 }},
+      language_id: $('#defaultLanguageSelect').val() || 0,
+    };
+    return $.getJSON('/book/tag_counts', params).then(function(tags) {
+      all_tags = tags;
+      const existing_ids = selected_tag_ids.filter(id => tags.some(t => t.id == id));
+      if (existing_ids.length != selected_tag_ids.length)
+        set_selected_tag_ids(existing_ids);
+      render_tag_filter();
+    });
+  };
+
+  let setup_tag_filter = function() {
+    selected_tag_ids = load_selected_tag_ids();
+    $('#book-tag-filter').on('click', '.tag-pill', function() {
+      toggle_tag_filter($(this).data('tag-id'));
+    });
+    $('#book-tag-filter').on('click', '.tag-pill-clear', () => set_selected_tag_ids([]));
+    load_tag_counts();
+  };
+
+  // Inline tag editing. ================================================
+
+  let parse_tag_list = function(tag_list) {
+    return (tag_list ?? '').split(', ').filter(t => t != '');
+  };
+
+  let open_tag_editor = null;  // { close } of the editor being used.
+
+  let save_book_tags = function(bkid, tags) {
+    return $.ajax({
+      url: `/book/${bkid}/tags`,
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify({ tags: tags }),
+    });
+  };
+
+  let tag_editor_settings = function() {
+    return {
+      whitelist: all_tags.map(t => t.text),
+      placeholder: 'Add tag',
+      editTags: false,
+      autoComplete: { enabled: true, rightKey: true, tabKey: true },
+      dropdown: {
+        enabled: 0,
+        maxItems: 50,
+        closeOnSelect: false,
+        highlightFirst: true,
+        classname: 'book-tags-dropdown',
+      },
+    };
+  };
+
+  let edit_book_tags = function(container) {
+    open_tag_editor?.close();
+    const bkid = $(container).data('bkid');
+    const row = book_row_data(bkid);
+    const original_tag_list = row.TagList ?? '';
+    const input = $('<input type="text">').val(parse_tag_list(row.TagList).join(','));
+    $(container).addClass('book-tags-editing').empty().append(input);
+    const tagify = new Tagify(input[0], tag_editor_settings());
+
+    let is_open = true;
+    const current_tags = () => tagify.value.map(t => t.value);
+    const save = function(tags) {
+      row.TagList = [...tags].sort((a, b) => a.localeCompare(b)).join(', ');
+      save_book_tags(bkid, tags).then(load_tag_counts);
+      // Offer the remaining tags, so several can be added in a row.
+      setTimeout(() => is_open && tagify.dropdown.show(), 0);
+    };
+    tagify.on('add', () => save(current_tags()));
+    // Tagify can still list the removed tag in its value during this event.
+    tagify.on('remove', (e) => save(current_tags().filter(t => t != e.detail.data.value)));
+
+    const add_pending_tag = function() {
+      const pending = tagify.DOM.input.textContent.trim();
+      if (pending != '')
+        tagify.addTags([pending]);
+    };
+
+    const on_outside_mousedown = function(e) {
+      const inside = $(e.target).closest(container).length || $(e.target).closest('.book-tags-dropdown').length;
+      if (!inside)
+        close();
+    };
+
+    const close = function() {
+      add_pending_tag();
+      is_open = false;
+      document.removeEventListener('mousedown', on_outside_mousedown, true);
+      tagify.destroy();
+      open_tag_editor = null;
+      $(container).replaceWith(render_book_tags(null, 'display', row));
+      render_tag_filter();
+      if (selected_tag_ids.length > 0 && row.TagList != original_tag_list)
+        book_listing_table.draw(false);
+    };
+
+    tagify.DOM.scope.addEventListener('keydown', function(e) {
+      if (e.key == 'Escape') {
+        e.stopPropagation();
+        close();
+      }
+    }, true);
+    document.addEventListener('mousedown', on_outside_mousedown, true);
+    open_tag_editor = { close: close };
+    // Tagify ignores keys if it missed the focus event during setup.
+    setTimeout(() => {
+      tagify.DOM.input.focus();
+      tagify.dropdown.show();
+    }, 0);
+  };
+
+  let setup_book_tags_cells = function() {
+    $('#booktable').on('click', '.book-tag', function() {
+      const tag_id = tag_id_for($(this).attr('data-tag'));
+      if (tag_id != null)
+        toggle_tag_filter(tag_id);
+    });
+    $('#booktable').on('click', '.book-tags:not(.book-tags-editing)', function(e) {
+      if (!$(e.target).closest('.book-tag').length)
+        edit_book_tags(this);
+    });
+  };
 
   // Rendering helpers. =================================================
   // each row in the table is a json dict, the keys are the SQL column names.
@@ -318,30 +562,25 @@
     return `<span title="${dt}">${txt}</span>`;
   };
 
+  let render_book_tags = function ( data, type, row, meta ) {
+    const tags = parse_tag_list(row['TagList']);
+    const chips = tags.map(t => {
+      const selected = selected_tag_ids.includes(tag_id_for(t)) ? ' book-tag-selected' : '';
+      return `<button type="button" class="book-tag${selected}" data-tag="${escape_html(t)}"
+        title="Show books tagged &quot;${escape_html(t)}&quot;">${escape_html(t)}</button>`;
+    });
+    const add_label = tags.length == 0 ? '<span>Add tag</span>' : '';
+    return `<div class="book-tags" data-bkid="${row['BkID']}">${chips.join('')}<button
+      type="button" class="book-tags-add" title="Edit tags" aria-label="Edit tags"><svg viewBox="0 0 16 16"
+      aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>${add_label}</button></div>`;
+  };
+
   let render_book_actions = function ( data, type, row, meta ) {
     // TODO zzfuture fix: security - add CSRF token
-    const bkid = row['BkID'];
-    const bktitle = encodeURIComponent(row['BkTitle']);
-    const is_active = (row['BkArchived'] == 0);
-
-    const links = [];
-    const make_link = function(label, func) {
-      const s = `<a href="#" data-bkid="${bkid}" data-bktitle="${bktitle}" onclick="${func}(this)">${label}</a>`;
-      links.push(s);
-    };
-
-    make_link('Edit', "edit_book");
-    if (is_active) {
-      make_link('Archive', "confirm_archive");
-    }
-    else {
-      make_link('Unarchive', "confirm_unarchive");
-    }
-    make_link('Delete', "confirm_delete");
-
-    return `<div class="book-action-dropdown"><span>&hellip;</span>
-      <div class="book-action-dropdown-content">${links.join('')}</div>
-    </div>`;
+    return `<button type="button" class="book-menu-toggle" data-bkid="${row['BkID']}"
+      title="Actions" aria-label="Actions" aria-haspopup="menu" aria-expanded="false"><svg
+      viewBox="0 0 16 16" aria-hidden="true"><circle cx="3" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle
+      cx="13" cy="8" r="1.3"/></svg></button>`;
   };
 
   // added class is used for changing static image to rotating arrow animation
