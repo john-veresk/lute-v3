@@ -32,6 +32,7 @@ def _load_term_custom_filters(request_form, parameters):
     "Manually add filters that the DataTablesFlaskParamParser doesn't know about."
     filter_param_names = [
         "filtLanguage",
+        "filtTagIDs",
     ]
     request_params = request_form.to_dict(flat=True)
     for p in filter_param_names:
@@ -179,6 +180,29 @@ def delete(bookid):
     db.session.delete(b)
     db.session.commit()
     return redirect("/", 302)
+
+
+@bp.route("/<int:bookid>/tags", methods=["POST"])
+def set_tags(bookid):
+    "Replace the book's tags, return ajax."
+    if _find_book(bookid) is None:
+        return jsonify({"error": "book not found"}), 404
+    tags = sorted({t.strip() for t in request.json.get("tags", []) if t.strip()})
+    repo = Repository(db.session)
+    b = repo.load(bookid)
+    b.book_tags = tags
+    repo.add(b)
+    repo.commit()
+    return jsonify({"tags": tags})
+
+
+@bp.route("/tag_counts", methods=["GET"])
+def tag_counts():
+    "All book tags with book counts for a listing, return ajax."
+    is_archived = request.args.get("archived", "0") == "1"
+    language_id = request.args.get("language_id", 0, type=int)
+    repo = Repository(db.session)
+    return jsonify(repo.get_book_tag_counts(is_archived, language_id))
 
 
 @bp.route("/table_stats/<int:bookid>", methods=["GET"])

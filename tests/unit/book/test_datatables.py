@@ -5,6 +5,7 @@ Book tests.
 from datetime import datetime
 import pytest
 from lute.models.language import Language
+from lute.models.book import BookTag
 from lute.book.datatables import get_data_tables_list
 from lute.db import db
 from lute.db.demo import Service as DemoService
@@ -77,3 +78,40 @@ def test_book_data_says_completed_if_last_page_has_been_read(
     actual = d["data"][0]
     assert actual["BkID"] == b.id, "correct book"
     assert actual["IsCompleted"] == 1, "completed"
+
+
+def _make_tagged_book(title, tags, language):
+    "Book with the given BookTags."
+    b = make_book(title, "Hello.", language)
+    for t in tags:
+        b.add_book_tag(t)
+    db.session.add(b)
+    return b
+
+
+def _listed_titles(params):
+    return [
+        row["BkTitle"]
+        for row in get_data_tables_list(params, False, db.session)["data"]
+    ]
+
+
+def test_tag_filter_lists_books_having_all_selected_tags(
+    app_context, _dt_params, english
+):
+    "Selecting several tags narrows the listing."
+    news = BookTag.make_book_tag("news")
+    easy = BookTag.make_book_tag("easy")
+    _make_tagged_book("both", [news, easy], english)
+    _make_tagged_book("only news", [news], english)
+    _make_tagged_book("untagged", [], english)
+    db.session.commit()
+
+    _dt_params["filtTagIDs"] = ""
+    assert {"both", "only news", "untagged"} <= set(_listed_titles(_dt_params))
+
+    _dt_params["filtTagIDs"] = f"{news.id}"
+    assert _listed_titles(_dt_params) == ["both", "only news"]
+
+    _dt_params["filtTagIDs"] = f"{news.id},{easy.id}"
+    assert _listed_titles(_dt_params) == ["both"]

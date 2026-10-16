@@ -2,6 +2,7 @@
 Book domain objects.
 """
 
+from sqlalchemy import text as sqltext
 from lute.models.book import BookTag, Book as DBBook, Text as DBText
 from lute.models.repositories import (
     BookRepository,
@@ -127,6 +128,22 @@ class Repository:
         "Get all available book tags, helper method."
         bts = self.session.query(BookTag).all()
         return sorted([t.text for t in bts])
+
+    def get_book_tag_counts(self, is_archived, language_id):
+        "All book tags with the count of their books in a listing."
+        language_filter = "and b.BkLgID = :language_id" if language_id else ""
+        sql = f"""
+            select T2ID, T2Text, count(b.BkID)
+            from tags2
+            left join booktags on BtT2ID = T2ID
+            left join books b on b.BkID = BtBkID
+              and b.BkArchived = :is_archived {language_filter}
+            group by T2ID, T2Text
+            order by T2Text
+        """
+        params = {"is_archived": is_archived, "language_id": language_id}
+        rows = self.session.execute(sqltext(sql), params).fetchall()
+        return [{"id": r[0], "text": r[1], "count": r[2]} for r in rows]
 
     def add(self, book):
         """

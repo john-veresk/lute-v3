@@ -169,6 +169,28 @@ def test_get_tags(app_context, new_book, repo):
     assert repo.get_book_tags() == ["tag1", "tag2"], "no tags yet"
 
 
+def test_get_tag_counts(app_context, new_book, repo, spanish):
+    "Counts are per listing (active/archived) and language, all tags are returned."
+    b = repo.add(new_book)
+    repo.commit()
+    english_id = new_book.language_id
+
+    def counts(is_archived, language_id):
+        return [
+            (t["text"], t["count"])
+            for t in repo.get_book_tag_counts(is_archived, language_id)
+        ]
+
+    assert counts(False, 0) == [("tag1", 1), ("tag2", 1)]
+    assert counts(False, english_id) == [("tag1", 1), ("tag2", 1)]
+    assert counts(False, spanish.id) == [("tag1", 0), ("tag2", 0)]
+    assert counts(True, 0) == [("tag1", 0), ("tag2", 0)]
+
+    b.archived = True
+    repo.commit()
+    assert counts(True, 0) == [("tag1", 1), ("tag2", 1)]
+
+
 def test_save_update_existing(app_context, new_book, repo):
     "Update an existing book, tags are replaced."
     b = repo.add(new_book)
