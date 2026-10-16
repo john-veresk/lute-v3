@@ -1,11 +1,13 @@
 """A generic first prompt, local checks, and exactly one bounded revision."""
 
 import json
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 import pytest
 from lute.db import db
 from lute.models.language import Language
-from lute.translation import service
+from lute.translation import service, store
 from tests.unit.read.test_vocabulary import add
 from tests.unit.read.test_codex_store import _lookup, _result
 
@@ -81,6 +83,67 @@ def test_learning_target_in_example_is_not_an_unfamiliar_obstacle(
         == []
     )
     generate.assert_called_once()
+
+
+@pytest.mark.parametrize("needs_revision", [False, True])
+def test_phrase_with_empty_lemma_completes_and_is_saved(
+    client, learner, monkeypatch, needs_revision
+):
+    for word in ("panna", "se", "sinne", "ovi", "luona", "huone", "alas", "alhaalla"):
+        add(learner, word)
+    db.session.commit()
+    phrase = "jätin eteisen lattialle"
+    context = "Kannoin sen turvaistuimessa sisälle ja jätin eteisen lattialle."
+    result = {
+        **answer("Panin sen lattialle."),
+        "lemma": "",
+        "words": [
+            {
+                "text": text,
+                "translation": translation,
+                "lemma": lemma,
+                "is_inflected": True,
+                "lemma_translation": base_translation,
+            }
+            for text, translation, lemma, base_translation in (
+                ("jätin", "Panin sen sinne.", "jättää", "Panna."),
+                ("eteisen", "Oven luona.", "eteinen", "Huone."),
+                ("lattialle", "Alas.", "lattia", "Alhaalla."),
+            )
+        ],
+    }
+    calls = []
+
+    def run_cli(command, workdir, cli, prompt=None):
+        payload = json.loads(prompt.rsplit("\n", 1)[1])
+        calls.append(payload)
+        assert payload["words_to_translate"] == phrase.split()
+        assert "known_words" not in payload
+        output = result
+        if needs_revision and len(calls) == 1:
+            output = {
+                **result,
+                "options": [
+                    {"translation": "Panin sen varovasti lattialle.", "explanation": ""}
+                ],
+            }
+        Path(command[command.index("--output-last-message") + 1]).write_text(
+            json.dumps(output), encoding="utf-8"
+        )
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(service, "_executable", lambda _: "/fake/codex")
+    monkeypatch.setattr(service, "_run_cli", run_cli)
+    response = _lookup(client, learner, mode="refresh", text=phrase, context=context)
+    completed = _result(client, response.json["job_id"])
+    assert completed["status"] == "complete", completed
+    generated = completed["result"]
+    assert generated["lemma"] == ""
+    assert generated["words"] == result["words"]
+    assert generated["vocabulary"]["unknown"] == []
+    assert generated["vocabulary"]["revised"] is needs_revision
+    assert len(calls) == (2 if needs_revision else 1)
+    assert store.find(db.session, learner, phrase, context=context) == generated
 
 
 def test_revision_payload_contains_only_output_feedback_not_a_full_dictionary():

@@ -44,7 +44,8 @@ _MORPHOLOGY_LOCK = threading.RLock()
 @lru_cache(maxsize=32768)
 def lemma_for(text, code):
     """Offline dictionary analysis; never guess by stripping arbitrary suffixes."""
-    if not code:
+    # Phrases and uncertain word cards legitimately have no dictionary headword.
+    if not text or not code:
         return text
     if code == "fi" and text in FINNISH_FORMS:
         return FINNISH_FORMS[text]
@@ -172,6 +173,7 @@ class Vocabulary:
     def check(self, text, exclude=()):
         """Classify every distinct word; excluded learning targets are not new obstacles."""
         excluded = {self.normalize(word) for word in exclude}
+        excluded.discard("")
         excluded.update(lemma_for(word, self.code) for word in list(excluded))
         report = {"known": [], "unknown": [], "ignored": []}
         for entry in self.lookup(self.words(text)):

@@ -6,7 +6,7 @@ import pytest
 from lute.db import db
 from lute.models.language import Language
 from lute.models.term import Term
-from lute.translation.vocabulary import Vocabulary
+from lute.translation.vocabulary import Vocabulary, lemma_for
 from lute.cli.vocabulary import main
 
 
@@ -25,6 +25,25 @@ def add(language, text, status=99, parents=()):
     term.parents = list(parents)
     db.session.add(term)
     return term
+
+
+def test_empty_lemma_does_not_call_morphology(monkeypatch):
+    monkeypatch.setattr(
+        "lute.translation.vocabulary.simplemma.lemmatize",
+        lambda *args, **kwargs: pytest.fail("Empty text is not a word"),
+    )
+    assert lemma_for("", "fi") == ""
+
+
+def test_empty_exclusions_do_not_break_vocabulary_check(finnish):
+    add(finnish, "minä")
+    db.session.commit()
+    report = Vocabulary(db.session, finnish).check(
+        "Minulla tarpeeksi.", exclude=["", " \n ", "\u200b"]
+    )
+    assert [e["text"] for e in report["known"]] == ["minulla"]
+    assert [e["text"] for e in report["unknown"]] == ["tarpeeksi"]
+    assert report["ignored"] == []
 
 
 def test_finnish_forms_and_lexicalized_adverb(finnish):
