@@ -806,51 +806,6 @@ let show_translation_for_text = function(text) {
 };
 
 
-/**
- * Get all selected words, post their IDs.
- */
-function send_selected_terms_to_anki() {
-  let elements = $('span.kwordmarked').toArray().concat($('span.wordhover').toArray());
-  if (elements.length == 0)
-    return;
-  const word_ids = elements.map(el => $(el).data("wid"));
-
-  function _get_sentence(el) {
-    const el_sentence_id = $(el).data('sentence-id');
-    const selector = `span.textitem[data-sentence-id="${el_sentence_id}"]`;
-    const tis = $(selector).toArray();
-    return _get_textitems_text(tis);
-  }
-
-  function _get_sentences_dict(elements) {
-    ret = {};
-    elements.forEach(function(el) {
-      const wid = $(el).data("wid");
-      ret[wid] = _get_sentence(el);
-    });
-    return ret;
-  }
-  const termid_sentences = _get_sentences_dict(elements);
-
-  function add_tooltip(term_id, results) {
-    $('.ui-tooltip').remove();
-    elements.forEach(function(el) {
-      if ($(el).data("wid") == term_id) {
-        _show_element_message_tooltip(el, "Anki exports", results, 0);
-      }
-    });
-  }
-
-  const ANKI_CONNECT_URL = LUTE_USER_SETTINGS["ankiconnect_url"];
-  LuteAnki.post_anki_cards(
-    ANKI_CONNECT_URL, word_ids, termid_sentences, add_tooltip
-  ).catch(error => {
-    console.error("ERROR:", error);
-    alert(error.message);
-  });
-}
-
-
 // Get all the word ids on the current page, open new tab with just those terms.
 function open_term_list_for_current_page() {
   const ids = new Set();
@@ -995,7 +950,6 @@ function handle_keydown (e) {
     "hotkey_StatusUp": () => increment_status_for_selected_elements(+1),
     "hotkey_StatusDown": () => increment_status_for_selected_elements(-1),
     "hotkey_PageTermList": () => open_term_list_for_current_page(),
-    "hotkey_PostTermsToAnki": () => send_selected_terms_to_anki(),
     "hotkey_Bookmark": () => handle_bookmark(),
     "hotkey_CopySentence": () => handle_copy('sentence-id'),
     "hotkey_CopyPara": () => handle_copy('paragraph-id'),

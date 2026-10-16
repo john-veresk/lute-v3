@@ -55,16 +55,6 @@
   </section>
 
   <section class="settings-section">
-    <h2>Anki</h2>
-    {{ field(form.use_ankiconnect) }}
-    {{ field(form.ankiconnect_url) }}
-    <div class="settings-test">
-      <button id="test_ankiconnect_btn" class="btn" onclick="test_ankiconnect_setup(); return false;">Test connection</button>
-      <div id="ankiconnect_result"></div>
-    </div>
-  </section>
-
-  <section class="settings-section">
     <h2>Japanese</h2>
     {{ field(form.mecab_path, 'Leave empty unless MeCab is not found. <a href="https://luteorg.github.io/lute-manual/install/mecab.html" target="_blank" rel="noopener">MeCab setup</a>') }}
     <div class="settings-test">
@@ -107,24 +97,6 @@
         alert('Error occured');
       }
     });
-  }
-
-  function test_ankiconnect_setup() {
-    const ac_url = $('#ankiconnect_url').val().trim();
-    const el = $('#ankiconnect_result');
-    if (ac_url == "") {
-      alert("Please specify the AnkiConnect URL.");
-      $("#ankiconnect_url").focus();
-      return;
-    }
-    LuteAnki.get_anki_specs(ac_url)
-      .then(() => {
-        show_test_result(el, `Connected to AnkiConnect at ${ac_url}.`, true);
-      })
-      .catch(error => {
-        show_test_result(el, error, false);
-        $("#use_ankiconnect").prop("checked", false);
-      });
   }
 
 </script>

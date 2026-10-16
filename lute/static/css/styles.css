@@ -905,7 +905,7 @@ img
     margin-left: 20pt;
 }
 
-/* Tooltip shown on copy or anki card creation. */
+/* Tooltip shown on copy. */
 .manual-tooltip {
     position: absolute;
     background-color: white;
