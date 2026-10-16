@@ -8,6 +8,43 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
 const template = fs.readFileSync('lute/templates/read/index.html', 'utf8');
 const collectWords = template.match(/  function pretranslate_page\([\s\S]*?\n  }/)[0];
 
+function checkProgress() {
+  const classes = {add() {}, remove() {}};
+  const label = {};
+  const count = {};
+  const bar = {firstElementChild: {style: {}}, setAttribute() {}};
+  const retry = {addEventListener(type, handler) { this[type] = handler; }};
+  const selectors = {
+    '[role="progressbar"]': bar,
+    '.pretranslate-progress-label': label,
+    '.pretranslate-progress-count': count,
+  };
+  let retried = 0;
+  const context = vm.createContext({
+    pretranslateProgress: {classList: classes, querySelector: selector => selectors[selector]},
+    pretranslateHideTimer: null,
+    document: {body: {classList: classes}, getElementById: () => retry},
+    pretranslator: {retry() { retried++; }},
+    place_pretranslate_progress() {}, clearTimeout() {}, setTimeout() {},
+  });
+  vm.runInContext(template.match(/  function render_pretranslate_progress\([\s\S]*?\n  }/)[0], context);
+  vm.runInContext(template.match(/  document.getElementById\('pretranslate-retry'\)\?\.addEventListener[^\n]+/)[0], context);
+  context.render_pretranslate_progress({done: 1, total: 3, error: true, message: 'Connection lost'});
+  assert.equal(label.textContent, 'Translation failed');
+  assert.equal(retry.hidden, false, 'a stopped queue has a Retry button');
+  assert.equal(context.pretranslateProgress.title, 'Connection lost', 'the failure reason is available');
+  assert.equal(count.textContent, '1/3');
+  retry.click();
+  assert.equal(retried, 1, 'the button resumes the pretranslator');
+  context.render_pretranslate_progress({done: 1, total: 3, paused: true, retryAfter: 60});
+  assert.equal(label.textContent, 'Paused (60s)');
+  assert.equal(retry.hidden, true, 'a cooldown already retries automatically');
+  context.render_pretranslate_progress({done: 1, total: 3, paused: true, retrying: true});
+  assert.equal(label.textContent, 'Retrying');
+  context.render_pretranslate_progress({done: 1, total: 3});
+  assert.equal(label.textContent, 'Translating');
+}
+
 function fixture(enabled = true) {
   const items = [
     ['Kissa', true], [' ', false], ['nukkuu', true], ['. ', false],
@@ -70,6 +107,7 @@ function fixture(enabled = true) {
 }
 
 (async () => {
+  checkProgress();
   const ahead = fixture();
   ahead.start();
   await tick();

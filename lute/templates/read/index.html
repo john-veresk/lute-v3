@@ -150,6 +150,7 @@
       <span></span>
     </div>
     <span class="pretranslate-progress-count" aria-hidden="true">0/0</span>
+    <button type="button" id="pretranslate-retry" class="app-button" hidden>Retry</button>
   </div>
   {% endif %}
 </div>
@@ -324,14 +325,16 @@
   }
 
   /** Shown only while this page still has words waiting for a translation. */
-  function render_pretranslate_progress({done, total, paused = false, error = false}) {
+  function render_pretranslate_progress({done, total, paused = false, error = false, retrying = false, retryAfter = 0, message = ''}) {
     if (!pretranslateProgress) return;
     clearTimeout(pretranslateHideTimer);
     const bar = pretranslateProgress.querySelector('[role="progressbar"]');
     const fill = bar.firstElementChild;
     const count = pretranslateProgress.querySelector('.pretranslate-progress-count');
     pretranslateProgress.querySelector('.pretranslate-progress-label').textContent =
-      error ? 'Translation failed' : paused ? 'Paused' : 'Translating';
+      error ? 'Translation failed' : retrying ? 'Retrying' : paused ? `Paused (${retryAfter}s)` : 'Translating';
+    pretranslateProgress.title = message;
+    document.getElementById('pretranslate-retry').hidden = !error;
     const hide = () => {
       pretranslateProgress.hidden = true;
       pretranslateProgress.classList.remove('is-leaving');
@@ -370,6 +373,7 @@
     languageId: LUTE_READING_LANGUAGE_ID,
     onProgress: render_pretranslate_progress,
   });
+  document.getElementById('pretranslate-retry')?.addEventListener('click', () => pretranslator.retry());
 
   // Rebuild from the reading position, including when the reader goes back.
   function pretranslate_page(afterOrder = -1) {

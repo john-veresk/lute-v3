@@ -867,6 +867,9 @@ body.pretranslate-active #reading-footer { padding-bottom: 4.5rem; }
 
 #pretranslate-progress[hidden] { display: none !important; }
 
+#pretranslate-retry { pointer-events: auto; }
+#pretranslate-retry[hidden] { display: none; }
+
 #pretranslate-progress.is-leaving {
     opacity: 0;
     transform: translateX(-50%) translateY(8px);

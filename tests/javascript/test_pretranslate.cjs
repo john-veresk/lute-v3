@@ -74,8 +74,10 @@ async function checks() {
   await throttled.pretranslator.run([words[0]]);
   assert.deepEqual(pauses, [30000, 120000], 'a CLI 429 pauses before retrying the same word');
   assert.deepEqual(throttled.requests.filter(r => r.body).map(r => r.body.text), ['Kissa', 'Kissa', 'Kissa']);
-  assert.deepEqual(throttleProgress.map(p => p.done), [0, 0, 0, 1], 'errors and cooldown do not advance progress');
+  assert.deepEqual(throttleProgress.map(p => p.done), [0, 0, 0, 0, 0, 1], 'errors and cooldown do not advance progress');
   assert.equal(throttleProgress[1].paused, true);
+  assert.equal(throttleProgress[1].retryAfter, 30, 'the UI can explain the server cooldown');
+  assert.equal(throttleProgress.at(-2).paused, undefined, 'the pause clears when requests resume');
 
   const refusedPauses = [];
   let refused = true;
@@ -91,16 +93,88 @@ async function checks() {
 
   for (const failure of ['cli', 'http', 'network']) {
     const failedProgress = [];
+    const failedPauses = [];
     const failed = makePretranslator(async url => {
       if (failure === 'network') throw new Error('offline');
       if (failure === 'http') return response({}, 500);
       return url === '/translation/jobs' ? response({job_id: 'failed'}, 202) : response({status: 'error'});
-    }, event => failedProgress.push({...event}));
+    }, event => failedProgress.push({...event}), async ms => failedPauses.push(ms));
     await failed.pretranslator.run(words);
+    assert.deepEqual(failedPauses, [5000, 15000], `${failure} retries before stopping`);
     assert.equal(failed.pretranslator.done, 0, `${failure} does not count as a processed word`);
     assert.equal(failedProgress.at(-1).error, true, `${failure} is reported as a failed translation`);
+    assert.ok(failedProgress.at(-1).message, 'the error includes a reason');
+    assert.equal(failed.pretranslator.queue[0].text, 'Kissa', 'keep the failed word for retry');
     assert.equal(failed.pretranslator.draining, null, 'failure allows a later run');
   }
+
+  for (const failure of ['cli', 'http', 'network']) {
+    let fail = true;
+    const recovered = makePretranslator(async url => {
+      if (fail && (failure !== 'cli' || url !== '/translation/jobs')) {
+        fail = false;
+        if (failure === 'network') throw new Error('offline');
+        return failure === 'http' ? response({}, 503) : response({status: 'error', error: 'CLI disconnected'});
+      }
+      return url === '/translation/jobs' ? response({job_id: 'job'}, 202) : response({status: 'complete'});
+    });
+    await recovered.pretranslator.run(words);
+    assert.equal(recovered.pretranslator.done, 2, `${failure}: a temporary failure does not stop the queue`);
+  }
+
+  let pollFailures = 2;
+  const polling = makePretranslator(async url => {
+    if (url === '/translation/jobs') return response({job_id: 'job'}, 202);
+    if (pollFailures-- > 0) return response({}, 503);
+    return response({status: 'complete'});
+  });
+  await polling.pretranslator.run([words[0]]);
+  assert.equal(polling.requests.filter(r => r.body).length, 1, 'polling failures keep the same job instead of submitting another translation');
+  assert.equal(polling.pretranslator.done, 1);
+
+  const invalid = makePretranslator(async () => response({error: 'Invalid language'}, 400));
+  await invalid.pretranslator.run(words);
+  assert.equal(invalid.requests.length, 1, 'invalid requests are not automatically retried');
+  assert.equal(invalid.pretranslator.lastError, 'Invalid language');
+
+  let broken = true;
+  const resumable = makePretranslator(async (url, body) => {
+    if (url === '/translation/jobs') return response({job_id: body.text}, 202);
+    return response({status: broken && url.endsWith('/nukkuu') ? 'error' : 'complete'});
+  });
+  await resumable.pretranslator.run(words);
+  assert.equal(resumable.pretranslator.done, 1);
+  broken = false;
+  await resumable.pretranslator.retry();
+  assert.equal(resumable.pretranslator.done, 2, 'retry preserves the completed count');
+  assert.equal(resumable.pretranslator.total, 2);
+  assert.equal(resumable.requests.filter(r => r.body?.text === 'Kissa').length, 1, 'retry does not restart finished words');
+
+  let releaseManual;
+  let savedManually = false;
+  const manual = makePretranslator(async (url, body) => {
+    if (url === '/translation/jobs') return response({job_id: savedManually && body.text === 'Kissa' ? null : body.text}, 202);
+    return response({status: savedManually ? 'complete' : 'error'});
+  }, undefined, () => new Promise(resolve => { releaseManual = resolve; }));
+  const manualRun = manual.pretranslator.run(words);
+  await new Promise(resolve => setImmediate(resolve));
+  savedManually = true;
+  releaseManual();
+  await manualRun;
+  assert.equal(manual.pretranslator.done, 2, 'a manual translation saved during a background retry is skipped and the queue continues');
+  assert.equal(manual.requests.filter(r => r.url === '/translation/jobs/Kissa').length, 1);
+
+  let releaseRetry;
+  const replacingRetry = makePretranslator(async (url, body) => {
+    if (url === '/translation/jobs') return response({job_id: body.text}, 202);
+    return response({status: url.endsWith('/Kissa') ? 'error' : 'complete'});
+  }, undefined, () => new Promise(resolve => { releaseRetry = resolve; }));
+  const abandoned = replacingRetry.pretranslator.run(words);
+  await new Promise(resolve => setImmediate(resolve));
+  const replaced = replacingRetry.pretranslator.run([{text: 'koira', context: 'Koira.'}]);
+  releaseRetry();
+  await Promise.all([abandoned, replaced]);
+  assert.deepEqual(replacingRetry.requests.filter(r => r.body).map(r => r.body.text), ['Kissa', 'koira'], 'a new reading position supersedes the failed word during retry');
 
   let pausedRelease;
   let oldThrottled = true;

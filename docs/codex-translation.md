@@ -131,9 +131,12 @@ include `retry_after` (plus `Retry-After` on rejected submissions).
 
 Background pre-translation waits and retries the same word after a 429; its
 progress shows **Paused** and does not count the word until translation succeeds
-or a stored translation is found. Other failures stop background processing and
-show **Translation failed**, without advancing the counter. Reload the page to
-restart it. Turning a page during the pause replaces the old waiting words.
+or a stored translation is found. The pause shows the server's wait in seconds.
+Temporary CLI and network failures are retried after 5 and 15 seconds, without
+advancing the counter. Brief polling failures retry the same job so its result
+can still be saved. If all attempts fail, **Translation failed** offers **Retry**
+to continue from the failed word without reloading or losing the waiting queue.
+Turning a page or opening another word replaces the old waiting words as usual.
 
 Diagnostics are written to `codex-translation.log` in the configured Lute data
 directory. Each CLI attempt records its job ID, lookup mode, model, reasoning
