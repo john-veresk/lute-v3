@@ -23,7 +23,6 @@ from lute.translation.service import (
     available_cursor_models,
     available_model_efforts,
     available_models,
-    cursor_model_efforts,
 )
 
 bp = Blueprint("language", __name__, url_prefix="/language")
@@ -67,7 +66,12 @@ def _handle_form(language, form) -> bool:
 
     if form.validate_on_submit():
         try:
+            codex_options = language.codex_reasoning_effort, language.codex_fast_mode
             form.populate_obj(language)
+            if language.translation_cli == "cursor":
+                language.codex_reasoning_effort, language.codex_fast_mode = (
+                    codex_options
+                )
             current_app.db.session.add(language)
             current_app.db.session.commit()
             flash(f"Language {language.name} updated", "success")
@@ -115,7 +119,6 @@ def edit(langid):
         codex_models=available_models(),
         codex_model_efforts=available_model_efforts(),
         cursor_models=available_cursor_models(),
-        cursor_model_efforts=cursor_model_efforts(available_cursor_models()),
         reasoning_efforts=list(REASONING_EFFORTS),
     )
 
@@ -163,7 +166,6 @@ def new(langname):
         codex_models=available_models(),
         codex_model_efforts=available_model_efforts(),
         cursor_models=available_cursor_models(),
-        cursor_model_efforts=cursor_model_efforts(available_cursor_models()),
         reasoning_efforts=list(REASONING_EFFORTS),
     )
 

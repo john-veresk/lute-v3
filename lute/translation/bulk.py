@@ -102,7 +102,7 @@ def language_settings(language):
         "target_label": language.translation_target_label,
         "translation_mode": language.translation_mode,
         "model": language.codex_model,
-        "effort": language.codex_reasoning_effort,
+        "effort": language.translation_reasoning_effort,
         "cli": language.translation_cli or "codex",
     }
 
@@ -270,7 +270,7 @@ class BookTranslationWorker:
                         word["context"],
                         "term",
                         (),
-                        settings["effort"],
+                        settings["effort"] if settings["cli"] != "cursor" else "",
                         False,
                         (),
                         settings["cli"],

@@ -147,7 +147,9 @@ def _phrase_job(client, language, monkeypatch, phrases=PHRASES):
     return response.json["job_id"]
 
 
-def test_phrases_already_in_the_vocabulary_are_marked_saved(client, english, monkeypatch):
+def test_phrases_already_in_the_vocabulary_are_marked_saved(
+    client, english, monkeypatch
+):
     "A phrase that already has a card starts checked; an unknown placeholder does not."
     job_id = _phrase_job(client, english, monkeypatch)
     client.get(f"/translation/jobs/{job_id}")
@@ -177,9 +179,14 @@ def test_phrases_already_in_the_vocabulary_are_marked_saved(client, english, mon
     assert "saved" not in phrases["looked after the cats"]
 
 
+@pytest.mark.parametrize("cli", ["codex", "cursor"])
 def test_save_phrase_is_explicit_and_independent_of_the_clicked_word(
-    client, english, monkeypatch
+    client, english, monkeypatch, cli
 ):
+    english.translation_cli = cli
+    if cli == "cursor":
+        english.codex_reasoning_effort = "high"
+        english.codex_fast_mode = True
     job_id = _phrase_job(client, english, monkeypatch)
     assert db.session.query(DBTerm).count() == 0
     response = client.post(

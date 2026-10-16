@@ -12,9 +12,7 @@ from wtforms import (
 from wtforms.validators import DataRequired, Length, Optional, Regexp
 from lute.translation.service import (
     REASONING_EFFORTS,
-    available_cursor_models,
     available_model_efforts,
-    cursor_model_efforts,
 )
 
 
@@ -101,15 +99,9 @@ class LanguageForm(FlaskForm):
 
     def validate_codex_reasoning_effort(self, field):
         "Reject explicit levels the selected model does not offer."
-        if not field.data:
+        if self.translation_cli.data == "cursor" or not field.data:
             return
-        if self.translation_cli.data == "cursor":
-            info = cursor_model_efforts(available_cursor_models()).get(
-                self.codex_model.data
-            )
-            supported = info["efforts"] if info else None
-        else:
-            supported = available_model_efforts().get(self.codex_model.data)
+        supported = available_model_efforts().get(self.codex_model.data)
         if supported and field.data not in supported:
             raise ValidationError(
                 "This model does not support the selected reasoning effort"

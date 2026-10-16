@@ -139,6 +139,16 @@ class Language(
         return "Cursor" if self.translation_cli == "cursor" else "Codex"
 
     @property
+    def translation_reasoning_effort(self):
+        "Cursor uses the selected model ID without separate overrides."
+        return "" if self.translation_cli == "cursor" else self.codex_reasoning_effort
+
+    @property
+    def translation_fast_mode(self):
+        "Fast mode is a Codex option; Cursor speed is part of the model ID."
+        return False if self.translation_cli == "cursor" else self.codex_fast_mode
+
+    @property
     def translation_target_name(self):
         "The personal mode explains in the language being learned."
         return (

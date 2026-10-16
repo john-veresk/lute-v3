@@ -192,8 +192,8 @@ def submit():
         context,
         kind,
         word_texts,
-        language.codex_reasoning_effort,
-        language.codex_fast_mode if mode != "prefetch" else False,
+        language.translation_reasoning_effort,
+        language.translation_fast_mode if mode != "prefetch" else False,
         phrase_texts,
         language.translation_cli or "codex",
         output_mode,
@@ -349,7 +349,8 @@ def _save_cards(card_type):
     )
     if (
         key[:3] != (language.name, target, language.codex_model)
-        or key[7:9] != (language.codex_reasoning_effort, language.codex_fast_mode)
+        or key[7:9]
+        != (language.translation_reasoning_effort, language.translation_fast_mode)
         or cli != (language.translation_cli or "codex")
         or (output_mode != language.translation_mode and not fallback)
         or key[5] != "term"

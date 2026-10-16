@@ -164,10 +164,11 @@ def test_personal_output_reaches_both_cli_prompts(monkeypatch, cli):
         )
         == RESULT
     )
-    payload = json.loads(calls[0][5].rsplit("\n", 1)[1])
+    prompt = calls[0][3 if cli == "cursor" else 5]
+    payload = json.loads(prompt.rsplit("\n", 1)[1])
     assert payload["target_language"] == "Finnish"
     assert "known_words" not in payload
-    assert "local-only-revision-must-not-reach-provider" not in calls[0][5]
+    assert "local-only-revision-must-not-reach-provider" not in prompt
 
 
 def test_refresh_replaces_russian_cache_without_changing_existing_card(

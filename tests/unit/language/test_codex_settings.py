@@ -2,6 +2,7 @@
 
 import json
 import pytest
+from bs4 import BeautifulSoup
 from lute.db import db
 from lute.models.language import Language
 
@@ -31,6 +32,11 @@ def test_save_codex_settings(client, app_context):
     assert b'<option selected value="low">low</option>' in page
     assert b'checked id="codex_fast_mode"' in page
     assert b'checked id="codex_show_timer"' in page
+    form = BeautifulSoup(page, "html.parser")
+    for row in ("codex-effort-row", "codex-fast-row"):
+        assert not form.select_one(f"#{row}").has_attr("hidden")
+    assert not form.select_one("#codex_reasoning_effort").has_attr("disabled")
+    assert not form.select_one("#codex_fast_mode").has_attr("disabled")
     assert (
         b'id="codex-timer"'
         in client.get(f"/translation/panel?language_id={language.id}").data
@@ -140,27 +146,39 @@ def test_unknown_translation_cli_is_rejected(client):
     assert b"Not a valid choice" in response.data
 
 
-def test_cursor_effort_outside_the_model_family_is_rejected(client, monkeypatch):
-    monkeypatch.setattr(
-        "lute.language.forms.available_cursor_models",
-        lambda: ["claude-opus-4-8-low", "claude-opus-4-8-high"],
-    )
+@pytest.mark.parametrize("submitted_options", [{}, {"codex_reasoning_effort": "max"}])
+def test_cursor_settings_hide_and_preserve_codex_options(
+    client, spanish, submitted_options
+):
+    spanish.codex_reasoning_effort = "low"
+    spanish.codex_fast_mode = True
+    db.session.commit()
     response = client.post(
-        "/language/new",
+        f"/language/edit/{spanish.id}",
         data={
-            "name": "Cursor family",
-            "parser_type": "spacedel",
+            "name": spanish.name,
+            "parser_type": spanish.parser_type,
             "translation_target": "Russian",
             "translation_cli": "cursor",
-            "codex_model": "claude-opus-4-8-high",
-            "codex_reasoning_effort": "max",
+            "codex_model": "cursor-grok-4.6-medium",
+            **submitted_options,
         },
     )
-    assert response.status_code == 200
-    assert b"does not support the selected reasoning effort" in response.data
+    assert response.status_code == 302
+    db.session.refresh(spanish)
+    assert spanish.codex_reasoning_effort == "low"
+    assert spanish.codex_fast_mode is True
+    assert spanish.translation_reasoning_effort == ""
+    assert spanish.translation_fast_mode is False
+    page = BeautifulSoup(client.get(f"/language/edit/{spanish.id}").data, "html.parser")
+    for row in ("codex-effort-row", "codex-fast-row"):
+        assert page.select_one(f"#{row}").has_attr("hidden")
+    assert page.select_one("#codex_reasoning_effort").has_attr("disabled")
+    assert page.select_one("#codex_fast_mode").has_attr("disabled")
+    assert page.select_one("#codex_model")["value"] == "cursor-grok-4.6-medium"
 
 
-def test_cursor_agent_accepts_effort_without_codex_metadata(
+def test_cursor_agent_does_not_apply_codex_effort_metadata(
     client, app_context, monkeypatch, tmp_path
 ):
     monkeypatch.setenv("CODEX_HOME", str(tmp_path))
@@ -190,7 +208,8 @@ def test_cursor_agent_accepts_effort_without_codex_metadata(
     assert response.status_code == 302
     language = db.session.query(Language).filter_by(name="Cursor effort").one()
     assert language.translation_cli == "cursor"
-    assert language.codex_reasoning_effort == "high"
+    assert language.codex_reasoning_effort == ""
+    assert language.codex_fast_mode is False
 
 
 def test_new_language_timer_is_checked_by_default(client):

@@ -348,13 +348,14 @@ def test_state_includes_book_tags(client, spanish):
     assert choice["tags"] == ["news", "study"]
 
 
+@pytest.mark.parametrize("cli", ["codex", "cursor"])
 def test_job_snapshots_language_options_and_uses_standard_processing(
-    client, spanish, monkeypatch
+    client, spanish, monkeypatch, cli
 ):
     spanish.codex_model = "original-model"
     spanish.codex_reasoning_effort = "low"
     spanish.codex_fast_mode = True
-    spanish.translation_cli = "cursor"
+    spanish.translation_cli = cli
     book = make_books(spanish, ["Gato."])[0]
     enqueue(client, [book])
     spanish.codex_model = "new-model"
@@ -364,8 +365,8 @@ def test_job_snapshots_language_options_and_uses_standard_processing(
     worker.step()
     key = translate.call_args.args[0]
     assert key[1:3] == ("Russian", "original-model")
-    assert key[7:9] == ("low", False)
-    assert key[10] == "cursor"
+    assert key[7:9] == ("low" if cli == "codex" else "", False)
+    assert key[10] == cli
 
 
 def test_resuming_earlier_book_does_not_interrupt_running_book(

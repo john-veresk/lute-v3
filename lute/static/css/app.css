@@ -275,6 +275,7 @@ a.app-brand.home-link {
     #edit-lang #language input[type="text"], #edit-lang #language select,
     #edit-lang #language .model-picker { max-width: none; width: 100%; }
 }
+#edit-lang #language tr[hidden] { display: none; }
 
 .model-suggestions {
     position: absolute;

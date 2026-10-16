@@ -110,64 +110,6 @@ def test_new_term_form_keeps_automatic_translation(client, spanish, route):
     assert page.select_one("#translation").get_text().strip() == ""
 
 
-def test_cursor_effort_options_follow_the_model_family():
-    options = service.cursor_model_efforts(
-        [
-            "claude-opus-4-8",
-            "claude-opus-4-8-low",
-            "claude-opus-4-8-high",
-            "claude-opus-4-8-low-fast",
-            "claude-opus-4-8-high-fast",
-            "gpt-5.5-extra-high",
-            "composer-2.5",
-        ]
-    )
-    high = options["claude-opus-4-8-high"]
-    assert high["effort"] == "high"
-    assert high["efforts"] == ["low", "high"]
-    assert high["variants"][""] == "claude-opus-4-8"
-    assert high["variants"]["low"] == "claude-opus-4-8-low"
-    assert options["claude-opus-4-8-high-fast"]["variants"]["low"] == (
-        "claude-opus-4-8-low-fast"
-    )
-    assert options["gpt-5.5-extra-high"]["effort"] == "xhigh"
-    assert options["composer-2.5"]["efforts"] == []
-    assert service.cursor_model_argument("claude-opus-4-8-high", "high", False) == (
-        "claude-opus-4-8-high"
-    )
-
-
-@pytest.mark.parametrize(
-    "model,effort,fast_mode,expected",
-    [
-        ("cursor-grok-4.6-medium", "medium", True, "cursor-grok-4.6-medium-fast"),
-        ("cursor-grok-4.6-medium", "high", False, "cursor-grok-4.6-high"),
-        ("cursor-grok-4.6-medium", "high", True, "cursor-grok-4.6-high-fast"),
-        ("cursor-grok-4.6-medium-fast", "high", False, "cursor-grok-4.6-high-fast"),
-        ("composer-2.5", "", True, "composer-2.5-fast"),
-        ("gemini-3.7-flash-high", "high", True, "gemini-3.7-flash-high"),
-        ("custom-model[effort=low]", "high", True, "custom-model[effort=low]"),
-    ],
-)
-def test_cursor_known_aliases_use_advertised_variants(
-    monkeypatch, model, effort, fast_mode, expected
-):
-    monkeypatch.setattr(
-        service,
-        "available_cursor_models",
-        lambda: [
-            "cursor-grok-4.6-medium",
-            "cursor-grok-4.6-medium-fast",
-            "cursor-grok-4.6-high",
-            "cursor-grok-4.6-high-fast",
-            "composer-2.5",
-            "composer-2.5-fast",
-            "gemini-3.7-flash-high",
-        ],
-    )
-    assert service.cursor_model_argument(model, effort, fast_mode) == expected
-
-
 def test_cursor_unsupported_model_error_is_actionable_and_does_not_leak_output():
     error = service._cli_error(
         "Cannot use this model: PRIVATE MODEL. Available models: PRIVATE LIST",
@@ -194,29 +136,24 @@ def test_cursor_model_list_ignores_labels_and_color(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "model,effort,fast_mode,expected",
+    "model,effort,fast_mode",
     [
-        ("composer-2.5", "", False, "composer-2.5"),
-        ("composer-2.5", "low", False, "composer-2.5[effort=low]"),
-        ("composer-2.5", "high", True, "composer-2.5[effort=high,fast=true]"),
-        ("composer-2.5", "", True, "composer-2.5[fast=true]"),
-        ("cursor-grok-4.6-medium", "medium", True, "cursor-grok-4.6-medium-fast"),
+        ("composer-2.5", "", False),
+        ("composer-2.5", "low", False),
+        ("composer-2.5", "high", True),
+        ("cursor-grok-4.6-medium", "medium", True),
+        ("cursor-grok-4.6-medium-fast", "high", False),
     ],
 )
 @pytest.mark.parametrize("translation_mode", ["translation", "personal"])
 def test_cursor_agent_prints_json_from_ask_mode(
-    monkeypatch, model, effort, fast_mode, expected, translation_mode
+    monkeypatch, model, effort, fast_mode, translation_mode
 ):
     def which(name):
         assert name == "cursor-agent"
         return "/usr/bin/cursor-agent"
 
     monkeypatch.setattr(service.shutil, "which", which)
-    monkeypatch.setattr(
-        service,
-        "available_cursor_models",
-        lambda: ["cursor-grok-4.6-medium", "cursor-grok-4.6-medium-fast"],
-    )
 
     def run(command, **kwargs):
         assert command[0] == "/usr/bin/cursor-agent"
@@ -225,7 +162,7 @@ def test_cursor_agent_prints_json_from_ask_mode(
         assert command[command.index("--sandbox") + 1] == "enabled"
         assert "--print" in command
         assert "--trust" in command
-        assert command[command.index("--model") + 1] == expected
+        assert command[command.index("--model") + 1] == model
         assert kwargs["stdin"] == subprocess.DEVNULL
         assert kwargs["timeout"] == 90
         assert not kwargs.get("shell")
@@ -417,6 +354,24 @@ def test_translation_cache_changes_with_settings(
         )
     finally:
         jobs.pool.shutdown(wait=True)
+
+
+def test_cursor_cache_ignores_codex_options(client, spanish, monkeypatch):
+    spanish.translation_cli = "cursor"
+    spanish.codex_model = "cursor-grok-4.6-medium"
+    db.session.commit()
+    monkeypatch.setattr(service, "translate", lambda *args: RESULT)
+    payload = {"language_id": spanish.id, "text": "gato"}
+    first = client.post("/translation/jobs", json=payload).json["job_id"]
+    jobs = client.application.extensions["codex_translation_jobs"]
+    jobs.jobs[first].future.result(timeout=5)
+    spanish.codex_reasoning_effort = "high"
+    spanish.codex_fast_mode = True
+    db.session.commit()
+    second = client.post("/translation/jobs", json=payload).json["job_id"]
+    assert second == first
+    assert jobs.key_for(first)[7:9] == ("", False)
+    assert jobs.key_for(first)[2] == "cursor-grok-4.6-medium"
 
 
 @pytest.mark.parametrize("failure", ["missing", "timeout", "exit", "invalid"])
