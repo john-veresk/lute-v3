@@ -17,6 +17,7 @@ data/
 
 # Generated output
 /output/
+tests/zz_bkp/
 
 ##########################
 # Standard python ignores.
