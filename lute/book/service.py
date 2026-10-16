@@ -7,10 +7,7 @@ import shutil
 from io import StringIO, TextIOWrapper, BytesIO
 from datetime import datetime
 import uuid
-from dataclasses import dataclass
 from tempfile import TemporaryFile
-import requests
-from bs4 import BeautifulSoup
 from flask import current_app, flash
 from openepub import Epub, EpubError
 from pypdf import PdfReader
@@ -27,14 +24,6 @@ class BookImportException(Exception):
         self.cause = cause
         self.message = message
         super().__init__(message)
-
-
-@dataclass
-class BookDataFromUrl:
-    "Data class"
-    title: str = None
-    source_uri: str = None
-    text: str = None
 
 
 class FileTextExtraction:
@@ -196,44 +185,6 @@ class Service:
         fp = os.path.join(current_app.env_config.useraudiopath, filename)
         audio_file_field_data.save(fp)
         return filename
-
-    def book_data_from_url(self, url):
-        """
-        Parse the url and load source data for a new Book.
-        This returns a domain object, as the book is still unparsed.
-        """
-        s = None
-        try:
-            # Add User Agent header to avoid forbidden HTTP issue 403.
-            headers = {"User-Agent": "Lute/3.0 (X11; Ubuntu; Linux x86_64)"}
-            timeout = 20  # seconds
-            response = requests.get(url, headers=headers, timeout=timeout)
-            response.raise_for_status()
-            s = response.content
-        except requests.exceptions.RequestException as e:
-            msg = f"Could not parse {url} (error: {str(e)})"
-            raise BookImportException(message=msg, cause=e) from e
-
-        soup = BeautifulSoup(s, "html.parser")
-        extracted_text = []
-
-        # Add elements in order found.
-        for element in soup.descendants:
-            if element.name in ("h1", "h2", "h3", "h4", "p"):
-                extracted_text.append(element.text)
-
-        title_node = soup.find("title")
-        orig_title = title_node.string if title_node else url
-
-        short_title = orig_title[:150]
-        if len(orig_title) > 150:
-            short_title += " ..."
-
-        b = BookDataFromUrl()
-        b.title = short_title
-        b.source_uri = url
-        b.text = "\n\n".join(extracted_text)
-        return b
 
     def import_book(self, book, session):
         """

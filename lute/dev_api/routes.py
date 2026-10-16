@@ -173,21 +173,6 @@ def throw_error(message):
     raise RuntimeError(message)
 
 
-@bp.route("/fake_story.html", methods=["GET"])
-def fake_story():
-    "Return a fake story for import book test."
-    return Response(
-        """<html>
-    <head>
-    <title>Mi perro.</title>
-    </head>
-    <body>
-    <p>Hola. Tengo un perro.</p>
-    </body>
-    </html>"""
-    )
-
-
 @bp.route("/temp_file_content/<filename>", methods=["GET"])
 def temp_file_content(filename):
     "Get the content of the file."

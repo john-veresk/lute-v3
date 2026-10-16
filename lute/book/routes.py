@@ -12,11 +12,7 @@ from flask import (
     flash,
 )
 from lute.utils.data_tables import DataTablesFlaskParamParser
-from lute.book.service import (
-    Service as BookService,
-    BookImportException,
-    BookDataFromUrl,
-)
+from lute.book.service import Service as BookService, BookImportException
 from lute.book.datatables import get_data_tables_list
 from lute.book.forms import NewBookForm, EditBookForm, ALLOWED_AUDIO_EXTENSIONS
 from lute.book.stats import Service as StatsService
@@ -83,22 +79,6 @@ def datatables_archived_source():
     return datatables_source(True)
 
 
-def _book_from_url(url):
-    "Get data for a new book, or flash an error if can't parse."
-    service = BookService()
-    bd = None
-    try:
-        bd = service.book_data_from_url(url)
-    except BookImportException as e:
-        flash(e.message, "notice")
-        bd = BookDataFromUrl()
-    b = Book()
-    b.title = bd.title
-    b.source_uri = bd.source_uri
-    b.text = bd.text
-    return b
-
-
 def _language_is_rtl_map():
     """
     Return language-id to is_rtl map, to be used during book creation.
@@ -113,10 +93,6 @@ def _language_is_rtl_map():
 def new():
     "Create a new book, either from text or from a file."
     b = Book()
-    import_url = request.args.get("importurl", "").strip()
-    if import_url != "":
-        b = _book_from_url(import_url)
-
     form = NewBookForm(obj=b)
     form.language_id.choices = lute.utils.formutils.language_choices(db.session)
     repo = Repository(db.session)
@@ -168,11 +144,6 @@ def edit(bookid):
         tags=repo.get_book_tags(),
         allowed_extensions=ALLOWED_AUDIO_EXTENSIONS,
     )
-
-
-@bp.route("/import_webpage", methods=["GET", "POST"])
-def import_webpage():
-    return render_template("book/import_webpage.html")
 
 
 def _find_book(bookid):
