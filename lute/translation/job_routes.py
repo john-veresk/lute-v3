@@ -6,6 +6,7 @@ from flask import Blueprint, current_app, jsonify, render_template, request
 from lute.db import db
 from lute.models.book import Book, Text
 from lute.translation.bulk import ACTIVE, BookTranslationJob, language_settings, utcnow
+from lute.translation.settings import updated_settings
 
 bp = Blueprint("jobs", __name__, url_prefix="/jobs")
 
@@ -31,6 +32,31 @@ def _page_info(books):
 
 def _worker():
     return current_app.extensions["book_translation_worker"]
+
+
+@bp.route("/<int:job_id>/settings", methods=["GET", "PATCH"])
+def settings(job_id):
+    """Change an existing job's CLI/model at the next word boundary."""
+    worker = _worker()
+    with worker.lock:
+        job = db.session.get(BookTranslationJob, job_id)
+        if job is None:
+            return jsonify(error="Job not found"), 404
+        if request.method == "PATCH":
+            if job.status not in ACTIVE:
+                return jsonify(error="Finished jobs cannot be changed"), 409
+            try:
+                updated = updated_settings(
+                    json.loads(job.settings), request.get_json(silent=True)
+                )
+            except ValueError as exc:
+                return jsonify(error=str(exc)), 400
+            job.settings = json.dumps(updated, ensure_ascii=False)
+            job.updated_at = utcnow()
+            db.session.commit()
+        return jsonify(
+            job=job.payload(), applies_after_current_word=worker.inflight == job_id
+        )
 
 
 @bp.get("")

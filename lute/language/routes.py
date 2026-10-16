@@ -11,12 +11,15 @@ from flask import (
     redirect,
     url_for,
     flash,
+    jsonify,
+    request,
 )
 from lute.models.language import Language
 from lute.models.repositories import UserSettingRepository
 from lute.language.service import Service
 from lute.language.forms import LanguageForm
 from lute.db import db
+from lute.translation.settings import language_cli_settings, updated_settings
 from lute.parse.registry import supported_parsers
 from lute.translation.service import (
     REASONING_EFFORTS,
@@ -26,6 +29,28 @@ from lute.translation.service import (
 )
 
 bp = Blueprint("language", __name__, url_prefix="/language")
+
+
+@bp.route("/<int:langid>/translation-settings", methods=["GET", "PATCH"])
+def translation_settings(langid):
+    """Read or partially update CLI/model defaults without submitting a form."""
+    language = db.session.get(Language, langid)
+    if language is None:
+        return jsonify(error="Language not found"), 404
+    if request.method == "PATCH":
+        try:
+            settings = updated_settings(
+                language_cli_settings(language), request.get_json(silent=True)
+            )
+        except ValueError as exc:
+            return jsonify(error=str(exc)), 400
+        language.translation_cli = settings["cli"]
+        language.codex_model = settings["model"]
+        # Keep Codex's saved effort when switching to Cursor, like the UI form.
+        if settings["cli"] == "codex":
+            language.codex_reasoning_effort = settings["effort"]
+        db.session.commit()
+    return jsonify(language_id=language.id, **language_cli_settings(language))
 
 
 @bp.route("/index")
