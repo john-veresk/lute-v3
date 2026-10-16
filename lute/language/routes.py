@@ -19,9 +19,11 @@ from lute.language.forms import LanguageForm
 from lute.db import db
 from lute.parse.registry import supported_parsers
 from lute.translation.service import (
+    REASONING_EFFORTS,
     available_cursor_models,
     available_model_efforts,
     available_models,
+    cursor_model_efforts,
 )
 
 bp = Blueprint("language", __name__, url_prefix="/language")
@@ -109,6 +111,8 @@ def edit(langid):
         codex_models=available_models(),
         codex_model_efforts=available_model_efforts(),
         cursor_models=available_cursor_models(),
+        cursor_model_efforts=cursor_model_efforts(available_cursor_models()),
+        reasoning_efforts=list(REASONING_EFFORTS),
     )
 
 
@@ -151,6 +155,8 @@ def new(langname):
         codex_models=available_models(),
         codex_model_efforts=available_model_efforts(),
         cursor_models=available_cursor_models(),
+        cursor_model_efforts=cursor_model_efforts(available_cursor_models()),
+        reasoning_efforts=list(REASONING_EFFORTS),
     )
 
 

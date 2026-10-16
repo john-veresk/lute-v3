@@ -59,6 +59,33 @@ def test_new_term_form_keeps_automatic_translation(client, spanish, route):
     assert page.select_one("#translation").get_text().strip() == ""
 
 
+def test_cursor_effort_options_follow_the_model_family():
+    options = service.cursor_model_efforts(
+        [
+            "claude-opus-4-8",
+            "claude-opus-4-8-low",
+            "claude-opus-4-8-high",
+            "claude-opus-4-8-low-fast",
+            "claude-opus-4-8-high-fast",
+            "gpt-5.5-extra-high",
+            "composer-2.5",
+        ]
+    )
+    high = options["claude-opus-4-8-high"]
+    assert high["effort"] == "high"
+    assert high["efforts"] == ["low", "high"]
+    assert high["variants"][""] == "claude-opus-4-8"
+    assert high["variants"]["low"] == "claude-opus-4-8-low"
+    assert options["claude-opus-4-8-high-fast"]["variants"]["low"] == (
+        "claude-opus-4-8-low-fast"
+    )
+    assert options["gpt-5.5-extra-high"]["effort"] == "xhigh"
+    assert options["composer-2.5"]["efforts"] == []
+    assert service.cursor_model_argument("claude-opus-4-8-high", "high", False) == (
+        "claude-opus-4-8-high"
+    )
+
+
 def test_cursor_model_list_ignores_labels_and_color(monkeypatch):
     colored = (
         "\x1b[2mAvailable models\x1b[22m\n\n"

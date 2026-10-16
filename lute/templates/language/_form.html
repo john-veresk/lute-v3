@@ -95,6 +95,8 @@
 <script>
   $(document).ready(function() {
     const modelEfforts = {{ codex_model_efforts|tojson }};
+    const allEfforts = {{ reasoning_efforts|tojson }};
+    const cursorFamilies = {{ cursor_model_efforts|tojson }};
     const cliModels = {
       codex: {{ codex_models|tojson }},
       cursor: {{ cursor_models|tojson }}
@@ -110,7 +112,7 @@
         placeholder: 'Default from Cursor Agent',
         model: 'Choose a Cursor Agent model or enter its ID. Leave blank to use the Cursor Agent default.',
         account: 'Cursor Agent must be installed and logged in on the computer running Lute. Text is sent through your Cursor account.',
-        effort: 'Higher effort spends more time reasoning. Cursor Agent applies it to the selected model when that model supports an effort override.'
+        effort: 'Shows the reasoning levels of the selected model. Choosing one switches to that model variant.'
       }
     };
     const modelInput = document.getElementById('codex_model');
@@ -130,14 +132,31 @@
       $('#translation-cli-account').text(copy.account);
       $('#translation-cli-effort').text(copy.effort);
     }
+    const effortSelect = document.getElementById('codex_reasoning_effort');
+    const effortByCli = { codex: '', cursor: '' };
+    let applyingEffort = false;
+    effortByCli[activeCli] = effortSelect.value;
+    function effortChoices() {
+      const model = modelInput.value;
+      if (selectedCli() === 'cursor') {
+        if (!model) return [];
+        return Object.prototype.hasOwnProperty.call(cursorFamilies, model)
+          ? cursorFamilies[model].efforts
+          : allEfforts;
+      }
+      return modelEfforts[model] || allEfforts;
+    }
     function updateReasoningEfforts() {
-      const supported = selectedCli() === 'codex' ? modelEfforts[modelInput.value] : null;
-      const select = $('#codex_reasoning_effort');
-      select.find('option').each(function() {
-        const unavailable = this.value !== '' && supported && !supported.includes(this.value);
-        $(this).prop('disabled', !!unavailable).prop('hidden', !!unavailable);
-      });
-      if (select.find('option:selected').prop('disabled')) select.val('');
+      const efforts = effortChoices();
+      const family = selectedCli() === 'cursor' ? cursorFamilies[modelInput.value] : null;
+      const wanted = family ? family.effort : effortByCli[selectedCli()];
+      effortSelect.replaceChildren();
+      effortSelect.append(new Option('Default from the selected CLI', ''));
+      efforts.forEach(effort => effortSelect.append(new Option(effort, effort)));
+      applyingEffort = true;
+      effortSelect.value = wanted === '' || efforts.includes(wanted) ? wanted : '';
+      applyingEffort = false;
+      effortByCli[selectedCli()] = effortSelect.value;
     }
     function showModels() {
       const query = filtering ? modelInput.value.trim().toLowerCase() : '';
@@ -190,8 +209,19 @@
         modelInput.setAttribute('aria-expanded', 'false');
       }
     });
+    effortSelect.addEventListener('change', () => {
+      if (applyingEffort || selectedCli() !== 'cursor') return;
+      const family = cursorFamilies[modelInput.value];
+      if (!family || !Object.prototype.hasOwnProperty.call(family.variants, effortSelect.value)) return;
+      const next = family.variants[effortSelect.value];
+      if (!next || next === modelInput.value) return;
+      modelInput.value = next;
+      modelByCli.cursor = next;
+      updateReasoningEfforts();
+    });
     $('#translation_cli').on('change', function() {
       modelByCli[activeCli] = modelInput.value;
+      effortByCli[activeCli] = effortSelect.value;
       activeCli = selectedCli();
       modelInput.value = modelByCli[activeCli] || '';
       filtering = false;

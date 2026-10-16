@@ -295,15 +295,61 @@ def available_cursor_models():
     return models
 
 
+_CURSOR_EFFORT_SUFFIXES = (
+    ("extra-high", "xhigh"),
+    ("xhigh", "xhigh"),
+    ("minimal", "minimal"),
+    ("medium", "medium"),
+    ("ultra", "ultra"),
+    ("none", "none"),
+    ("high", "high"),
+    ("max", "max"),
+    ("low", "low"),
+)
+
+
+def split_cursor_model(model_id):
+    "Separate a Cursor model id into family, effort and fast variant."
+    fast = model_id.endswith("-fast")
+    body = model_id[: -len("-fast")] if fast else model_id
+    for suffix, canonical in _CURSOR_EFFORT_SUFFIXES:
+        token = f"-{suffix}"
+        if body.endswith(token):
+            return body[: -len(token)], canonical, fast
+    return body, "", fast
+
+
+def cursor_model_efforts(model_ids):
+    "Efforts and sibling ids for each Cursor model in one fast/non-fast family."
+    parsed = [(model, *split_cursor_model(model)) for model in model_ids]
+    families = {}
+    for model, base, effort, fast in parsed:
+        families.setdefault((base, fast), []).append((model, effort))
+    options = {}
+    for model, base, effort, fast in parsed:
+        members = families[(base, fast)]
+        present = {member_effort for _member, member_effort in members if member_effort}
+        variants = {}
+        for member, member_effort in members:
+            variants.setdefault(member_effort, member)
+        options[model] = {
+            "effort": effort,
+            "efforts": [name for name in REASONING_EFFORTS if name in present],
+            "variants": variants,
+        }
+    return options
+
+
 def cursor_model_argument(model, reasoning_effort, fast_mode):
     "Cursor Agent accepts effort and fast mode as bracket overrides on a model id."
     model = (model or "").strip()
     if not model or "[" in model:
         return model
+    _base, effort, fast = split_cursor_model(model)
     params = []
-    if reasoning_effort:
+    if reasoning_effort and reasoning_effort != effort:
         params.append(f"effort={reasoning_effort}")
-    if fast_mode:
+    if fast_mode and not fast:
         params.append("fast=true")
     if not params:
         return model

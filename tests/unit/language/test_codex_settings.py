@@ -140,6 +140,26 @@ def test_unknown_translation_cli_is_rejected(client):
     assert b"Not a valid choice" in response.data
 
 
+def test_cursor_effort_outside_the_model_family_is_rejected(client, monkeypatch):
+    monkeypatch.setattr(
+        "lute.language.forms.available_cursor_models",
+        lambda: ["claude-opus-4-8-low", "claude-opus-4-8-high"],
+    )
+    response = client.post(
+        "/language/new",
+        data={
+            "name": "Cursor family",
+            "parser_type": "spacedel",
+            "translation_target": "Russian",
+            "translation_cli": "cursor",
+            "codex_model": "claude-opus-4-8-high",
+            "codex_reasoning_effort": "max",
+        },
+    )
+    assert response.status_code == 200
+    assert b"does not support the selected reasoning effort" in response.data
+
+
 def test_cursor_agent_accepts_effort_without_codex_metadata(
     client, app_context, monkeypatch, tmp_path
 ):
