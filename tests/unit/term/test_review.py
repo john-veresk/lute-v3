@@ -325,6 +325,32 @@ def test_live_card_has_safe_data_and_current_language_direction(client, spanish)
     assert client.get(f"/term/review/card/{term.id}").status_code == 410
 
 
+def test_review_sentences_embed_existing_context_and_family(client, spanish):
+    """Show actual book references, including child forms, inside the card."""
+    terms = save_terms(spanish, [("gato", "cat", 2), ("gatos", "cats", 2)])
+    terms["gatos"].add_parent(terms["gato"])
+    book = make_book("Context book", "Tengo un gato. Tengo dos gatos.", spanish)
+    book.texts[0].read_date = datetime.now()
+    db.session.add(book)
+    db.session.commit()
+    card = client.get(f'/term/review/card/{terms["gato"].id}').json
+    response = client.get(card["sentences_url"])
+    assert response.status_code == 200
+    document = BeautifulSoup(response.data, "html.parser")
+    assert [b.text for b in document.select(".sentencelist b")] == ["gato", "gatos"]
+    assert "Context book" in document.text
+    assert document.select_one(".sentencelist a")["target"] == "_blank"
+    assert book.current_tx_id == 0
+    assert client.get("/term/review/card/999999/sentences").status_code == 404
+
+
+def test_review_sentences_without_context(client, spanish):
+    """Keep the existing explanation when no saved references exist."""
+    terms = save_terms(spanish, [("sin contexto", "no context", 2)])
+    response = client.get(f'/term/review/card/{terms["sin contexto"].id}/sentences')
+    assert b"No references found" in response.data
+
+
 @pytest.mark.parametrize("status", [1, 2, 3, 4, 5, 98, 99])
 def test_review_save_updates_synchronized_family_and_live_cards(
     client, spanish, status

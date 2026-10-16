@@ -28,6 +28,13 @@
     <button id="review-show-answer" class="review-reveal" type="button" hidden>Show answer <kbd>Space</kbd></button>
     <div id="review-answer" class="review-answer" hidden>
       <div id="review-meanings"></div>
+      <button id="review-show-sentences" class="review-context-toggle" type="button" aria-expanded="false" aria-controls="review-context">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 5h6a3 3 0 0 1 2 1 3 3 0 0 1 2-1h6v14h-6a3 3 0 0 0-2 1 3 3 0 0 0-2-1H4zM12 6v14"/></svg>
+        <span id="review-context-label">Show sentences</span>
+      </button>
+      <div id="review-context" class="review-context" hidden>
+        <iframe id="review-sentences" title="Sentences from your books"></iframe>
+      </div>
       <div class="review-levels" role="group" aria-label="Learning level">
         {% for status in review_statuses %}
         {% set label = 'Known' if status.id == 99 else ('Ignore' if status.id == 98 else status.id) %}

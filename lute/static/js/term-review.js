@@ -17,6 +17,7 @@ class LuteTermReview {
     this.busy = false;
     this.levels = [...root.querySelectorAll('[data-review-status]')];
     this.el('show-answer').addEventListener('click', () => this.showAnswer());
+    this.el('show-sentences').addEventListener('click', () => this.toggleSentences());
     this.el('card').addEventListener('click', () => this.showAnswer());
     this.el('skip').addEventListener('click', () => this.skip());
     this.el('retry').addEventListener('click', () => this.loadCurrent());
@@ -55,6 +56,11 @@ class LuteTermReview {
     this.el('word').textContent = '';
     this.el('language').textContent = '';
     this.el('meanings').replaceChildren();
+    this.el('context').hidden = true;
+    this.el('show-sentences').setAttribute('aria-expanded', 'false');
+    this.el('context-label').textContent = 'Show sentences';
+    this.el('sentences').removeAttribute('src');
+    this.el('current-status').textContent = '';
     this.el('loading').hidden = false;
     this.setBusy(true);
     try {
@@ -134,6 +140,17 @@ class LuteTermReview {
     this.index++;
     this.setBusy(false);
     await this.loadCurrent();
+  }
+
+  toggleSentences() {
+    if (this.busy || !this.card || !this.revealed) return;
+    const panel = this.el('context');
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden && !this.el('sentences').getAttribute('src')) {
+      this.el('sentences').src = this.card.sentences_url;
+    }
+    this.el('show-sentences').setAttribute('aria-expanded', String(!panel.hidden));
+    this.el('context-label').textContent = panel.hidden ? 'Show sentences' : 'Hide sentences';
   }
 
   skip() {

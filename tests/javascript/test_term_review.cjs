@@ -16,6 +16,9 @@ class Element {
   }
   addEventListener(type, listener) { this.listeners[type] = listener; }
   setAttribute(name, value) { this.attributes[name] = value; }
+  getAttribute(name) { return this.attributes[name] ?? null; }
+  removeAttribute(name) { delete this.attributes[name]; }
+  set src(value) { this.attributes.src = value; }
   replaceChildren() { this.children = []; }
   appendChild(child) { this.children.push(child); }
   focus() { this.focused = true; }
@@ -29,7 +32,8 @@ function fixture(ids, options = {}) {
   const elements = {};
   const names = ['show-answer', 'skip', 'retry', 'error', 'card', 'answer', 'word',
     'language', 'meanings', 'loading', 'progress', 'progress-bar', 'current-status',
-    'navigation', 'help', 'complete', 'complete-title', 'summary'];
+    'navigation', 'help', 'complete', 'complete-title', 'summary', 'show-sentences',
+    'context', 'context-label', 'sentences'];
   names.forEach(name => { elements[name] = new Element(); });
   elements.complete.hidden = true;
   const levels = [1, 2, 3, 4, 5, 99, 98].map(status => {
@@ -41,7 +45,7 @@ function fixture(ids, options = {}) {
   const root = {
     querySelector: selector => elements[selector.replace('#review-', '')],
     querySelectorAll: selector => selector === '[data-review-status]' ? levels
-      : [...levels, elements['show-answer'], elements.skip, elements.retry],
+      : [...levels, elements['show-answer'], elements['show-sentences'], elements.skip, elements.retry],
   };
   const posts = [];
   const loaded = [];
@@ -60,6 +64,7 @@ function fixture(ids, options = {}) {
       loaded.push(id);
       if (options.load) return options.load(id, loaded);
       return {ok: true, status: 200, json: async () => ({id, text: `word${id}`, language: 'Finnish',
+        sentences_url: `/term/review/card/${id}/sentences`,
         direction: 'rtl', status: posts.length ? 4 : 1,
         meanings: [{parent: 'base', translation: '<script>evil()</script>\ntranslation'}]})};
     },
@@ -77,12 +82,20 @@ function fixture(ids, options = {}) {
   assert.equal(f.elements.answer.hidden, true);
   assert.equal(f.elements.complete.hidden, true);
   assert.equal(f.elements.meanings.children.length, 0, 'no answer in the front DOM');
+  f.review.toggleSentences();
+  assert.equal(f.elements.sentences.getAttribute('src'), null, 'context is not loaded on the front');
   await f.review.rate(4);
   assert.equal(f.posts.length, 0, 'cannot rate before revealing');
   let prevented = false;
   f.review.handleKey({code: 'Space', key: ' ', preventDefault() { prevented = true; }});
   assert.equal(prevented, true);
   assert.equal(f.elements.answer.hidden, false);
+  f.elements['show-sentences'].listeners.click();
+  assert.equal(f.elements.context.hidden, false);
+  assert.equal(f.elements.sentences.getAttribute('src'), '/term/review/card/1/sentences');
+  assert.equal(f.elements['show-sentences'].getAttribute('aria-expanded'), 'true');
+  f.review.toggleSentences();
+  assert.equal(f.elements.context.hidden, true);
   assert.equal(f.elements.meanings.children[1].textContent, '<script>evil()</script>\ntranslation');
   f.review.handleKey({key: '4', preventDefault() {}});
   await tick();
@@ -91,6 +104,7 @@ function fixture(ids, options = {}) {
   assert.equal(f.review.index, 1);
   assert.equal(f.elements.word.textContent, 'word2');
   assert.equal(f.elements.answer.hidden, true, 'next answer starts hidden');
+  assert.equal(f.elements.sentences.getAttribute('src'), null, 'previous context is cleared');
   assert.equal(f.review.card.status, 4, 'loads current synchronized status');
   f.review.skip();
   await tick();

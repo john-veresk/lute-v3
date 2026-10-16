@@ -171,9 +171,19 @@ def review_card(term_id):
     card = card_data(term)
     if not card["meanings"]:
         return jsonify({"error": "This term no longer has a translation."}), 422
+    card["sentences_url"] = url_for("term.review_sentences", term_id=term.id)
     response = jsonify(card)
     response.headers["Cache-Control"] = "no-store"
     return response
+
+
+@bp.route("/review/card/<int:term_id>/sentences", methods=["GET"])
+def review_sentences(term_id):
+    """Embed the existing Sentences view without leaving the review card."""
+    term = TermRepository(db.session).find(term_id)
+    if term is None:
+        return "This term was deleted.", 404
+    return sentences(term.language_id, term.text, embedded=True)
 
 
 def get_bulk_update_from_form(form):
@@ -436,7 +446,7 @@ def search_by_text_in_language(text, langid):
 
 
 @bp.route("/sentences/<int:langid>/<text>", methods=["GET"])
-def sentences(langid, text):
+def sentences(langid, text, embedded=False):
     "Get sentences for terms."
     repo = Repository(db.session)
     # Use find_or_new(): if the user clicks on a parent tag
@@ -458,6 +468,7 @@ def sentences(langid, text):
         text=text,
         no_references=(refcount == 0),
         references=refdata,
+        embedded=embedded,
     )
 
 
