@@ -30,8 +30,9 @@ def test_reload_files_include_templates_assets_schema_and_selected_config(tmp_pa
 
 @pytest.mark.parametrize("reload_enabled", [False, True])
 @pytest.mark.parametrize("local", [False, True])
+@pytest.mark.parametrize("serving_child", [False, True])
 def test_start_uses_requested_server_and_host(
-    monkeypatch, tmp_path, reload_enabled, local
+    monkeypatch, tmp_path, reload_enabled, local, serving_child
 ):
     app = SimpleNamespace(
         root_path=str(tmp_path),
@@ -48,6 +49,7 @@ def test_start_uses_requested_server_and_host(
     monkeypatch.setattr(main, "serve", serve)
     monkeypatch.setattr(main, "run_simple", run)
     monkeypatch.setattr(main, "_print", Mock())
+    monkeypatch.setattr(main, "is_running_from_reloader", lambda: serving_child)
     main._start(
         SimpleNamespace(config=config, reload=reload_enabled, local=local, port=5123)
     )
@@ -67,11 +69,14 @@ def test_start_uses_requested_server_and_host(
         assert create.call_args.kwargs["extra_config"] == {
             "TEMPLATES_AUTO_RELOAD": True,
             "SEND_FILE_MAX_AGE_DEFAULT": 0,
+            "BOOK_TRANSLATION_WORKER_ENABLED": serving_child,
         }
     else:
         run.assert_not_called()
         serve.assert_called_once_with(app, host=host, port=5123)
-        assert create.call_args.kwargs["extra_config"] is None
+        assert create.call_args.kwargs["extra_config"] == {
+            "BOOK_TRANSLATION_WORKER_ENABLED": True
+        }
     assert create.call_args.args == (config,)
 
 

@@ -59,7 +59,6 @@ class LanguageForm(FlaskForm):
     )
     codex_fast_mode = BooleanField("Fast mode", default=False)
     codex_show_timer = BooleanField("Show translation timer", default=True)
-    codex_pretranslate = BooleanField("Pre-translate unknown words", default=False)
     show_romanization = BooleanField("Show Pronunciation field")
     right_to_left = BooleanField("Right-to-left")
 

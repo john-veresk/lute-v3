@@ -13,7 +13,7 @@ phrases, sentences and pages.
 **Show translation timer** displays elapsed request time beside the model in the
 Codex panel, including waiting for the result. It stops when the response is
 ready or fails. Uncheck it to hide the timer for that language.
-**Pre-translate unknown words** is described below.
+**Jobs**, after Review in the main navigation, manages bulk book translations.
 
 Clicking a word or selecting a phrase opens its term card. Codex is part of the
 card, without separate tabs or a divider: it translates the term using the sentence
@@ -37,22 +37,34 @@ The ↻ icon at the top right of the card always asks Codex again and replaces t
 stored translation. Phrase suggestions stored from another sentence are shown
 only if they occur in the current one.
 
-**Pre-translate unknown words** (off by default) translates the unknown words of
-the page you are reading in the background, one word at a time with its sentence,
-and saves them in the translation store, so their cards open without waiting.
-Words that are already stored are skipped. Turning a page replaces the words
-still waiting; the word being translated finishes first. Each unknown word is a
-Codex request and counts toward your usage. Background pre-translation always
-uses standard processing, even when **Fast mode** is enabled for the language.
-Translations started from a term card or the sentence/page commands still use
-the language's **Fast mode** setting.
+**Jobs** translates unknown words from selected books on the server, one book
+and one word at a time. Closing the browser, opening a book, or changing pages
+does not affect execution. The client only displays state and sends management
+commands. The reader no longer starts background pre-translation.
 
-Opening a word or selecting a phrase in the reading text rebuilds the waiting
-queue from the words after that selection on the current page. The background
-translation already running finishes first. Opening an earlier word moves the
-queue back too, so pre-translation follows where you are reading. Stored
-translations are still skipped, and the progress counter restarts for the new
-queue.
+Search books by title or language and filter by one or more tag pills (any
+selected tag matches). Select individual books or all visible books. Each book
+has a **From page** field, defaulting to its current reading page; set it before
+adding the selection to the queue. Translation covers that page through the end
+of the book. Repeated words are processed once, using their first sentence in
+that range. Words with a vocabulary status other than Unknown (0) are excluded;
+the worker checks the status again immediately before each request. Existing
+stored translations are skipped. Jobs only populate the translation store and
+do not create vocabulary cards or change reading progress.
+
+Each job snapshots the language's translation target, CLI, model and reasoning
+effort when added. Background jobs use standard processing, regardless of Fast
+mode. The queue shows progress, translated/skipped counts, the current word and
+page, settings and timestamps. Expand **Details & errors** for sentence context
+and the latest 50 errors. **↑ / ↓** change the waiting book order. **Pause** and
+**Cancel** allow the in-flight word to finish and save its result; **Resume** or
+**Retry** continue at the checkpoint. A book cannot be queued twice while it has
+an active, paused or failed job. Completed and cancelled jobs remain in history.
+
+Queue order, word lists, progress and errors are stored in the Lute database.
+After a server restart, interrupted jobs are paused and can be resumed from their
+saved position; waiting books remain queued. The built-in development reloader
+runs the worker only in the serving process.
 
 Sentence and page translation commands also use Codex. The sentences icon and
 the image icon beside ↻ open term usage and the Bing image search inside the card.
@@ -133,14 +145,12 @@ already running may finish; queued requests also respect the pause. Saved
 translations remain available. The panel reports the wait, and API responses
 include `retry_after` (plus `Retry-After` on rejected submissions).
 
-Background pre-translation waits and retries the same word after a 429; its
-progress shows **Paused** and does not count the word until translation succeeds
-or a stored translation is found. The pause shows the server's wait in seconds.
-Temporary CLI and network failures are retried after 5 and 15 seconds, without
-advancing the counter. Brief polling failures retry the same job so its result
-can still be saved. If all attempts fail, **Translation failed** offers **Retry**
-to continue from the failed word without reloading or losing the waiting queue.
-Turning a page or opening another word replaces the old waiting words as usual.
+Bulk jobs wait and retry the same word after a 429, showing the scheduled retry
+time without advancing progress. Temporary translation failures retry after 5
+and 15 seconds. Missing CLIs, authentication/access errors and unsupported models
+stop immediately. After retries are exhausted the job shows **Failed**; other
+queued books can proceed. **Retry** resumes the failed book without losing its
+completed count. Error history is kept after recovery.
 
 Diagnostics are written to `codex-translation.log` in the configured Lute data
 directory. Each CLI attempt records its job ID, lookup mode, model, reasoning

@@ -993,6 +993,12 @@ class TranslationJobs:
         except Exception:  # pylint: disable=broad-exception-caught
             return {"status": "error", "error": "Translation failed. Try again."}
 
+    def wait(self, job_id):
+        """Wait in a server worker, never an HTTP request handler."""
+        with self.lock:
+            future = self.jobs[job_id].future
+        return future.result()
+
     def key_for(self, job_id):
         """Identify the source language and phrase of a reviewed result."""
         with self.lock:

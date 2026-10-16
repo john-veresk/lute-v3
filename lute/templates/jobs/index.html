@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block title %}Jobs · Lute{% endblock %}
+{% block header %}Jobs{% endblock %}
+{% block preloadassets %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/translation-jobs.css') }}">
+{% endblock %}
+{% block body %}
+<section id="translation-jobs" class="translation-jobs">
+  <p class="jobs-intro">Translate unknown words across entire books. Jobs run on the server, even when this page is closed. Only unknown words are translated; saved translations are skipped.</p>
+  <div id="jobs-error" role="alert" hidden></div>
+  <div class="jobs-layout">
+    <aside class="jobs-picker">
+      <h2>Add books</h2>
+      <label for="jobs-search">Find a book</label>
+      <input id="jobs-search" type="search" placeholder="Title or language" autocomplete="off">
+      <span id="jobs-tag-label">Tags</span>
+      <div id="jobs-tags" role="group" aria-labelledby="jobs-tag-label" aria-describedby="jobs-tag-help"></div>
+      <p id="jobs-tag-help" class="jobs-note">Match any selected tag.</p>
+      <label class="jobs-check"><input id="jobs-select-all" type="checkbox"> Select visible books</label>
+      <p id="jobs-selection" class="jobs-note" role="status"></p>
+      <div id="jobs-books" class="jobs-books" aria-label="Books to translate"></div>
+      <button id="jobs-add" class="app-button app-button-primary" type="button" disabled>Add to queue</button>
+      <button id="jobs-clear" class="tag-pill-clear" type="button" hidden>Clear selection</button>
+      <p class="jobs-note">Defaults to your reading page. Uses your language's translation settings and CLI account.</p>
+    </aside>
+    <section class="jobs-queue" aria-labelledby="queue-heading">
+      <div class="jobs-queue-heading"><h2 id="queue-heading">Translation queue</h2><span id="jobs-summary" role="status"></span></div>
+      <p class="jobs-note">Books run one at a time. Use ↑ and ↓ to change the waiting order. Pause and cancel let the current word finish and save its result.</p>
+      <p id="jobs-loading" role="status">Loading jobs…</p>
+      <p id="jobs-empty" hidden>No jobs yet. Select books to start translating.</p>
+      <div id="jobs-list"></div>
+    </section>
+  </div>
+</section>
+<template id="job-card-template">
+  <article class="job-card">
+    <div class="job-heading"><h3><a data-field="title"></a></h3><span data-field="status" class="job-status"></span></div>
+    <p class="job-settings" data-field="settings"></p>
+    <progress data-field="progress" max="1" value="0" aria-label="Book translation progress"></progress>
+    <div class="job-counts"><span data-field="counts"></span><span data-field="percent"></span></div>
+    <p class="job-current" data-field="current"></p>
+    <p class="job-error" data-field="error" hidden></p>
+    <div class="job-actions">
+      <button type="button" class="app-button" data-action="up" title="Move book up" aria-label="Move book up">↑</button>
+      <button type="button" class="app-button" data-action="down" title="Move book down" aria-label="Move book down">↓</button>
+      <button type="button" class="app-button" data-action="pause">Pause</button>
+      <button type="button" class="app-button" data-action="resume">Resume</button>
+      <button type="button" class="app-button" data-action="cancel">Cancel</button>
+    </div>
+    <details><summary>Details &amp; errors</summary><p data-field="times"></p><p data-field="context" class="job-context"></p><ul data-field="errors"></ul></details>
+  </article>
+</template>
+<script src="/static/js/never_cache/translation-jobs.js" defer></script>
+{% endblock %}

@@ -16,7 +16,7 @@ import logging
 import textwrap
 from pathlib import Path
 from waitress import serve
-from werkzeug.serving import run_simple
+from werkzeug.serving import is_running_from_reloader, run_simple
 from lute import __version__
 from lute.app_factory import create_app, data_initialization
 from lute.config.app_config import AppConfig
@@ -98,11 +98,12 @@ def _start(args):
     _print(f"\nStarting Lute version {__version__}.\n")
 
     config_file_path = _get_config_file_path(args.config)
-    extra_config = (
-        {"TEMPLATES_AUTO_RELOAD": True, "SEND_FILE_MAX_AGE_DEFAULT": 0}
-        if args.reload
-        else None
-    )
+    extra_config = {
+        "BOOK_TRANSLATION_WORKER_ENABLED": not args.reload
+        or is_running_from_reloader(),
+    }
+    if args.reload:
+        extra_config.update(TEMPLATES_AUTO_RELOAD=True, SEND_FILE_MAX_AGE_DEFAULT=0)
     app = create_app(config_file_path, extra_config=extra_config, output_func=_print)
     with app.app_context():
         data_initialization(db.session, _print)

@@ -197,9 +197,9 @@ def test_new_language_timer_is_checked_by_default(client):
     assert b'checked id="codex_show_timer"' in client.get("/language/new").data
 
 
-def test_pretranslation_is_off_by_default_and_can_be_enabled(client, spanish):
+def test_legacy_reader_pretranslation_setting_is_not_exposed(client, spanish):
     assert spanish.codex_pretranslate is False
-    assert b'checked id="codex_pretranslate"' not in client.get("/language/new").data
+    assert b'id="codex_pretranslate"' not in client.get("/language/new").data
     response = client.post(
         f"/language/edit/{spanish.id}",
         data={
@@ -211,8 +211,8 @@ def test_pretranslation_is_off_by_default_and_can_be_enabled(client, spanish):
     )
     assert response.status_code == 302
     db.session.refresh(spanish)
-    assert spanish.codex_pretranslate is True
-    assert Language.from_dict(spanish.to_dict()).codex_pretranslate is True
+    assert spanish.codex_pretranslate is False
+    assert Language.from_dict(spanish.to_dict()).codex_pretranslate is False
 
 
 def test_settings_have_no_dictionary_controls(client, spanish):

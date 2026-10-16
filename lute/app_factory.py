@@ -63,6 +63,8 @@ from lute.themes.routes import bp as themes_bp
 from lute.stats.routes import bp as stats_bp
 from lute.cli.commands import bp as cli_bp
 from lute.translation.routes import bp as translation_bp
+from lute.translation.job_routes import bp as jobs_bp
+from lute.translation.bulk import BookTranslationWorker
 
 
 def _setup_app_dir(dirname, readme_content):
@@ -337,6 +339,7 @@ def _create_app(app_config, extra_config):
     _add_base_routes(app, app_config)
     app.register_blueprint(language_bp)
     app.register_blueprint(translation_bp)
+    app.register_blueprint(jobs_bp)
     app.register_blueprint(book_bp)
     app.register_blueprint(bookmarks_bp)
     app.register_blueprint(term_bp)
@@ -422,6 +425,13 @@ def create_app(
 
     # Plugins are loaded after the app, as they may use settings etc.
     _init_parser_plugins(app_config.plugin_datapath, outfunc)
+
+    worker = BookTranslationWorker(app)
+    app.extensions["book_translation_worker"] = worker
+    if not app.testing and app.config.get(
+        "BOOK_TRANSLATION_WORKER_ENABLED", not app_config.is_test_db
+    ):
+        worker.start()
 
     return app
 

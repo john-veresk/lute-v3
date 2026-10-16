@@ -37,11 +37,11 @@ def test_reading_page_has_no_dictionary_tabs(client, spanish):
 
 
 @pytest.mark.parametrize("enabled", [False, True])
-def test_reading_page_pretranslates_only_when_enabled(client, spanish, enabled):
+def test_reading_page_never_starts_bulk_translation(client, spanish, enabled):
     spanish.codex_pretranslate = enabled
     book = make_book("Gatos", "Hola gato.", spanish)
     db.session.add(book)
     db.session.commit()
     page = client.get(f"/read/{book.id}").data.decode()
-    assert f"var LUTE_CODEX_PRETRANSLATE = {str(enabled).lower()};" in page
-    assert ('id="pretranslate-progress"' in page) is enabled
+    assert "pretranslate" not in page
+    assert "Pretranslator" not in page

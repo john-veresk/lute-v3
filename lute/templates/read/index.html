@@ -8,7 +8,6 @@
 <script type="text/javascript" src="{{ url_for('static', filename='js/resize.js') }}" charset="utf-8" defer></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/text-options.js') }}" charset="utf-8" defer></script>
 <script type="text/javascript" src="{{ url_for('static', filename='js/term-pane.js') }}" charset="utf-8"></script>
-<script type="text/javascript" src="{{ url_for('static', filename='js/pretranslate.js') }}" charset="utf-8"></script>
 
 <div id="rendering_controls" style="display: none">
   <pre>
@@ -27,7 +26,6 @@
 <script>
   // Used by the Codex sentence translation in lute.js.
   var LUTE_READING_LANGUAGE_ID = {{ lang_id | safe }};
-  var LUTE_CODEX_PRETRANSLATE = {{ pretranslate | tojson }};
 </script>
 
 
@@ -143,16 +141,6 @@
 
   </div>
   <div class="btm-margin-container"></div>
-  {% if pretranslate %}
-  <div id="pretranslate-progress" hidden>
-    <span class="pretranslate-progress-label">Translating</span>
-    <div class="pretranslate-progress-bar" role="progressbar" aria-label="Pre-translating unknown words" aria-valuemin="0" aria-valuenow="0" aria-valuemax="1">
-      <span></span>
-    </div>
-    <span class="pretranslate-progress-count" aria-hidden="true">0/0</span>
-    <button type="button" id="pretranslate-retry" class="app-button" hidden>Retry</button>
-  </div>
-  {% endif %}
 </div>
 
 <div id="read_pane_right">
@@ -315,83 +303,6 @@
     goto_relative_page(0, true);
   });
 
-  const pretranslateProgress = document.getElementById('pretranslate-progress');
-  let pretranslateHideTimer = null;
-
-  function place_pretranslate_progress() {
-    if (!pretranslateProgress) return;
-    const pane = document.getElementById('read_pane_left').getBoundingClientRect();
-    pretranslateProgress.style.left = `${pane.left + pane.width / 2}px`;
-  }
-
-  /** Shown only while this page still has words waiting for a translation. */
-  function render_pretranslate_progress({done, total, paused = false, error = false, retrying = false, retryAfter = 0, message = ''}) {
-    if (!pretranslateProgress) return;
-    clearTimeout(pretranslateHideTimer);
-    const bar = pretranslateProgress.querySelector('[role="progressbar"]');
-    const fill = bar.firstElementChild;
-    const count = pretranslateProgress.querySelector('.pretranslate-progress-count');
-    pretranslateProgress.querySelector('.pretranslate-progress-label').textContent =
-      error ? 'Translation failed' : retrying ? 'Retrying' : paused ? `Paused (${retryAfter}s)` : 'Translating';
-    pretranslateProgress.title = message;
-    document.getElementById('pretranslate-retry').hidden = !error;
-    const hide = () => {
-      pretranslateProgress.hidden = true;
-      pretranslateProgress.classList.remove('is-leaving');
-      document.body.classList.remove('pretranslate-active');
-    };
-
-    if (!total) {
-      hide();
-      return;
-    }
-
-    fill.style.width = `${(done / total) * 100}%`;
-    bar.setAttribute('aria-valuenow', String(done));
-    bar.setAttribute('aria-valuemax', String(total));
-    bar.setAttribute('aria-valuetext', `${done} of ${total}`);
-    count.textContent = `${done}/${total}`;
-    if (done < total) {
-      pretranslateProgress.classList.remove('is-leaving');
-      pretranslateProgress.hidden = false;
-      document.body.classList.add('pretranslate-active');
-      place_pretranslate_progress();
-      return;
-    }
-
-    pretranslateProgress.classList.add('is-leaving');
-    pretranslateHideTimer = setTimeout(hide, 700);
-  }
-
-  if (pretranslateProgress && window.ResizeObserver) {
-    new ResizeObserver(place_pretranslate_progress).observe(document.getElementById('read_pane_left'));
-  }
-
-  const pretranslator = new Pretranslator({
-    fetch: (...args) => window.fetch(...args),
-    wait: ms => new Promise(resolve => setTimeout(resolve, ms)),
-    languageId: LUTE_READING_LANGUAGE_ID,
-    onProgress: render_pretranslate_progress,
-  });
-  document.getElementById('pretranslate-retry')?.addEventListener('click', () => pretranslator.retry());
-
-  // Rebuild from the reading position, including when the reader goes back.
-  function pretranslate_page(afterOrder = -1) {
-    if (!LUTE_CODEX_PRETRANSLATE) return;
-    const sentences = {};
-    $('span.textitem').each(function() {
-      const id = $(this).data('sentence-id');
-      (sentences[id] ||= []).push(this);
-    });
-    const words = $('span.textitem.word.status0').toArray()
-      .filter(el => _get_order($(el)) > afterOrder)
-      .map(el => ({
-        text: el.textContent,
-        context: _get_textitems_text(sentences[$(el).data('sentence-id')]).slice(0, 4000),
-      }));
-    pretranslator.run(words);
-  }
-
   let have_audio_file = function() {
     return ($('#book_audio_file').val() != '');
   }
@@ -543,7 +454,6 @@
         $('#thetext').html(data);
         add_status_classes();
         start_hover_mode();
-        pretranslate_page();
         $('#page_num').val(actualPage);
         enable_page_nav_links();
         set_page_fraction();

@@ -46,7 +46,14 @@ def start(port):
 
     config_file = AppConfig.default_config_filename()
     dev_print("")
-    app = create_app(config_file, output_func=dev_print)
+    app = create_app(
+        config_file,
+        output_func=dev_print,
+        extra_config={
+            "BOOK_TRANSLATION_WORKER_ENABLED": os.environ.get("WERKZEUG_RUN_MAIN")
+            == "true"
+        },
+    )
     with app.app_context():
         data_initialization(db.session, dev_print)
 

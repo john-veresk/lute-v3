@@ -68,6 +68,7 @@
       <span id="menu_books"><a href="/" {% if path == '/' or path.startswith('/book') %}aria-current="page"{% endif %}>Library</a></span>
       <span id="menu_terms"><a id="term_index" href="/term/index" {% if path.startswith('/term/') and not path.startswith('/term/review') %}aria-current="page"{% endif %}>Words</a></span>
       <span id="menu_review"><a href="/term/review" {% if path.startswith('/term/review') %}aria-current="page"{% endif %}>Review</a></span>
+      <span id="menu_jobs"><a href="/jobs" {% if path.startswith('/jobs') %}aria-current="page"{% endif %}>Jobs</a></span>
     </nav>
     {% endif %}
     <div class="app-actions">
