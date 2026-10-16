@@ -211,9 +211,27 @@ def submit():
         return jsonify(job_id=job_id, saved=True), 202
     if saved is not None or mode == "stored":
         return jsonify(job_id=None), 200
+    paired_key = None
+    if fallback and kind == "term":
+        # A missing fallback refreshes both variants through the normal personal flow.
+        paired_key = (
+            key[:1]
+            + (language.translation_target_name,)
+            + key[2:11]
+            + (
+                "personal",
+                vocabulary_for(db.session, language, "personal"),
+                None,
+                language.translation_target,
+            )
+        )
     try:
         job_id = _jobs().submit(
-            key, fresh=mode == "refresh", language_id=language.id, mode=mode
+            key,
+            fresh=mode == "refresh" or paired_key is not None,
+            language_id=language.id,
+            mode=mode,
+            paired_key=paired_key,
         )
     except RateLimitError as exc:
         return (

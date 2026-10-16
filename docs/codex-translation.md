@@ -43,9 +43,9 @@ translation store, so pressing the language button uses the saved translation
 without another model request. This also applies to background book jobs, which
 snapshot the fallback language when queued. Press **Save** to persist the
 replacement on the vocabulary card; **↻** regenerates the main mode and its fallback.
-Older personal results need one regeneration with **↻**, or a new book job,
-to prepare both variants. If no fallback is stored, the language button generates
-it on demand. With **Output → Translation**, the same setting is the main
+If no fallback is stored, including on older cards, the language button runs the
+full personal flow again, saves both variants and shows the fallback translation.
+With **Output → Translation**, the same setting is the main
 **Translate into** language. Personal explanations
 use short sentences, common everyday vocabulary and simple grammar around A2,
 and explain the meaning in the current sentence with one simple example.

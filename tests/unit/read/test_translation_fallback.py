@@ -21,20 +21,26 @@ from tests.unit.read.test_translation_jobs import (
 )
 
 
-def test_fallback_uses_configured_language_and_bypasses_personal_checks(
-    client, english, monkeypatch
+@pytest.mark.parametrize("mode", ["auto", "refresh"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_missing_fallback_refreshes_both_variants_and_shows_requested_language(
+    client, english, monkeypatch, mode, existing
 ):
     english.translation_mode = "personal"
     english.translation_target = "French"
     db.session.commit()
-    generate = Mock(return_value=RESULT)
+    reply = {**paired_result(), "fallback_language": "French"}
+    if existing:
+        store.save(db.session, english, "cats", "The cats sleep.", RESULT)
+    generate = Mock(return_value=reply)
     monkeypatch.setattr(service, "translate", generate)
     response = client.post(
         "/translation/jobs",
         json={
             "language_id": english.id,
-            "text": "cat",
-            "mode": "refresh",
+            "text": "cats",
+            "context": "The cats sleep.",
+            "mode": mode,
             "fallback": True,
         },
     )
@@ -42,12 +48,51 @@ def test_fallback_uses_configured_language_and_bypasses_personal_checks(
     result = _result(client, response.json["job_id"])["result"]
     generate.assert_called_once()
     key = generate.call_args.args
-    assert key[1] == "French"
-    assert key[11:] == ("translation", "")
+    assert key[1] == "English"
+    assert key[11] == "personal"
+    assert key[14] == "French"
+    assert result == reply["fallback"]
     assert "vocabulary" not in result
     assert english.translation_mode == "personal"
-    assert store.find(db.session, english, "cat") is None
-    assert _lookup(client, english, mode="stored", text="cat").json["job_id"] is None
+    assert store.find(db.session, english, "cats")["options"] == reply["options"]
+    assert (
+        store.find(db.session, english, "cats", cache_profile("English", "French"))
+        == reply["fallback"]
+    )
+    assert (
+        _lookup(
+            client, english, mode="stored", text="cats", context="The cats sleep."
+        ).json["saved"]
+        is True
+    )
+
+
+def test_missing_fallback_runs_personal_revision_before_showing_translation(
+    client, english, monkeypatch
+):
+    english.translation_mode = "personal"
+    db.session.commit()
+    reply = {**paired_result(), "fallback_language": "Russian"}
+    first = {**reply, "options": [{"translation": "animal", "explanation": ""}]}
+    generate = Mock(side_effect=[first, reply])
+    monkeypatch.setattr(service, "translate", generate)
+    response = client.post(
+        "/translation/jobs",
+        json={
+            "language_id": english.id,
+            "text": "cats",
+            "context": "The cats sleep.",
+            "fallback": True,
+        },
+    )
+    completed = _result(client, response.json["job_id"])
+    assert completed["status"] == "complete", completed
+    assert completed["result"] == reply["fallback"]
+    assert generate.call_count == 2
+    assert generate.call_args.args[13]["unfamiliar_words"] == [
+        {"text": "animal", "lemma": "animal"}
+    ]
+    assert store.find(db.session, english, "cats")["vocabulary"]["revised"] is True
 
 
 def test_button_and_settings_labels_follow_the_configured_target(client, english):
@@ -135,7 +180,12 @@ def test_fallback_word_cards_can_be_saved_in_personal_mode(
             },
         ],
     }
-    monkeypatch.setattr(service, "translate", lambda *args: result)
+    personal = {
+        **paired_result(phrase=True),
+        "fallback": result,
+        "fallback_language": "French",
+    }
+    monkeypatch.setattr(service, "translate", lambda *args: personal)
     response = client.post(
         "/translation/jobs",
         json={
@@ -367,7 +417,7 @@ def test_translation_profiles_migration_preserves_existing_results():
     connection.close()
 
 
-def test_refreshing_fallback_keeps_personal_and_other_target_translations(
+def test_refreshing_fallback_updates_both_variants_and_keeps_other_targets(
     client, english, monkeypatch
 ):
     english.translation_mode = "personal"
@@ -376,24 +426,30 @@ def test_refreshing_fallback_keeps_personal_and_other_target_translations(
     store.save(db.session, english, "cats", "The cats sleep.", personal)
     french_profile = cache_profile("English", "French")
     store.save(db.session, english, "cats", "", RESULT, french_profile)
-    generate = Mock(return_value=RESULT)
+    refreshed = {
+        **paired_result(),
+        "fallback_language": "Russian",
+        "options": [{"translation": "cat cat", "explanation": ""}],
+    }
+    generate = Mock(return_value=refreshed)
     monkeypatch.setattr(service, "translate", generate)
     response = client.post(
         "/translation/jobs",
         json={
             "language_id": english.id,
             "text": "cats",
+            "context": "The cats sleep.",
             "fallback": True,
             "mode": "refresh",
         },
     )
     assert _result(client, response.json["job_id"])["status"] == "complete"
     generate.assert_called_once()
-    assert store.find(db.session, english, "cats") == personal
+    assert store.find(db.session, english, "cats")["options"] == refreshed["options"]
     assert store.find(db.session, english, "cats", french_profile) == RESULT
     assert (
         store.find(db.session, english, "cats", cache_profile("English", "Russian"))
-        == RESULT
+        == refreshed["fallback"]
     )
 
 

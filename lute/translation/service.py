@@ -912,7 +912,7 @@ class TranslationJobs:
         "Seconds until another CLI invocation is permitted; caller holds lock."
         return max(0, math.ceil(self.cooldown_until - time.monotonic()))
 
-    def _run(self, key, job_id, mode, language_id=None):
+    def _run(self, key, job_id, mode, language_id=None, show_fallback=False):
         "Guard queued jobs too, so a throttle stops the entire waiting queue."
         source = _limit_source(key)
         with self.lock:
@@ -940,6 +940,25 @@ class TranslationJobs:
                 from lute.translation.personal import check_and_revise
 
                 result = check_and_revise(self.app, language_id, key, result, translate)
+            if show_fallback:
+                from lute.db import db
+                from lute.models.language import Language
+                from lute.translation import store
+                from lute.translation.profile import profile_from_key
+
+                fallback = result["fallback"]
+                with self.app.app_context():
+                    language = db.session.get(Language, language_id)
+                    if language is not None:
+                        store.save(
+                            db.session,
+                            language,
+                            key[3],
+                            key[4],
+                            result,
+                            profile_from_key(key),
+                        )
+                result = fallback
         except Exception as exc:
             # No raw stderr, exception messages, credentials or book text in logs.
             failure = {
@@ -993,10 +1012,12 @@ class TranslationJobs:
         self.jobs[job_id] = job
         return job_id
 
-    def submit(self, key, fresh=False, language_id=None, mode="auto"):
+    def submit(self, key, fresh=False, language_id=None, mode="auto", paired_key=None):
         """Cache up to 128 results, with at most 8 pending jobs.
 
         A fresh lookup ignores cached results but still joins an in-flight one.
+        A paired key refreshes and saves both variants, exposing only the fallback
+        under the requested key so its word and phrase cards remain saveable.
         """
         with self.lock:
             now = time.monotonic()
@@ -1016,8 +1037,18 @@ class TranslationJobs:
                     "Translation is busy with other words. Try again shortly."
                 )
             job_id = uuid.uuid4().hex
-            future = self.pool.submit(self._run, key, job_id, mode, language_id)
-            self._add(_Job(key, future, now, language_id), job_id)
+            future = self.pool.submit(
+                self._run,
+                paired_key or key,
+                job_id,
+                mode,
+                language_id,
+                paired_key is not None,
+            )
+            self._add(
+                _Job(key, future, now, language_id, saved=paired_key is not None),
+                job_id,
+            )
             return job_id
 
     def adopt(self, key, result, language_id=None):
