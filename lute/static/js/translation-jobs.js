@@ -221,10 +221,10 @@ class TranslationJobManager {
     list.replaceChildren();
     const waiting = this.state.jobs.filter(job => ['queued', 'paused', 'error'].includes(job.status));
     const active = this.state.jobs.filter(job => this.active(job));
-    const history = this.state.jobs.filter(job => !this.active(job)).reverse();
+    const history = this.state.jobs.filter(job => job.status === 'complete').reverse();
     const complete = this.state.jobs.filter(job => job.status === 'complete').length;
     this.find('jobs-summary').textContent = `${active.length} active · ${complete} completed`;
-    this.find('jobs-empty').hidden = this.state.jobs.length > 0;
+    this.find('jobs-empty').hidden = active.length + history.length > 0;
     [...active, ...history].forEach(job => {
       const card = this.find('job-card-template').content.firstElementChild.cloneNode(true);
       card.dataset.jobId = job.id;
