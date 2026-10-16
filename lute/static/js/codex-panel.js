@@ -113,6 +113,8 @@ class CodexPanel {
   }
 
   reset() {
+    const vocabulary = this.element('codex-vocabulary');
+    if (vocabulary) { vocabulary.replaceChildren(); vocabulary.hidden = true; }
     this.element('codex-options').replaceChildren();
     this.element('codex-lemma').textContent = '';
     this.element('codex-retry').hidden = true;
@@ -194,6 +196,7 @@ class CodexPanel {
     if (current !== this.generation) return;
     this.options = result.options;
     result.options.forEach((option, index) => this.element('codex-options').appendChild(this.renderOption(option, index)));
+    this.renderVocabulary(result.vocabulary);
     if (!this.form) return;
     this.renderCards(result.words || [], jobId, current, 'words');
     this.renderCards(result.phrases || [], jobId, current, 'phrases');
@@ -202,6 +205,31 @@ class CodexPanel {
       if (this.form.translation() === this.translationAtStart) this.choose(0, false);
     } else {
       this.choose(0, true);
+    }
+  }
+
+  renderVocabulary(report) {
+    const element = this.element('codex-vocabulary');
+    if (!element) return;
+    element.replaceChildren();
+    const unfamiliar = report?.unknown || [];
+    element.hidden = unfamiliar.length === 0;
+    if (!unfamiliar.length) return;
+    const label = this.doc.createElement('span');
+    label.textContent = 'Words to learn: ';
+    element.append(label);
+    unfamiliar.slice(0, 12).forEach((word, index) => {
+      const link = this.doc.createElement('a');
+      link.textContent = `${index ? ', ' : ''}${word.text}`;
+      const url = termCardUrl(this.languageId, word.text, this.embedded);
+      link.setAttribute('href', url);
+      if (this.openWord) link.addEventListener('click', event => { event.preventDefault(); this.openWord(url); });
+      element.append(link);
+    });
+    if (unfamiliar.length > 12) {
+      const more = this.doc.createElement('span');
+      more.textContent = ` +${unfamiliar.length - 12}`;
+      element.append(more);
     }
   }
 

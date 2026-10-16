@@ -105,7 +105,7 @@ def _phrase_candidates(language, word, context):
 def setup(state):
     """One bounded job manager per application."""
     log_path = Path(state.app.config["DATAPATH"]) / "codex-translation.log"
-    state.app.extensions["codex_translation_jobs"] = TranslationJobs(log_path)
+    state.app.extensions["codex_translation_jobs"] = TranslationJobs(log_path, state.app)
 
 
 @bp.route("/panel")

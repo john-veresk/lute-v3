@@ -1,4 +1,6 @@
 /* Codex in the term card, and the sentence translation panel. */
+.codex-vocabulary { margin: .6rem .3rem; color: var(--ink-3); font-size: .85rem; line-height: 1.5; }
+.codex-vocabulary a { color: inherit; text-decoration: underline dotted; text-underline-offset: .2em; }
 
 body:has(> .codex-panel) { margin: 0; }
 

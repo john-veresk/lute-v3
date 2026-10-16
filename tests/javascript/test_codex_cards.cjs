@@ -59,6 +59,11 @@ async function checks() {
   assert.equal(card.win.requests.length, 2, 'rendering suggestions does not save cards');
   assert.deepEqual(card.form.choices, [{value: 'смотрел', automatic: true}], 'the best meaning fills the form');
   assert.equal(card.form.edits, 0, 'an automatic meaning does not count as an edit');
+  card.panel.renderVocabulary({unknown: [{text: 'tarpeeksi'}]});
+  assert.equal(card.el('codex-vocabulary').hidden, false);
+  assert.equal(card.el('codex-vocabulary').children[1].getAttribute('href'), '/term/editbytext/1/tarpeeksi');
+  card.panel.renderVocabulary({unknown: []});
+  assert.equal(card.el('codex-vocabulary').hidden, true);
 
   await rows[0].children[2].handlers.click();
   assert.deepEqual(card.win.requests[2], {

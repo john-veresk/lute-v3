@@ -18,17 +18,25 @@ ready or fails. Uncheck it to hide the timer for that language.
 **Output → Personal Finnish** (named after the language you are learning) explains
 words and phrases in simple Finnish instead of translating into **Translate into**.
 The other target is kept for switching back to **Translation**. Personal explanations
-use short sentences and simple grammar around A2, prefer your Learned (5) and
-Well Known (99) vocabulary, and explain the meaning in the current sentence with
-one simple example. Familiar vocabulary is a preference, not a strict whitelist.
+use short sentences, common everyday vocabulary and simple grammar around A2,
+and explain the meaning in the current sentence with one simple example.
+The initial prompt is generic: the reader's vocabulary is never sent with it.
+After generation, Lute checks explanations, examples, parents and phrase/word
+cards against the local database, using Learned (5), Well Known (99), explicit
+parents and offline lemmatization. If unfamiliar words occur, it makes exactly
+one revision request with those words and familiar words used in the first answer.
+The second valid answer is accepted even if unfamiliar words remain; there is
+no revision loop. Remaining unfamiliar words appear as **Words to learn**, with
+links to their cards. The selected learning target itself is excluded from this list.
 Sentence context selects the meaning and grammatical form; saved explanations
 and examples stand alone, without importing characters' names, places or plot
 details. Suggested phrases containing names or story-specific references are
 omitted. A selected proper name itself is still explained as a name. Full sentence
 and page paraphrases preserve the source's names and facts.
-Known child forms are represented only by their root parents, even when a parent
-has a lower learning status; statuses are never changed. Unlinked known words
-remain in the list. Sentence and page commands produce a simplified paraphrase.
+Known child forms establish knowledge of their parent family even when a parent
+has a lower status; statuses are never changed. Sentence and page commands
+produce a simplified paraphrase. Local search/check tools are documented in
+`lute/cli/README.md`; they do not call a model or modify the database.
 
 Existing vocabulary translations are not converted automatically. Select the
 personal mode, save the language, reload the card, and press **↻** to generate
@@ -36,7 +44,9 @@ a personal explanation, then **Save** to keep it on the card. Translation caches
 distinguish output modes, target languages and personal vocabulary, so a Russian
 cached result is not reused as a personal Finnish explanation. Personal results
 from a different sentence are also regenerated. Queued book jobs snapshot the
-output mode and personal vocabulary along with the other language settings.
+output mode and model settings, and check vocabulary against the current local
+database when each word is processed. Only a compact vocabulary fingerprint is
+used in cache keys, not a word list.
 
 Clicking a word or selecting a phrase opens its term card. Codex is part of the
 card, without separate tabs or a divider: it translates the term using the sentence

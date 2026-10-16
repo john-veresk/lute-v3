@@ -2,54 +2,21 @@
 
 import hashlib
 import json
-from lute.models.term import Term, wordparents
+from lute.translation.vocabulary import Vocabulary
 
 
 def known_words(session, language):
     """Represent learned forms by their root parents, without changing statuses."""
-    terms = {
-        term_id: (text.replace("\u200b", ""), status)
-        for term_id, text, status in session.query(
-            Term.id, Term.text_lc, Term.status
-        ).filter(Term.language_id == language.id)
-    }
-    parents = {}
-    for child, parent in (
-        session.query(wordparents)
-        .join(Term, Term.id == wordparents.c.WpWoID)
-        .filter(Term.language_id == language.id)
-    ):
-        if parent in terms:
-            parents.setdefault(child, set()).add(parent)
-    vocabulary = set()
-    for term_id, (_, status) in terms.items():
-        if status not in (5, 99):
-            continue
-        pending = [term_id]
-        visited = set()
-        roots = set()
-        while pending:
-            current = pending.pop()
-            if current in visited:
-                continue
-            visited.add(current)
-            if current in parents:
-                pending.extend(parents[current])
-            else:
-                roots.add(current)
-        # Bad cyclic links must not hang requests or lose the entire family.
-        if not roots:
-            roots.add(min(visited, key=lambda item: terms[item][0]))
-        vocabulary.update(terms[root][0] for root in roots)
-    return tuple(sorted(vocabulary))
+    vocabulary = Vocabulary(session, language)
+    return tuple(sorted(vocabulary.terms[item][0] for item in vocabulary.known_roots))
 
 
-def vocabulary_for(session, language):
-    """Only personal output needs the reader's vocabulary in its prompt."""
+def vocabulary_for(session, language, mode=None):
+    """Only a compact local revision enters job keys; never send the word list."""
     return (
-        known_words(session, language)
-        if language.translation_mode == "personal"
-        else ()
+        Vocabulary(session, language).revision
+        if (mode or language.translation_mode) == "personal"
+        else ""
     )
 
 
@@ -57,7 +24,7 @@ def cache_profile(source, target, mode="translation", vocabulary=()):
     """Separate ordinary translations from explanations for a particular reader."""
     if mode != "personal":
         return f"translation:{len(source)}:{source}{target}"
-    payload = json.dumps([source, target, vocabulary], ensure_ascii=False)
+    payload = json.dumps(["checked-v1", source, target, vocabulary], ensure_ascii=False)
     return "personal:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

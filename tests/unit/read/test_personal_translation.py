@@ -9,7 +9,7 @@ from lute.db import db
 from lute.models.language import Language
 from lute.models.term import Term
 from lute.translation import service, store
-from lute.translation.profile import cache_profile, known_words
+from lute.translation.profile import cache_profile, known_words, vocabulary_for
 from tests.unit.read.test_codex_store import _lookup, _result
 from tests.unit.read.test_codex_translation import RESULT
 from tests.unit.read.test_translation_jobs import enqueue, make_books, worker_for
@@ -97,7 +97,9 @@ def test_unknown_output_mode_is_rejected(client):
 
 
 @pytest.mark.parametrize("kind", ["term", "sentence"])
-def test_personal_lookup_passes_only_known_families(client, english, monkeypatch, kind):
+def test_personal_lookup_passes_only_a_local_revision(
+    client, english, monkeypatch, kind
+):
     root = term(english, "go")
     term(english, "went", 99, [root])
     term(english, "cat", 99)
@@ -108,7 +110,8 @@ def test_personal_lookup_passes_only_known_families(client, english, monkeypatch
     jobs = client.application.extensions["codex_translation_jobs"]
     key = jobs.key_for(response.json["job_id"])
     assert key[1] == "English"
-    assert key[11:] == ("personal", ("cat", "go"))
+    assert key[11:] == ("personal", vocabulary_for(db.session, english))
+    assert isinstance(key[12], str) and len(key[12]) == 64
     jobs.pool.shutdown(wait=True)
 
 
@@ -122,13 +125,12 @@ def test_personal_prompt_covers_terms_sentences_and_cards_without_translation_ru
         [],
         (),
         "personal",
-        ("kaveri", "puhua"),
     )
     instructions, raw = prompt.rsplit("\n", 1)
     payload = json.loads(raw)
-    assert payload["known_words"] == ["kaveri", "puhua"]
+    assert "known_words" not in payload
+    assert "revision" not in payload
     assert payload["sentence_context"] == "Älä keskeytä."
-    assert "not a strict whitelist" in instructions
     assert "simplified paraphrase" in instructions
     assert "only the meaning in sentence_context" in instructions
     assert "common meanings outside sentence_context" not in instructions
@@ -154,13 +156,14 @@ def test_personal_output_reaches_both_cli_prompts(monkeypatch, cli):
             "Kissa nukkuu.",
             cli=cli,
             translation_mode="personal",
-            known_words=("eläin",),
+            vocabulary_revision="local-only-revision-must-not-reach-provider",
         )
         == RESULT
     )
     payload = json.loads(calls[0][5].rsplit("\n", 1)[1])
     assert payload["target_language"] == "Finnish"
-    assert payload["known_words"] == ["eläin"]
+    assert "known_words" not in payload
+    assert "local-only-revision-must-not-reach-provider" not in calls[0][5]
 
 
 def test_refresh_replaces_russian_cache_without_changing_existing_card(
@@ -185,11 +188,12 @@ def test_refresh_replaces_russian_cache_without_changing_existing_card(
     monkeypatch.setattr(service, "translate", translate)
     assert store.find(db.session, english, "walk") is None
     response = _lookup(client, english, "refresh", "walk", "I walk.")
-    assert _result(client, response.json["job_id"])["result"] == personal
-    assert store.find(db.session, english, "walk") == personal
+    generated = _result(client, response.json["job_id"])["result"]
+    assert generated["options"] == personal["options"]
+    assert store.find(db.session, english, "walk") == generated
     db.session.refresh(card)
     assert card.translation == "гулять"
-    assert len(calls) == 1
+    assert len(calls) == 2
     assert (
         _lookup(client, english, text="walk", context="I walk.").json["saved"] is True
     )
@@ -228,7 +232,7 @@ def test_inflight_result_keeps_its_original_profile(client, english, monkeypatch
     _result(client, response.json["job_id"])
     assert store.find(db.session, english, "gato") is None
     english.translation_mode = "personal"
-    assert store.find(db.session, english, "gato") == RESULT
+    assert store.find(db.session, english, "gato")["options"] == RESULT["options"]
 
 
 def test_parent_suggestion_does_not_prefer_saved_russian_in_personal_mode(
@@ -256,7 +260,7 @@ def test_book_job_snapshots_personal_vocabulary_and_cache_profile(
     db.session.commit()
     worker, translate = worker_for(client, monkeypatch)
     worker.step()
-    translate.assert_not_called()
+    translate.assert_called_once()
     row = db.session.get(store.StoredTranslation, 1)
     assert row.profile.startswith("personal:")
     job = client.get("/jobs/state").json["jobs"][0]
@@ -278,7 +282,7 @@ def test_book_job_passes_snapshot_and_saves_under_snapshot_profile(
     worker.step()
     key = translate.call_args.args[0]
     assert key[1] == "English"
-    assert key[11:] == ("personal", ("cat",))
+    assert key[11:] == ("personal", vocabulary_for(db.session, english, "personal"))
     assert store.find(db.session, english, "Dog") is None
     english.translation_mode = "personal"
     assert store.find(db.session, english, "Dog") == RESULT

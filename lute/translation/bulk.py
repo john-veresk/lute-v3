@@ -87,7 +87,7 @@ class BookTranslationJob(db.Model):
         result["settings"] = {
             key: value
             for key, value in json.loads(self.settings).items()
-            if key != "known_words"
+            if key not in ("known_words", "vocabulary_revision")
         }
         result["errors"] = json.loads(self.errors)
         return result
@@ -101,7 +101,6 @@ def language_settings(language):
         "target": language.translation_target_name,
         "target_label": language.translation_target_label,
         "translation_mode": language.translation_mode,
-        "known_words": vocabulary_for(db.session, language),
         "model": language.codex_model,
         "effort": language.codex_reasoning_effort,
         "cli": language.translation_cli or "codex",
@@ -276,7 +275,11 @@ class BookTranslationWorker:
                         (),
                         settings["cli"],
                         settings.get("translation_mode", "translation"),
-                        tuple(settings.get("known_words", ())),
+                        vocabulary_for(
+                            db.session,
+                            language,
+                            settings.get("translation_mode", "translation"),
+                        ),
                     )
                     skipped = self._skip(
                         language, word["text"], profile_from_key(key), word["context"]
