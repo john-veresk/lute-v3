@@ -10,12 +10,56 @@ from lute.translation import store
 from lute.translation.cards import save_card
 from lute.translation.profile import profile_from_key, vocabulary_for
 from lute.translation.service import RateLimitError, TranslationError, TranslationJobs
+from lute.translation.vocabulary import Vocabulary
 
 bp = Blueprint("translation", __name__, url_prefix="/translation")
 
 # auto: a saved result, otherwise translate.  stored: only a saved result.
 # prefetch: translate only terms without a saved result.  refresh: always translate.
 LOOKUP_MODES = ("auto", "stored", "prefetch", "refresh")
+
+
+@bp.route("/vocabulary", methods=["GET", "POST"])
+def vocabulary_lookup():
+    """Read-only literal search or batch lookup; never call a translation provider."""
+    data = request.get_json(silent=True) if request.method == "POST" else request.args
+    if not isinstance(data, dict) and request.method == "POST":
+        return jsonify(error="Expected a JSON object"), 400
+    lang_id = data.get("language_id")
+    if request.method == "GET":
+        lang_id = request.args.get("language_id", type=int)
+    language = db.session.get(Language, lang_id) if type(lang_id) is int else None
+    if language is None:
+        return jsonify(error="Invalid language"), 400
+    if request.method == "GET":
+        query = data.get("q", "")
+        if not query.strip() or len(query) > 250:
+            return jsonify(error="Enter a search query of 1–250 characters"), 400
+        return jsonify(matches=Vocabulary(db.session, language).search(query))
+    words = data.get("words")
+    if (
+        not isinstance(words, list)
+        or not 1 <= len(words) <= 200
+        or any(
+            not isinstance(word, str) or not word.strip() or len(word) > 250
+            for word in words
+        )
+    ):
+        return jsonify(error="Expected 1–200 words"), 400
+    return jsonify(matches=Vocabulary(db.session, language).lookup(words))
+
+
+@bp.route("/vocabulary/check", methods=["POST"])
+def vocabulary_check():
+    """Classify every word in a short text using the same checker as translations."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or type(data.get("language_id")) is not int:
+        return jsonify(error="Invalid language"), 400
+    language = db.session.get(Language, data["language_id"])
+    text = data.get("text")
+    if language is None or not isinstance(text, str) or len(text) > 32000:
+        return jsonify(error="Invalid language or text (limit: 32000 characters)"), 400
+    return jsonify(Vocabulary(db.session, language).check(text))
 
 
 def _jobs():
