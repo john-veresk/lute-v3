@@ -5,7 +5,7 @@
   <header class="codex-head">
     <h2 id="codex-text"></h2>
     <div class="term-head-actions">
-      <span class="codex-meta" title="{{ language.translation_source_name if language else 'Codex' }} model{% if language %}, translating into {{ language.translation_target }}{% endif %}">
+      <span class="codex-meta" title="{{ language.translation_source_name if language else 'Codex' }} model{% if language %}, translating into {{ language.translation_target_label }}{% endif %}">
         <span class="codex-model">{{ (language.codex_model or language.translation_source_name) if language else 'Codex' }}</span>
         {% if language and language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off"></span>{% endif %}
       </span>

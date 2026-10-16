@@ -10,6 +10,7 @@ from lute.models.book import Book
 from lute.models.language import Language
 from lute.models.term import Term
 from lute.translation import store
+from lute.translation.profile import profile_from_key, vocabulary_for
 from lute.translation.service import RateLimitError, TranslationError
 
 ACTIVE = ("queued", "running", "waiting", "paused", "error")
@@ -83,7 +84,11 @@ class BookTranslationJob(db.Model):
             value = getattr(self, field)
             result[field] = value.isoformat() + "Z" if value else None
         result["prepared"] = self.items is not None if prepared is None else prepared
-        result["settings"] = json.loads(self.settings)
+        result["settings"] = {
+            key: value
+            for key, value in json.loads(self.settings).items()
+            if key != "known_words"
+        }
         result["errors"] = json.loads(self.errors)
         return result
 
@@ -93,7 +98,10 @@ def language_settings(language):
     return {
         "language_id": language.id,
         "source": language.name,
-        "target": language.translation_target,
+        "target": language.translation_target_name,
+        "target_label": language.translation_target_label,
+        "translation_mode": language.translation_mode,
+        "known_words": vocabulary_for(db.session, language),
         "model": language.codex_model,
         "effort": language.codex_reasoning_effort,
         "cli": language.translation_cli or "codex",
@@ -255,7 +263,6 @@ class BookTranslationWorker:
                     job.retry_at = None
                     job.updated_at = utcnow()
                     settings = json.loads(job.settings)
-                    skipped = self._skip(language, word["text"])
                     key = (
                         settings["source"],
                         settings["target"],
@@ -268,6 +275,11 @@ class BookTranslationWorker:
                         False,
                         (),
                         settings["cli"],
+                        settings.get("translation_mode", "translation"),
+                        tuple(settings.get("known_words", ())),
+                    )
+                    skipped = self._skip(
+                        language, word["text"], profile_from_key(key), word["context"]
                     )
                     db.session.commit()
                 except Exception as exc:  # pylint: disable=broad-exception-caught
@@ -300,6 +312,7 @@ class BookTranslationWorker:
                                 word["text"],
                                 word["context"],
                                 result,
+                                profile_from_key(key),
                             )
                         job.done += 1
                         job.skipped += int(skipped)
@@ -318,8 +331,8 @@ class BookTranslationWorker:
             return True
 
     @staticmethod
-    def _skip(language, text):
-        if store.find(db.session, language, text) is not None:
+    def _skip(language, text, profile=None, context=None):
+        if store.find(db.session, language, text, profile, context) is not None:
             return True
         return (
             db.session.query(Term.id)

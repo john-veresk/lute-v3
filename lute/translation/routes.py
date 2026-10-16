@@ -8,6 +8,7 @@ from lute.models.term import Term as DBTerm
 from lute.term.model import Repository
 from lute.translation import store
 from lute.translation.cards import save_card
+from lute.translation.profile import profile_from_key, vocabulary_for
 from lute.translation.service import RateLimitError, TranslationError, TranslationJobs
 
 bp = Blueprint("translation", __name__, url_prefix="/translation")
@@ -123,7 +124,7 @@ def submit():
             )
     key = (
         language.name,
-        language.translation_target,
+        language.translation_target_name,
         language.codex_model,
         clean_text,
         context,
@@ -133,10 +134,14 @@ def submit():
         language.codex_fast_mode if mode != "prefetch" else False,
         phrase_texts,
         language.translation_cli or "codex",
+        language.translation_mode,
+        vocabulary_for(db.session, language),
     )
     saved = None
     if kind == "term" and mode != "refresh":
-        saved = store.find(db.session, language, clean_text)
+        saved = store.find(
+            db.session, language, clean_text, profile_from_key(key), context
+        )
     if saved is not None and mode != "prefetch":
         job_id = _jobs().adopt(key, _fit_to_context(saved, phrase_texts), language.id)
         return jsonify(job_id=job_id, saved=True), 202
@@ -217,7 +222,9 @@ def _save_new_result(job_id, result):
     try:
         language = db.session.get(Language, language_id)
         if language is not None and key[5] == "term":
-            store.save(db.session, language, key[3], key[4], result)
+            store.save(
+                db.session, language, key[3], key[4], result, profile_from_key(key)
+            )
     except Exception:
         _jobs().release_unsaved(job_id)
         db.session.rollback()
@@ -235,7 +242,10 @@ def parent():
     term = Repository(db.session).find(lang_id, text)
     if term is None:
         return jsonify(exists=False, translation="", status=0)
-    return jsonify(exists=True, translation=term.translation or "", status=term.status)
+    translation = (
+        "" if language.translation_mode == "personal" else term.translation or ""
+    )
+    return jsonify(exists=True, translation=translation, status=term.status)
 
 
 @bp.route("/words", methods=["POST"])
@@ -271,9 +281,11 @@ def _save_cards(card_type):
         return jsonify(error="Translation expired. Translate again."), 404
     cli = key[10] if len(key) > 10 else "codex"
     if (
-        key[:3] != (language.name, language.translation_target, language.codex_model)
+        key[:3]
+        != (language.name, language.translation_target_name, language.codex_model)
         or key[7:9] != (language.codex_reasoning_effort, language.codex_fast_mode)
         or cli != (language.translation_cli or "codex")
+        or (key[11] if len(key) > 11 else "translation") != language.translation_mode
         or key[5] != "term"
         or result["status"] != "complete"
     ):

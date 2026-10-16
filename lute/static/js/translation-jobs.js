@@ -237,7 +237,7 @@ class TranslationJobManager {
       if (job.status === 'waiting' && job.retry_at) status += ` in ${Math.max(0, Math.ceil((Date.parse(job.retry_at) - Date.now()) / 1000))} s`;
       field('status').textContent = status;
       const settings = job.settings;
-      field('settings').textContent = `${settings.source} → ${settings.target} · ${settings.cli === 'cursor' ? 'Cursor Agent' : 'Codex CLI'} · ${settings.model || 'CLI default'}${settings.effort ? ` · ${settings.effort}` : ''} · From page ${job.start_page}`;
+      field('settings').textContent = `${settings.source} → ${settings.target_label || settings.target} · ${settings.cli === 'cursor' ? 'Cursor Agent' : 'Codex CLI'} · ${settings.model || 'CLI default'}${settings.effort ? ` · ${settings.effort}` : ''} · From page ${job.start_page}`;
       const progress = field('progress');
       progress.max = job.total || 1;
       progress.value = job.status === 'complete' ? progress.max : job.done;

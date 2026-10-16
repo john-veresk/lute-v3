@@ -4,6 +4,7 @@ import json
 from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 from lute.db import db
+from lute.translation.profile import profile_for
 
 
 class StoredTranslation(db.Model):  # pylint: disable=too-few-public-methods
@@ -19,6 +20,7 @@ class StoredTranslation(db.Model):  # pylint: disable=too-few-public-methods
     context = db.Column("CtContext", db.Text, nullable=False, default="")
     result = db.Column("CtResult", db.Text, nullable=False)
     updated = db.Column("CtUpdated", db.DateTime, nullable=False)
+    profile = db.Column("CtProfile", db.Text, nullable=False, default="")
 
 
 def text_key(language, text):
@@ -34,13 +36,23 @@ def _find_row(session, language, text):
     )
 
 
-def find(session, language, text):
+def find(session, language, text, profile=None, context=None):
     "The saved result for a term, or None."
     row = _find_row(session, language, text)
-    return json.loads(row.result) if row else None
+    if row is None or row.profile != (
+        profile if profile is not None else profile_for(session, language)
+    ):
+        return None
+    if (
+        row.profile.startswith("personal:")
+        and context is not None
+        and row.context != context
+    ):
+        return None
+    return json.loads(row.result)
 
 
-def save(session, language, text, context, result):
+def save(session, language, text, context, result, profile=None):
     "Keep only the latest result for each term."
     row = _find_row(session, language, text) or StoredTranslation(
         language_id=language.id, text_lc=text_key(language, text)
@@ -48,6 +60,7 @@ def save(session, language, text, context, result):
     row.context = context
     row.result = json.dumps(result, ensure_ascii=False)
     row.updated = datetime.now()
+    row.profile = profile if profile is not None else profile_for(session, language)
     session.add(row)
     try:
         session.commit()

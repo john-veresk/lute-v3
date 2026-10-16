@@ -6,8 +6,12 @@ const {makeWindow, loadCodex, settle} = require('./fake-dom.cjs');
 const {CodexPanel, startTermCodex} = loadCodex();
 const result = {lemma: '', is_inflected: false, options: [{translation: 'кошки', explanation: ''}], words: [], phrases: []};
 
-function openCard(translation, job = {job_id: null}) {
-  const win = makeWindow(async url => url === '/translation/jobs' ? job : {status: 'complete', result});
+function openCard(translation, job = {job_id: null}, {mode = 'auto', beforePoll = () => {}} = {}) {
+  const win = makeWindow(async url => {
+    if (url === '/translation/jobs') return job;
+    beforePoll();
+    return {status: 'complete', result};
+  });
   const fields = {
     '#translation': {value: translation, dispatchEvent() {}},
     '#text': {value: 'kissat'},
@@ -16,8 +20,9 @@ function openCard(translation, job = {job_id: null}) {
     '#codex_words': {value: ''},
   };
   win.document.getElementById('term-form-container').querySelector = selector => fields[selector];
-  startTermCodex(win, 'Kissat nukkuvat.');
-  return {win, el: id => win.document.getElementById(id)};
+  const panel = startTermCodex(win, 'Kissat nukkuvat.');
+  if (mode === 'refresh') panel.start('refresh');
+  return {win, fields, el: id => win.document.getElementById(id)};
 }
 
 async function checks() {
@@ -47,6 +52,18 @@ async function checks() {
   assert.equal(saved.win.timers(), 0);
   assert.equal(saved.el('codex-options').children.length, 1, 'a saved result is shown even for a known term');
   assert.equal(saved.el('codex-refresh').disabled, false);
+  assert.equal(saved.fields['#translation'].value, 'мой перевод', 'opening a saved result preserves the card');
+
+  const refreshed = openCard('мой перевод', {job_id: 'job', saved: false}, {mode: 'refresh'});
+  await settle();
+  assert.equal(refreshed.fields['#translation'].value, 'кошки', 'explicit refresh replaces an existing translation');
+
+  let edited;
+  edited = openCard('мой перевод', {job_id: 'job', saved: false}, {
+    mode: 'refresh', beforePoll: () => { edited.fields['#translation'].value = 'typed while waiting'; },
+  });
+  await settle();
+  assert.equal(edited.fields['#translation'].value, 'typed while waiting', 'refresh preserves edits made during the request');
 
   const win = makeWindow(async url => url === '/translation/jobs' ? {job_id: 'job', saved: false} : {status: 'complete', result});
   const sentence = new CodexPanel({window: win, languageId: 1, kind: 'sentence'});

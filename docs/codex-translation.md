@@ -15,6 +15,24 @@ Codex panel, including waiting for the result. It stops when the response is
 ready or fails. Uncheck it to hide the timer for that language.
 **Jobs**, after Review in the main navigation, manages bulk book translations.
 
+**Output → Personal Finnish** (named after the language you are learning) explains
+words and phrases in simple Finnish instead of translating into **Translate into**.
+The other target is kept for switching back to **Translation**. Personal explanations
+use short sentences and simple grammar around A2, prefer your Learned (5) and
+Well Known (99) vocabulary, and explain the meaning in the current sentence with
+one simple example. Familiar vocabulary is a preference, not a strict whitelist.
+Known child forms are represented only by their root parents, even when a parent
+has a lower learning status; statuses are never changed. Unlinked known words
+remain in the list. Sentence and page commands produce a simplified paraphrase.
+
+Existing vocabulary translations are not converted automatically. Select the
+personal mode, save the language, reload the card, and press **↻** to generate
+a personal explanation, then **Save** to keep it on the card. Translation caches
+distinguish output modes, target languages and personal vocabulary, so a Russian
+cached result is not reused as a personal Finnish explanation. Personal results
+from a different sentence are also regenerated. Queued book jobs snapshot the
+output mode and personal vocabulary along with the other language settings.
+
 Clicking a word or selecting a phrase opens its term card. Codex is part of the
 card, without separate tabs or a divider: it translates the term using the sentence
 from the book and shows its main
@@ -34,7 +52,8 @@ automatically, regardless of whether the word or phrase already has a database
 record or is marked as known. Whitespace alone counts as empty. If **Translation**
 is filled and nothing is stored, opening the term does not start a translation.
 The ↻ icon at the top right of the card always asks Codex again and replaces the
-stored translation. Phrase suggestions stored from another sentence are shown
+stored translation and the card's Translation field, unless you edited the field
+while waiting. Press **Save** to persist the new card text. Phrase suggestions stored from another sentence are shown
 only if they occur in the current one.
 
 **Jobs** translates unknown words from selected books on the server, one book

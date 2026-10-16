@@ -137,6 +137,7 @@ class CodexPanel {
       this.languageId = this.form.languageId();
     }
     if (!withoutZeroWidth(this.text).trim() || !this.languageId) return;
+    this.translationAtStart = typeof this.form?.translation === 'function' ? this.form.translation() : undefined;
     const current = ++this.generation;
     this.lastMode = mode;
     this.reset();
@@ -196,7 +197,12 @@ class CodexPanel {
     if (!this.form) return;
     this.renderCards(result.words || [], jobId, current, 'words');
     this.renderCards(result.phrases || [], jobId, current, 'phrases');
-    this.choose(0, true);
+    if (this.lastMode === 'refresh' && this.translationAtStart !== undefined) {
+      // Refresh replaces the old meaning, but preserves edits made while waiting.
+      if (this.form.translation() === this.translationAtStart) this.choose(0, false);
+    } else {
+      this.choose(0, true);
+    }
   }
 
   async renderParent(result, current) {

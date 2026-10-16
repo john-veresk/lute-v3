@@ -62,7 +62,7 @@
         </button>
         {{ form.text(class="form-control", autofocus=not embedded_in_reading_frame, value=(form.original_text.data or '')) }}
         <div class="term-head-actions">
-          <span class="codex-meta" title="{{ term_language.translation_source_name if term_language else 'Codex' }} model{% if term_language %}, translating into {{ term_language.translation_target }}{% endif %}">
+          <span class="codex-meta" title="{{ term_language.translation_source_name if term_language else 'Codex' }} model{% if term_language %}, translating into {{ term_language.translation_target_label }}{% endif %}">
             <span class="codex-model">{{ (term_language.codex_model if term_language else '') or (term_language.translation_source_name if term_language else 'Codex') }}</span>
             {% if not term_language or term_language.codex_show_timer %}<span id="codex-timer" role="timer" aria-live="off"></span>{% endif %}
           </span>
